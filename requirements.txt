@@ -1,0 +1,10 @@
+pandas
+numpy
+torch
+pytorch-lightning  # For better PyTorch structure
+python-dotenv
+psycopg2-binary   # for PostgreSQL
+pytest            # for testing
+jupyter           # for notebooks
+ta                # for technical indicators
+yfinance          # for market data (we can change this based on your data source choice)
