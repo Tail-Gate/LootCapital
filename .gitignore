@@ -1,0 +1,48 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+
+# IDE files
+.idea/
+.vscode/
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Data files
+*.csv
+*.xlsx
+*.json
+
+# Model files
+*.pkl
+*.pt
+*.pth
+
+# Logs
+*.log
+logs/
+
+# API credentials
+**/credentials.py
+**/api_keys.py
+**/secret_keys.py
+.env
+
+# Testing
+.pytest_cache/
+.coverage
+
+# Trading output
+backtest_results/
