@@ -5,13 +5,14 @@ from strategies.base_strategy import BaseStrategy
 from strategies.technical_strategy import TechnicalStrategy, TechnicalConfig
 from strategies.fundamental_strategy import FundamentalStrategy
 from strategies.mean_reversion import MeanReversionStrategy, MeanReversionConfig
-from strategies.price_breakout import BreakoutStrategy,BreakoutConfig
-from strategies.dynamic_trendline import DynamicTrendlineStrategy,DynamicTrendlineConfig
-from strategies.range_trading import RangeTradingStrategy,RangeTradingConfig
-from volatility_enhanced_strategy import VolatilityEnhancedStrategy, VolatilityEnhancedConfig
-from volatility_breakout import VolatilityBreakoutConfig, VolatilityBreakoutStrategy
-from momentum_reversal_strategy import MomentumReversalConfig,MomentumReversalStrategy
+from strategies.price_breakout import BreakoutStrategy, BreakoutConfig
+from strategies.dynamic_trendline import DynamicTrendlineStrategy, DynamicTrendlineConfig
+from strategies.range_trading import RangeTradingStrategy, RangeTradingConfig
+from strategies.volatility_enhanced_strategy import VolatilityEnhancedStrategy, VolatilityEnhancedConfig
+from strategies.volatility_breakout import VolatilityBreakoutStrategy, VolatilityBreakoutConfig
+from strategies.momentum_reversal_strategy import MomentumReversalStrategy, MomentumReversalConfig
 from strategies.volatility_clustering_strategy import VolatilityClusteringStrategy, VolatilityClusteringConfig
+from strategies.time_calender import TimeCalendarStrategy, TimeCalendarConfig
 
 @dataclass
 class StrategyConfig:
@@ -33,7 +34,8 @@ class StrategyFactory:
         'range_trading': RangeTradingStrategy,
         'volatility_breakout': VolatilityBreakoutStrategy,
         'momentum_reversal': MomentumReversalStrategy,
-        'volatility_clustering': VolatilityClusteringStrategy
+        'volatility_clustering': VolatilityClusteringStrategy,
+        'time_calendar': TimeCalendarStrategy  # Added the new strategy
     }
 
     # Update the _configs dictionary
@@ -46,7 +48,8 @@ class StrategyFactory:
         'range_trading': RangeTradingConfig,
         'volatility_breakout': VolatilityBreakoutConfig,
         'momentum_reversal': MomentumReversalConfig,
-        'volatility_clustering': VolatilityClusteringConfig
+        'volatility_clustering': VolatilityClusteringConfig,
+        'time_calendar': TimeCalendarConfig  # Added the new config
     }
     
     @classmethod
@@ -68,65 +71,74 @@ class StrategyFactory:
         if config_class:
             cls._configs[name] = config_class
     
-
-@classmethod
-def create_strategy(cls, config: StrategyConfig) -> BaseStrategy:
-    """
-    Create a standard strategy instance
-    
-    Args:
-        config: Strategy configuration
+    @classmethod
+    def get_available_strategies(cls) -> list:
+        """
+        Get list of available strategy types
         
-    Returns:
-        Configured strategy instance
-    """
-    if config.strategy_type not in cls._strategies:
-        raise ValueError(
-            f"Unknown strategy type: {config.strategy_type}. "
-            f"Available strategies: {list(cls._strategies.keys())}"
+        Returns:
+            List of strategy names
+        """
+        return list(cls._strategies.keys())
+
+    @classmethod
+    def create_strategy(cls, config: StrategyConfig) -> BaseStrategy:
+        """
+        Create a standard strategy instance
+        
+        Args:
+            config: Strategy configuration
+            
+        Returns:
+            Configured strategy instance
+        """
+        if config.strategy_type not in cls._strategies:
+            raise ValueError(
+                f"Unknown strategy type: {config.strategy_type}. "
+                f"Available strategies: {list(cls._strategies.keys())}"
+            )
+        
+        # Get strategy class and config class
+        strategy_class = cls._strategies[config.strategy_type]
+        config_class = cls._configs.get(config.strategy_type)
+        
+        # Create strategy config if parameters provided
+        strategy_config = None
+        if config.parameters and config_class:
+            strategy_config = config_class(**config.parameters)
+        
+        # Create and return strategy instance
+        return strategy_class(config=strategy_config)
+
+    @classmethod
+    def create_enhanced_strategy(
+        cls, 
+        base_strategy_config: StrategyConfig,
+        volatility_config: dict = None
+    ) -> BaseStrategy:
+        """
+        Create a volatility-enhanced strategy
+        
+        Args:
+            base_strategy_config: Configuration for the base strategy
+            volatility_config: Parameters for volatility enhancement
+            
+        Returns:
+            Volatility-enhanced strategy instance
+        """
+        # Create base strategy
+        base_strategy = cls.create_strategy(base_strategy_config)
+        
+        # Create volatility enhancement config
+        vol_enhancement_config = None
+        if volatility_config:
+            vol_enhancement_config = VolatilityEnhancedConfig(**volatility_config)
+        
+        # Create and return enhanced strategy
+        return VolatilityEnhancedStrategy(
+            base_strategy=base_strategy,
+            config=vol_enhancement_config
         )
-    
-    # Get strategy class and config class
-    strategy_class = cls._strategies[config.strategy_type]
-    config_class = cls._configs.get(config.strategy_type)
-    
-    # Create strategy config if parameters provided
-    strategy_config = None
-    if config.parameters and config_class:
-        strategy_config = config_class(**config.parameters)
-    
-    # Create and return strategy instance
-    return strategy_class(config=strategy_config)
-
-@classmethod
-def create_enhanced_strategy(
-    cls, 
-    base_strategy_config: StrategyConfig,
-    volatility_config: dict = None
-) -> BaseStrategy:
-    """
-    Create a volatility-enhanced strategy
-    
-    Args:
-        base_strategy_config: Configuration for the base strategy
-        volatility_config: Parameters for volatility enhancement
-        
-    Returns:
-        Volatility-enhanced strategy instance
-    """
-    # Create base strategy
-    base_strategy = cls.create_strategy(base_strategy_config)
-    
-    # Create volatility enhancement config
-    vol_enhancement_config = None
-    if volatility_config:
-        vol_enhancement_config = VolatilityEnhancedConfig(**volatility_config)
-    
-    # Create and return enhanced strategy
-    return VolatilityEnhancedStrategy(
-        base_strategy=base_strategy,
-        config=vol_enhancement_config
-    )
 
 
 # Example usage:
