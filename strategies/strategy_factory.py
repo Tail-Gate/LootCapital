@@ -13,6 +13,7 @@ from strategies.volatility_breakout import VolatilityBreakoutStrategy, Volatilit
 from strategies.momentum_reversal_strategy import MomentumReversalStrategy, MomentumReversalConfig
 from strategies.volatility_clustering_strategy import VolatilityClusteringStrategy, VolatilityClusteringConfig
 from strategies.time_calender import TimeCalendarStrategy, TimeCalendarConfig
+from strategies.order_flow_strategy import OrderFlowStrategy, OrderFlowConfig
 
 @dataclass
 class StrategyConfig:
@@ -35,7 +36,8 @@ class StrategyFactory:
         'volatility_breakout': VolatilityBreakoutStrategy,
         'momentum_reversal': MomentumReversalStrategy,
         'volatility_clustering': VolatilityClusteringStrategy,
-        'time_calendar': TimeCalendarStrategy  # Added the new strategy
+        'time_calendar': TimeCalendarStrategy,
+        'order_flow': OrderFlowStrategy  # Added the new Order Flow strategy
     }
 
     # Update the _configs dictionary
@@ -49,7 +51,8 @@ class StrategyFactory:
         'volatility_breakout': VolatilityBreakoutConfig,
         'momentum_reversal': MomentumReversalConfig,
         'volatility_clustering': VolatilityClusteringConfig,
-        'time_calendar': TimeCalendarConfig  # Added the new config
+        'time_calendar': TimeCalendarConfig,
+        'order_flow': OrderFlowConfig  # Added the new Order Flow config
     }
     
     @classmethod
