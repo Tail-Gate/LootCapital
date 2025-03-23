@@ -11,8 +11,8 @@ from strategies.technical_strategy import TechnicalStrategy, TechnicalConfig, Tr
 class TimeCalendarConfig(TechnicalConfig):
     """Configuration for time of day and calendar-based strategy"""
     # Time of day parameters
-    market_open_start: time = time(9, 0)  # 9:00 AM ET
-    market_open_end: time = time(9, 30)   # 9:30 AM ET
+    market_open_start: time = time(6, 0)  # 9:00 AM ET
+    market_open_end: time = time(5, 30)   # 9:30 AM ET
     midday_start: time = time(12, 0)      # 12:00 PM ET
     midday_end: time = time(13, 0)        # 1:00 PM ET
     market_close_start: time = time(14, 30)  # 2:30 PM ET

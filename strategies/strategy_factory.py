@@ -1,8 +1,8 @@
 from typing import Dict, Type, Optional
 from dataclasses import dataclass
-from strategies.momentum_strategy import MomentumStrategy, MomentumConfig
 from strategies.base_strategy import BaseStrategy
 from strategies.technical_strategy import TechnicalStrategy, TechnicalConfig
+from strategies.momentum_strategy import MomentumStrategy, MomentumConfig
 from strategies.fundamental_strategy import FundamentalStrategy
 from strategies.mean_reversion import MeanReversionStrategy, MeanReversionConfig
 from strategies.price_breakout import BreakoutStrategy, BreakoutConfig
@@ -14,6 +14,7 @@ from strategies.momentum_reversal_strategy import MomentumReversalStrategy, Mome
 from strategies.volatility_clustering_strategy import VolatilityClusteringStrategy, VolatilityClusteringConfig
 from strategies.time_calender import TimeCalendarStrategy, TimeCalendarConfig
 from strategies.order_flow_strategy import OrderFlowStrategy, OrderFlowConfig
+from strategies.time_series import TimeSeriesStrategy, TimeSeriesConfig  # Add import for new strategy
 
 @dataclass
 class StrategyConfig:
@@ -37,7 +38,8 @@ class StrategyFactory:
         'momentum_reversal': MomentumReversalStrategy,
         'volatility_clustering': VolatilityClusteringStrategy,
         'time_calendar': TimeCalendarStrategy,
-        'order_flow': OrderFlowStrategy  # Added the new Order Flow strategy
+        'order_flow': OrderFlowStrategy,
+        'time_series': TimeSeriesStrategy  # Add new strategy to the dictionary
     }
 
     # Update the _configs dictionary
@@ -52,7 +54,8 @@ class StrategyFactory:
         'momentum_reversal': MomentumReversalConfig,
         'volatility_clustering': VolatilityClusteringConfig,
         'time_calendar': TimeCalendarConfig,
-        'order_flow': OrderFlowConfig  # Added the new Order Flow config
+        'order_flow': OrderFlowConfig,
+        'time_series': TimeSeriesConfig  # Add new config to the dictionary
     }
     
     @classmethod
@@ -142,8 +145,6 @@ class StrategyFactory:
             base_strategy=base_strategy,
             config=vol_enhancement_config
         )
-
-
 # Example usage:
 if __name__ == "__main__":
     # Create a mean reversion strategy with custom config
