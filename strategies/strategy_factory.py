@@ -14,7 +14,8 @@ from strategies.momentum_reversal_strategy import MomentumReversalStrategy, Mome
 from strategies.volatility_clustering_strategy import VolatilityClusteringStrategy, VolatilityClusteringConfig
 from strategies.time_calender import TimeCalendarStrategy, TimeCalendarConfig
 from strategies.order_flow_strategy import OrderFlowStrategy, OrderFlowConfig
-from strategies.time_series import TimeSeriesStrategy, TimeSeriesConfig  # Add import for new strategy
+from strategies.time_series import TimeSeriesStrategy, TimeSeriesConfig
+from strategies.stochastic_process import StochasticProcessStrategy, StochasticProcessConfig
 
 @dataclass
 class StrategyConfig:
@@ -39,7 +40,8 @@ class StrategyFactory:
         'volatility_clustering': VolatilityClusteringStrategy,
         'time_calendar': TimeCalendarStrategy,
         'order_flow': OrderFlowStrategy,
-        'time_series': TimeSeriesStrategy  # Add new strategy to the dictionary
+        'time_series': TimeSeriesStrategy,
+        'stochastic_process': StochasticProcessStrategy
     }
 
     # Update the _configs dictionary
@@ -55,7 +57,8 @@ class StrategyFactory:
         'volatility_clustering': VolatilityClusteringConfig,
         'time_calendar': TimeCalendarConfig,
         'order_flow': OrderFlowConfig,
-        'time_series': TimeSeriesConfig  # Add new config to the dictionary
+        'time_series': TimeSeriesConfig,
+        'stochastic_process': StochasticProcessConfig
     }
     
     @classmethod
@@ -145,6 +148,7 @@ class StrategyFactory:
             base_strategy=base_strategy,
             config=vol_enhancement_config
         )
+    
 # Example usage:
 if __name__ == "__main__":
     # Create a mean reversion strategy with custom config
