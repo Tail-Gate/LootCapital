@@ -16,6 +16,7 @@ from strategies.time_calender import TimeCalendarStrategy, TimeCalendarConfig
 from strategies.order_flow_strategy import OrderFlowStrategy, OrderFlowConfig
 from strategies.time_series import TimeSeriesStrategy, TimeSeriesConfig
 from strategies.stochastic_process import StochasticProcessStrategy, StochasticProcessConfig
+from strategies.bayesian_inference_strategy import BayesianInferenceStrategy,BayesianInferenceConfig
 
 @dataclass
 class StrategyConfig:
@@ -41,7 +42,8 @@ class StrategyFactory:
         'time_calendar': TimeCalendarStrategy,
         'order_flow': OrderFlowStrategy,
         'time_series': TimeSeriesStrategy,
-        'stochastic_process': StochasticProcessStrategy
+        'stochastic_process': StochasticProcessStrategy,
+        'bayesian_inference': BayesianInferenceStrategy
     }
 
     # Update the _configs dictionary
@@ -58,7 +60,8 @@ class StrategyFactory:
         'time_calendar': TimeCalendarConfig,
         'order_flow': OrderFlowConfig,
         'time_series': TimeSeriesConfig,
-        'stochastic_process': StochasticProcessConfig
+        'stochastic_process': StochasticProcessConfig,
+        'bayesian_inference': BayesianInferenceConfig 
     }
     
     @classmethod
