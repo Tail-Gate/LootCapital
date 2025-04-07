@@ -17,6 +17,8 @@ from strategies.order_flow_strategy import OrderFlowStrategy, OrderFlowConfig
 from strategies.time_series import TimeSeriesStrategy, TimeSeriesConfig
 from strategies.stochastic_process import StochasticProcessStrategy, StochasticProcessConfig
 from strategies.bayesian_inference_strategy import BayesianInferenceStrategy,BayesianInferenceConfig
+from strategies.markov_chain_strategy import MarkovChainStrategy, MarkovChainConfig
+from strategies.trend_following import TrendFollowingConfig,TrendFollowingStrategy
 
 @dataclass
 class StrategyConfig:
@@ -43,7 +45,9 @@ class StrategyFactory:
         'order_flow': OrderFlowStrategy,
         'time_series': TimeSeriesStrategy,
         'stochastic_process': StochasticProcessStrategy,
-        'bayesian_inference': BayesianInferenceStrategy
+        'bayesian_inference': BayesianInferenceStrategy,
+        'markov_chain': MarkovChainStrategy,
+        'trend_following': TrendFollowingStrategy 
     }
 
     # Update the _configs dictionary
@@ -61,7 +65,10 @@ class StrategyFactory:
         'order_flow': OrderFlowConfig,
         'time_series': TimeSeriesConfig,
         'stochastic_process': StochasticProcessConfig,
-        'bayesian_inference': BayesianInferenceConfig 
+        'bayesian_inference': BayesianInferenceConfig,
+        'markov_chain': MarkovChainConfig,
+        'trend_following': TrendFollowingConfig 
+        
     }
     
     @classmethod
