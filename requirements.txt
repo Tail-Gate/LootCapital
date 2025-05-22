@@ -1,10 +1,15 @@
-pandas
-numpy
-torch
+pandas>=1.5.0
+numpy>=1.21.0
+psutil>=5.9.0
+scikit-learn>=1.0.0
+ta-lib>=0.4.0
+torch>=1.9.0
+xgboost>=1.5.0
+matplotlib>=3.4.0
+seaborn>=0.11.0
 pytorch-lightning  # For better PyTorch structure
 python-dotenv
 psycopg2-binary   # for PostgreSQL
 pytest            # for testing
 jupyter           # for notebooks
 ta                # for technical indicators
-yfinance          # for market data (we can change this based on your data source choice)

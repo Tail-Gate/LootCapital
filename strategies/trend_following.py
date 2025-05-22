@@ -34,16 +34,8 @@ class TrendFollowingConfig(TechnicalConfig):
     # Volume confirmation
     volume_threshold: float = 1.2  # Minimum volume surge for confirmation
     
-    # Seasonality adjustment (for natural gas)
-    winter_boost: float = 1.2      # Boost trend signals in winter
-    summer_boost: float = 1.1      # Slight boost in summer (cooling demand)
-    
-    # VWAP parameters (for day trading)
-    vwap_deviation_threshold: float = 1.5  # Deviation from VWAP in ATR units
-    
-    # Natural gas specific EIA report parameters
-    eia_report_day: int = 3  # Thursday
-    eia_volatility_boost: float = 1.3  # Increased volatility after EIA reports
+    # Placeholder for crypto/Ethereum-specific event/calendar logic
+    # TODO: Add funding rate, exchange event, or blockchain event parameters as needed
     
     # Feature weights
     feature_weights: Dict[str, Dict[str, float]] = None
@@ -58,7 +50,7 @@ class TrendFollowingConfig(TechnicalConfig):
                     'adx': 0.20,
                     'price_momentum': 0.15,
                     'volume': 0.10,
-                    'seasonality': 0.10
+                    # 'seasonality': 0.10  # Removed gas-specific
                 },
                 'day': {
                     'ma_crossover': 0.20,
@@ -73,20 +65,12 @@ class TrendFollowingConfig(TechnicalConfig):
 
 class TrendFollowingStrategy(TechnicalStrategy):
     """
-    Trend following strategy for natural gas futures.
-    
-    This strategy identifies and follows established trends by combining:
-    1. Moving average crossovers for trend direction
-    2. Momentum indicators for trend strength
-    3. Volatility measures for position sizing
-    4. Volume confirmation for trend validation
-    5. Seasonality adjustments specific to natural gas
+    Trend following strategy for crypto (Ethereum-focused, asset-agnostic).
     """
-    
     def __init__(self, config: TrendFollowingConfig = None):
         super().__init__(name="trend_following", config=config or TrendFollowingConfig())
         self.config: TrendFollowingConfig = self.config
-        
+    
     def prepare_features(self, data: pd.DataFrame) -> pd.DataFrame:
         """Prepare features for trend following analysis"""
         df = self.prepare_base_features(data)
@@ -104,8 +88,8 @@ class TrendFollowingStrategy(TechnicalStrategy):
         else:
             df = self._add_swing_features(df)
         
-        # Add natural gas specific features
-        df = self._add_natural_gas_features(df)
+        # TODO: Add crypto/Ethereum-specific event/calendar features here
+        # (e.g., funding rate events, exchange maintenance, blockchain upgrades)
         
         return df
     
@@ -284,69 +268,6 @@ class TrendFollowingStrategy(TechnicalStrategy):
         
         return df
     
-    def _add_natural_gas_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Add natural gas specific features for trend following"""
-        # Add seasonal factors
-        if hasattr(df.index, 'month'):
-            df['month'] = df.index.month
-            
-            # Seasonal flags
-            df['winter_season'] = df['month'].isin([11, 12, 1, 2, 3])
-            df['summer_season'] = df['month'].isin([6, 7, 8])
-            df['shoulder_season'] = df['month'].isin([4, 5, 9, 10])
-            
-            # Seasonal factor (how much to weight trend signals)
-            df['seasonal_factor'] = 1.0  # Default neutral
-            df.loc[df['winter_season'], 'seasonal_factor'] = self.config.winter_boost
-            df.loc[df['summer_season'], 'seasonal_factor'] = self.config.summer_boost
-            df.loc[df['shoulder_season'], 'seasonal_factor'] = 0.9  # Slightly reduce in shoulder months
-        
-        # EIA report day features (Thursday at 10:30am)
-        if hasattr(df.index, 'dayofweek'):
-            df['is_eia_report_day'] = df.index.dayofweek == self.config.eia_report_day
-            
-            # Enhanced volatility after report
-            if 'is_eia_report_day' in df.columns:
-                report_day_indices = df.index[df['is_eia_report_day']]
-                
-                for report_idx in report_day_indices:
-                    # Find positions 1, 2, and 3 periods after report
-                    try:
-                        idx_loc = df.index.get_loc(report_idx)
-                        if idx_loc + 3 < len(df):
-                            # Mark the next 3 bars after report
-                            for i in range(1, 4):
-                                post_idx = df.index[idx_loc + i]
-                                df.loc[post_idx, 'post_eia_volatility'] = True
-                    except:
-                        pass
-                
-                # Fill NaN values
-                df['post_eia_volatility'] = df['post_eia_volatility'].fillna(False)
-        
-        # If storage data is available
-        if 'storage_level' in df.columns:
-            # Z-score against seasonal norms
-            if 'month' in df.columns:
-                # Group by month and calculate average
-                monthly_avg = df.groupby('month')['storage_level'].mean()
-                
-                # Merge back to main DataFrame
-                df = pd.merge(
-                    df, 
-                    monthly_avg.reset_index().rename(columns={'storage_level': 'seasonal_storage_avg'}),
-                    on='month',
-                    how='left'
-                )
-                
-                # Calculate deviation from seasonal norm
-                df['storage_deviation'] = (df['storage_level'] - df['seasonal_storage_avg']) / df['seasonal_storage_avg']
-                
-                # Create signal based on deviation
-                df['storage_signal'] = -np.sign(df['storage_deviation'])  # Lower storage = bullish
-        
-        return df
-    
     def calculate_technical_signals(
         self, 
         features: pd.DataFrame
@@ -422,13 +343,8 @@ class TrendFollowingStrategy(TechnicalStrategy):
             signals['volume'] = 0
             
         # 6. Seasonality Adjustment
-        if 'seasonal_factor' in current:
-            # Stronger trend signals during appropriate seasons
-            seasonal_signal = (current['seasonal_factor'] - 1.0) * np.sign(signals['ma_crossover'])
-            signals['seasonality'] = seasonal_signal
-        else:
-            signals['seasonality'] = 0
-            
+        signals['seasonality'] = 0
+        
         # Combine signals with weights
         weights = self.config.feature_weights['swing']
         total_signal = sum(signals[k] * weights[k] for k in signals)
@@ -544,13 +460,8 @@ class TrendFollowingStrategy(TechnicalStrategy):
             elif current.get('market_close', False):
                 session_factor = 0.9  # Slightly less confident at close
                 
-            # Factor in post-EIA volatility
-            eia_factor = 1.0
-            if current.get('post_eia_volatility', False):
-                eia_factor = self.config.eia_volatility_boost
-                
             # Calculate final confidence
-            confidence = agreement_ratio * session_factor * eia_factor
+            confidence = agreement_ratio * session_factor
         else:
             confidence = 0
             
@@ -560,7 +471,7 @@ class TrendFollowingStrategy(TechnicalStrategy):
         """Additional trend following specific validation"""
         if not self.validate_technical_signal(signal, features):
             return False
-            
+        
         current = features.iloc[-1]
         is_intraday = self.is_intraday_data(features)
         
@@ -576,14 +487,8 @@ class TrendFollowingStrategy(TechnicalStrategy):
             day_validations = [
                 # ADX above threshold or trending VWAP
                 current.get('adx', 0) > 20 or abs(current.get('vwap_slope', 0)) > 0.001,
-                
                 # Volume confirmation
-                current.get('volume_ratio', 0) > 0.8,
-                
-                # Not against strong EIA report reaction
-                not (current.get('post_eia_volatility', False) and 
-                     current.get('returns', 0) * signal < 0 and 
-                     abs(current.get('returns', 0)) > 0.01)
+                current.get('volume_ratio', 0) > 0.8
             ]
             validations.extend(day_validations)
         else:
@@ -591,16 +496,11 @@ class TrendFollowingStrategy(TechnicalStrategy):
             swing_validations = [
                 # Strong enough trend
                 current.get('adx', 0) > self.config.adx_threshold,
-                
                 # MACD aligned with signal direction
-                np.sign(current.get('swing_macd', 0)) == np.sign(signal),
-                
-                # Not against strong seasonal factors
-                not (current.get('winter_season', False) and signal < 0 and 
-                     current.get('storage_deviation', 0) < -0.1)
+                np.sign(current.get('swing_macd', 0)) == np.sign(signal)
             ]
             validations.extend(swing_validations)
-            
+        
         return all(validations)
     
     def calculate_stop_loss(
@@ -619,14 +519,9 @@ class TrendFollowingStrategy(TechnicalStrategy):
         if is_intraday:
             # Base stop distance for day trading
             stop_distance = atr * self.config.day_atr_multiplier
-            
-            # Adjust based on post-EIA volatility
-            if current.get('post_eia_volatility', False):
-                stop_distance *= 1.2  # Wider stops during volatile periods
         else:
             # Base stop distance for swing trading
             stop_distance = atr * self.config.swing_atr_multiplier
-            
             # Adjust based on ADX - stronger trends need wider stops
             if 'adx' in current:
                 adx_factor = min(1.0 + (current['adx'] - 25) / 50.0, 1.5)  # Scale from 1.0 to 1.5
@@ -655,36 +550,19 @@ class TrendFollowingStrategy(TechnicalStrategy):
         if is_intraday:
             # Day trading - typically 1.5:1 to 2:1 reward:risk
             reward_risk_ratio = 2.0
-            
             # Adjust based on time of day
             if current.get('market_open', False):
-                # More potential for longer moves early in session
                 reward_risk_ratio = 2.5
             elif current.get('market_close', False):
-                # More conservative targets near close
                 reward_risk_ratio = 1.5
-                
-            # Adjust for post-EIA volatility
-            if current.get('post_eia_volatility', False):
-                reward_risk_ratio *= 1.2  # Higher targets during volatile periods
         else:
             # Swing trading - typically 2:1 to 3:1 reward:risk for trend following
             reward_risk_ratio = 2.5
-            
             # Adjust based on trend strength
             if 'adx' in current:
-                # Stronger trends can run further
                 adx_factor = min(1.0 + (current['adx'] - 25) / 40.0, 1.5)  # Scale from 1.0 to 1.5
                 reward_risk_ratio *= adx_factor
-            
-            # Adjust for seasonality
-            if current.get('winter_season', False):
-                # Winter trends in natural gas can be stronger
-                reward_risk_ratio *= 1.2
-            elif current.get('shoulder_season', False):
-                # Shoulder season trends tend to be weaker
-                reward_risk_ratio *= 0.9
-                
+        
         # Calculate reward based on risk
         reward = risk * reward_risk_ratio
         

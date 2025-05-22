@@ -164,4 +164,37 @@ class TechnicalIndicators:
         direction = close.diff().apply(lambda x: 1 if x > 0 else -1)
         return (direction * volume).cumsum()
     
+    @staticmethod
+    def calculate_macd(
+        close: pd.Series,
+        fast_period: int = 12,
+        slow_period: int = 26,
+        signal_period: int = 9
+    ) -> Tuple[pd.Series, pd.Series, pd.Series]:
+        """Calculate MACD (Moving Average Convergence Divergence)
+        
+        Args:
+            close: Close price series
+            fast_period: Fast EMA period
+            slow_period: Slow EMA period
+            signal_period: Signal line period
+            
+        Returns:
+            Tuple of (MACD line, Signal line, Histogram)
+        """
+        # Calculate EMAs
+        fast_ema = close.ewm(span=fast_period, adjust=False).mean()
+        slow_ema = close.ewm(span=slow_period, adjust=False).mean()
+        
+        # Calculate MACD line
+        macd_line = fast_ema - slow_ema
+        
+        # Calculate Signal line
+        signal_line = macd_line.ewm(span=signal_period, adjust=False).mean()
+        
+        # Calculate Histogram
+        histogram = macd_line - signal_line
+        
+        return macd_line, signal_line, histogram
+    
     

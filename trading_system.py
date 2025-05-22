@@ -8,7 +8,7 @@ from datetime import datetime
 
 from strategies.strategy_factory import StrategyFactory, StrategyConfig
 from market_analysis.market_analyzer import MarketAnalyzer
-from market_analysis.signal_enhancer import NaturalGasSignalEnhancer
+from market_analysis.signal_enhancer import CryptoSignalEnhancer
 from risk_management.parameter_optimizer import DQNParameterOptimizer
 
 class TradingSystem:
@@ -121,12 +121,12 @@ class TradingSystem:
         Args:
             model_path: Path to load models from
         """
-        # Set up signal enhancer for natural gas
+        # Set up signal enhancer for crypto (Ethereum-focused, asset-agnostic)
         enhancer_path = os.path.join(model_path, 'signal_enhancer') if model_path else None
-        self.signal_enhancer = NaturalGasSignalEnhancer(model_path=enhancer_path)
+        self.signal_enhancer = CryptoSignalEnhancer(model_path=enhancer_path)
         
         # Set up parameter optimizer
-        # For natural gas futures, we want to optimize these key parameters
+        # For crypto, define asset-agnostic parameter space
         parameter_space = {
             'zscore_entry_threshold': [1.5, 2.0, 2.5, 3.0],
             'volatility_window': [10, 20, 30],
@@ -411,15 +411,15 @@ class TradingSystem:
         optimal_params: Dict
     ) -> float:
         """
-        Calculate position size based on risk management rules
+        Calculate position size based on risk management rules for crypto (Ethereum-focused, asset-agnostic)
         
         Args:
             data: Market data DataFrame
             signal_info: Signal information
             optimal_params: Optimized parameters
-            
+        
         Returns:
-            Position size (in contracts/shares/units)
+            Position size (in units/coins/contracts)
         """
         current_price = data['close'].iloc[-1]
         
@@ -453,8 +453,7 @@ class TradingSystem:
         if 'position_size_factor' in market_context:
             position_size = position_size * market_context['position_size_factor']
         
-        # Apply volatility adjustment for natural gas
-        # Reduce size in higher volatility environments
+        # Volatility adjustment (generic)
         vol_ratio = data['returns'].rolling(window=5).std().iloc[-1] / \
                     data['returns'].rolling(window=20).std().iloc[-1]
         if vol_ratio > 1.2:  # Higher short-term volatility
@@ -463,12 +462,8 @@ class TradingSystem:
         # Ensure we don't exceed maximum position size
         position_size = min(position_size, max_position_size)
         
-        # Round to appropriate contract size for natural gas futures
-        # Each contract is 10,000 MMBtu
-        contract_size = 10000
-        num_contracts = round(position_size / (current_price * contract_size))
-        position_size = num_contracts * contract_size
-        
+        # TODO: Implement crypto/Ethereum-specific lot size, leverage, and exchange rules here
+        # For now, return the calculated position size in units/coins
         return position_size
     
     def update_positions(self, data: pd.DataFrame):

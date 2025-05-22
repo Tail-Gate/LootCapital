@@ -19,6 +19,8 @@ from strategies.stochastic_process import StochasticProcessStrategy, StochasticP
 from strategies.bayesian_inference_strategy import BayesianInferenceStrategy,BayesianInferenceConfig
 from strategies.markov_chain_strategy import MarkovChainStrategy, MarkovChainConfig
 from strategies.trend_following import TrendFollowingConfig,TrendFollowingStrategy
+from strategies.xgboost_mean_reversion import XGBoostMeanReversionStrategy, XGBoostMeanReversionConfig
+from strategies.lstm_swing_mean_reversion import LSTMSwingMeanReversionStrategy, LSTMSwingMeanReversionConfig
 
 @dataclass
 class StrategyConfig:
@@ -47,7 +49,9 @@ class StrategyFactory:
         'stochastic_process': StochasticProcessStrategy,
         'bayesian_inference': BayesianInferenceStrategy,
         'markov_chain': MarkovChainStrategy,
-        'trend_following': TrendFollowingStrategy 
+        'trend_following': TrendFollowingStrategy,
+        'xgboost_mean_reversion': XGBoostMeanReversionStrategy,
+        'lstm_swing_mean_reversion': LSTMSwingMeanReversionStrategy 
     }
 
     # Update the _configs dictionary
@@ -67,8 +71,9 @@ class StrategyFactory:
         'stochastic_process': StochasticProcessConfig,
         'bayesian_inference': BayesianInferenceConfig,
         'markov_chain': MarkovChainConfig,
-        'trend_following': TrendFollowingConfig 
-        
+        'trend_following': TrendFollowingConfig,
+        'xgboost_mean_reversion': XGBoostMeanReversionConfig,
+        'lstm_swing_mean_reversion': LSTMSwingMeanReversionConfig 
     }
     
     @classmethod

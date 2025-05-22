@@ -61,9 +61,9 @@ class LSTMSignalEnhancer(nn.Module):
         return out, attention_weights
 
 
-class NaturalGasSignalEnhancer:
+class CryptoSignalEnhancer:
     """
-    Enhances trading signals for natural gas futures using deep learning
+    Signal enhancer for crypto trading (Ethereum-focused, asset-agnostic). Uses LSTM or other ML models to enhance signals.
     """
     def __init__(
         self,
@@ -102,74 +102,57 @@ class NaturalGasSignalEnhancer:
     
     def prepare_features(self, data: pd.DataFrame) -> pd.DataFrame:
         """
-        Prepare features specific to natural gas futures
+        Prepare features for crypto trading (Ethereum-focused, asset-agnostic)
         
         Args:
             data: DataFrame with OHLCV and other features
-            
+        
         Returns:
             DataFrame with extracted features
         """
         df = data.copy()
-        
-        # Ensure we have basic price and returns data
+        # --- Core OHLCV features ---
         if 'returns' not in df.columns:
             df['returns'] = df['close'].pct_change()
+        df['log_returns'] = np.log(df['close'] / df['close'].shift(1))
+        df['volatility_20'] = df['returns'].rolling(window=20).std()
+        df['volume_zscore'] = (df['volume'] - df['volume'].rolling(20).mean()) / df['volume'].rolling(20).std()
         
-        # Feature Group 1: Price action features
-        # Relative price to moving averages
-        for window in [5, 10, 20, 50]:
-            df[f'ma_{window}_ratio'] = df['close'] / df['close'].rolling(window=window).mean()
+        # --- Order book features (if available) ---
+        if 'bid_volume' in df.columns and 'ask_volume' in df.columns:
+            df['order_imbalance'] = (df['bid_volume'] - df['ask_volume']) / (df['bid_volume'] + df['ask_volume'] + 1e-9)
+            df['spread'] = df['ask'] - df['bid'] if 'ask' in df.columns and 'bid' in df.columns else np.nan
+        else:
+            df['order_imbalance'] = np.nan
+            df['spread'] = np.nan
+        # TODO: Integrate real-time order book snapshots for more granular features
         
-        # Feature Group 2: Volatility features (crucial for natural gas)
-        if 'volatility' not in df.columns:
-            df['volatility'] = df['returns'].rolling(window=20).std()
-            
-        # Volatility ratios (for capturing regime shifts)
-        df['vol_ratio_5_20'] = df['returns'].rolling(window=5).std() / df['returns'].rolling(window=20).std()
+        # --- Funding rates (for perpetual swaps) ---
+        if 'funding_rate' in df.columns:
+            df['funding_rate_zscore'] = (df['funding_rate'] - df['funding_rate'].rolling(20).mean()) / df['funding_rate'].rolling(20).std()
+        else:
+            df['funding_rate_zscore'] = np.nan
+        # TODO: Integrate funding rate data from exchange APIs
         
-        # Feature Group 3: Seasonality features (important for natural gas)
-        # Extract month and day of month
-        if hasattr(df.index, 'month'):
-            df['month'] = df.index.month
-            df['day_of_month'] = df.index.day
-            
-            # Winter vs summer season (heating vs cooling)
-            df['winter_season'] = df['month'].isin([11, 12, 1, 2, 3]).astype(int)
-            
-            # Beginning, middle, or end of month (contract rolling effects)
-            df['start_of_month'] = (df['day_of_month'] <= 10).astype(int)
-            df['end_of_month'] = (df['day_of_month'] >= 21).astype(int)
+        # --- On-chain metrics (if available) ---
+        for col in ['tx_volume', 'active_addresses', 'large_transfers', 'miner_flows']:
+            if col not in df.columns:
+                df[col] = np.nan
+        # TODO: Integrate on-chain data from providers like Glassnode, Nansen, etc.
         
-        # Feature Group 4: EIA report day effects
-        if hasattr(df.index, 'dayofweek'):
-            # EIA Natural Gas Storage Report (typically Thursday)
-            df['report_day'] = (df.index.dayofweek == 3).astype(int)
-            df['day_after_report'] = (df.index.dayofweek == 4).astype(int)
+        # --- Exchange events (if available) ---
+        for col in ['exchange_maintenance', 'listing_event', 'delisting_event', 'fork_event']:
+            if col not in df.columns:
+                df[col] = 0  # Binary event flags
+        # TODO: Integrate event data from exchange status APIs
         
-        # Feature Group 5: Technical indicators specific to natural gas
-        # RSI (captures overbought/oversold conditions)
-        from utils.technical_indicators import TechnicalIndicators
-        ti = TechnicalIndicators()
-        df['rsi'] = ti.calculate_rsi(df['close'], 14)
+        # --- 24/7 trading/timezone features ---
+        df['hour_of_day'] = df.index.hour if hasattr(df.index, 'hour') else 0
+        df['day_of_week'] = df.index.dayofweek if hasattr(df.index, 'dayofweek') else 0
+        # No market open/close, but can use hour/day for cyclical patterns
         
-        # Calculate momentum indicators
-        df['momentum_10'] = df['close'] / df['close'].shift(10) - 1
-        
-        # Feature Group 6: Volume analysis
-        if 'volume' in df.columns:
-            # Volume relative to moving average
-            df['volume_ratio'] = df['volume'] / df['volume'].rolling(window=20).mean()
-            
-            # Volume-price relationship (important for spotting reversals)
-            df['volume_price_trend'] = df['volume_ratio'] * np.sign(df['returns'])
-            
-            # OBV-like measure
-            df['obv_change'] = df['volume'] * np.sign(df['returns'])
-            df['obv'] = df['obv_change'].cumsum()
-        
-        # Remove NaN values
-        df = df.dropna()
+        # --- Placeholder for future asset-agnostic features ---
+        # TODO: Add more features as new data sources become available
         
         return df
     

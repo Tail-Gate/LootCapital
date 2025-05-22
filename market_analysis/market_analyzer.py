@@ -9,7 +9,7 @@ from market_analysis.market_regime import MarketRegimeDetector
 class MarketAnalyzer:
     """
     Analyzes market conditions and provides context to trading strategies.
-    Combines traditional indicators with machine learning for natural gas markets.
+    Combines traditional indicators with machine learning for crypto markets (Ethereum-focused, asset-agnostic).
     """
     
     def __init__(
@@ -37,18 +37,16 @@ class MarketAnalyzer:
         self.current_regime = None
         self.regime_history = []
         
-        # Natural gas specific seasonal factors
-        self.is_heating_season = False
-        self.is_injection_season = False
-        self.is_report_day = False
+        # Placeholder for crypto-specific context (e.g., funding rates, exchange events)
+        self.crypto_context = {}
     
     def analyze_market(self, data: pd.DataFrame) -> Dict:
         """
-        Analyze market conditions for natural gas futures
+        Analyze market conditions for crypto (Ethereum)
         
         Args:
             data: DataFrame with OHLCV data
-            
+        
         Returns:
             Dictionary with market analysis results
         """
@@ -71,17 +69,8 @@ class MarketAnalyzer:
         # Get regime name
         regime_name = self.regime_detector.get_regime_name(self.current_regime)
         
-        # Check for natural gas specific seasonal factors
-        current_date = data.index[-1]
-        
-        # Heating season: November through March
-        self.is_heating_season = current_date.month in [11, 12, 1, 2, 3]
-        
-        # Injection season: April through October
-        self.is_injection_season = current_date.month in [4, 5, 6, 7, 8, 9, 10]
-        
-        # EIA Natural Gas Storage Report day (Thursday)
-        self.is_report_day = current_date.dayofweek == 3
+        # Placeholder for crypto-specific context (e.g., funding rates, exchange events)
+        # TODO: Add real crypto context features here
         
         # Detect volatility conditions
         volatility = data['returns'].rolling(window=20).std().iloc[-1]
@@ -93,18 +82,16 @@ class MarketAnalyzer:
             'regime_name': regime_name,
             'regime_stability': regime_stability,
             'confidence': min(regime_stability * 1.5, 1.0),
-            'heating_season': self.is_heating_season,
-            'injection_season': self.is_injection_season,
-            'report_day': self.is_report_day,
             'volatility': volatility,
-            'volatility_percentile': volatility_percentile
+            'volatility_percentile': volatility_percentile,
+            # Add crypto context fields as needed
         }
         
         # Update regime history
         self.regime_history.append(result)
         if len(self.regime_history) > 100:
             self.regime_history = self.regime_history[-100:]
-            
+        
         return result
     
     def _calculate_percentile(self, value: float, distribution: pd.Series) -> float:
@@ -114,23 +101,23 @@ class MarketAnalyzer:
         Args:
             value: Value to calculate percentile for
             distribution: Reference distribution
-            
+        
         Returns:
             Percentile (0-100)
         """
         distribution = distribution.dropna()
         if len(distribution) == 0:
             return 50.0
-            
+        
         return sum(distribution <= value) / len(distribution) * 100
     
     def get_strategy_adjustments(self, regime_info: Dict) -> Dict:
         """
-        Get strategy adjustments based on market regime and natural gas specific factors
+        Get strategy adjustments based on market regime and crypto-specific context
         
         Args:
             regime_info: Market regime information from analyze_market
-            
+        
         Returns:
             Dictionary with strategy adjustments
         """
@@ -138,7 +125,7 @@ class MarketAnalyzer:
         confidence = regime_info['confidence']
         volatility_percentile = regime_info.get('volatility_percentile', 50)
         
-        # Default adjustments
+        # Default adjustments (can be extended for crypto context)
         adjustments = {
             'position_size_factor': 1.0,
             'stop_loss_factor': 1.0,
@@ -147,42 +134,37 @@ class MarketAnalyzer:
             'disfavored_strategies': []
         }
         
-        # Adjust based on regime
+        # Adjust based on regime (generic, not gas-specific)
         if regime_name == "High Volatility Trending":
             adjustments['position_size_factor'] = 0.7
             adjustments['stop_loss_factor'] = 1.5
             adjustments['take_profit_factor'] = 1.2
             adjustments['favored_strategies'] = ['momentum', 'volatility_breakout']
             adjustments['disfavored_strategies'] = ['mean_reversion', 'range_trading']
-            
         elif regime_name == "Low Volatility Trending":
             adjustments['position_size_factor'] = 1.2
             adjustments['stop_loss_factor'] = 0.8
             adjustments['take_profit_factor'] = 1.0
             adjustments['favored_strategies'] = ['momentum', 'dynamic_trendline']
             adjustments['disfavored_strategies'] = ['volatility_breakout']
-            
         elif regime_name == "High Volatility Mean Reversion":
             adjustments['position_size_factor'] = 0.6
             adjustments['stop_loss_factor'] = 1.5
             adjustments['take_profit_factor'] = 0.8
             adjustments['favored_strategies'] = ['mean_reversion', 'volatility_clustering']
             adjustments['disfavored_strategies'] = ['momentum', 'breakout']
-            
         elif regime_name == "Low Volatility Mean Reversion":
             adjustments['position_size_factor'] = 1.0
             adjustments['stop_loss_factor'] = 0.9
             adjustments['take_profit_factor'] = 1.1
             adjustments['favored_strategies'] = ['range_trading', 'mean_reversion']
             adjustments['disfavored_strategies'] = ['volatility_breakout']
-            
         elif regime_name == "High Volatility Choppy":
             adjustments['position_size_factor'] = 0.5
             adjustments['stop_loss_factor'] = 1.7
             adjustments['take_profit_factor'] = 0.7
             adjustments['favored_strategies'] = ['volatility_clustering']
             adjustments['disfavored_strategies'] = ['momentum', 'dynamic_trendline']
-            
         elif regime_name == "Low Volatility Consolidation":
             adjustments['position_size_factor'] = 0.8
             adjustments['stop_loss_factor'] = 1.0
@@ -190,58 +172,16 @@ class MarketAnalyzer:
             adjustments['favored_strategies'] = ['range_trading', 'volatility_breakout']
             adjustments['disfavored_strategies'] = ['momentum']
         
-        # Natural gas specific adjustments
-        
-        # Heating season adjustments (higher volatility, more trending)
-        if self.is_heating_season:
-            # Favor momentum strategies during heating season
-            if 'momentum' not in adjustments['favored_strategies']:
-                adjustments['favored_strategies'].append('momentum')
-            
-            # Increase stop loss for higher volatility
-            adjustments['stop_loss_factor'] *= 1.2
-            
-            # Be more cautious with position sizing
-            adjustments['position_size_factor'] *= 0.9
-        
-        # Injection season adjustments (more range-bound)
-        if self.is_injection_season:
-            # Favor range trading and mean reversion during injection season
-            if 'range_trading' not in adjustments['favored_strategies']:
-                adjustments['favored_strategies'].append('range_trading')
-                
-            # Tighter stop losses in more predictable market
-            adjustments['stop_loss_factor'] *= 0.9
-        
-        # EIA report day adjustments (high volatility)
-        if self.is_report_day:
-            # Reduce position size on report days
-            adjustments['position_size_factor'] *= 0.7
-            
-            # Widen stop losses for report day volatility
-            adjustments['stop_loss_factor'] *= 1.3
-            
-            # Favor volatility strategies on report days
-            if 'volatility_clustering' not in adjustments['favored_strategies']:
-                adjustments['favored_strategies'].append('volatility_clustering')
-                
-            # Avoid range strategies on report days
-            if 'range_trading' not in adjustments['disfavored_strategies']:
-                adjustments['disfavored_strategies'].append('range_trading')
-        
-        # Volatility-based adjustments
+        # Volatility-based adjustments (generic)
         if volatility_percentile > 80:
-            # Very high volatility - reduce size further
             adjustments['position_size_factor'] *= 0.8
             adjustments['stop_loss_factor'] *= 1.2
         elif volatility_percentile < 20:
-            # Very low volatility - can increase size
             adjustments['position_size_factor'] *= 1.2
             adjustments['stop_loss_factor'] *= 0.8
         
         # Scale adjustments by confidence
         for key in ['position_size_factor', 'stop_loss_factor', 'take_profit_factor']:
-            # Scale adjustment toward 1.0 based on confidence
             adjustments[key] = 1.0 + (adjustments[key] - 1.0) * confidence
         
         return adjustments
@@ -269,9 +209,7 @@ class MarketAnalyzer:
         # Save analyzer state
         analyzer_state = {
             'current_regime': self.current_regime,
-            'is_heating_season': self.is_heating_season,
-            'is_injection_season': self.is_injection_season,
-            'is_report_day': self.is_report_day
+            'crypto_context': self.crypto_context
         }
         joblib.dump(analyzer_state, os.path.join(path, 'analyzer_state.joblib'))
     
@@ -290,6 +228,4 @@ class MarketAnalyzer:
         if os.path.exists(analyzer_state_path):
             analyzer_state = joblib.load(analyzer_state_path)
             self.current_regime = analyzer_state.get('current_regime')
-            self.is_heating_season = analyzer_state.get('is_heating_season', False)
-            self.is_injection_season = analyzer_state.get('is_injection_season', False)
-            self.is_report_day = analyzer_state.get('is_report_day', False)
+            self.crypto_context = analyzer_state.get('crypto_context', {})

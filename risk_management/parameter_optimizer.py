@@ -145,11 +145,11 @@ class DQNParameterOptimizer:
     
     def prepare_state(self, market_data: pd.DataFrame) -> torch.Tensor:
         """
-        Extract state from market data
+        Extract state from market data for crypto (Ethereum-focused, asset-agnostic)
         
         Args:
             market_data: DataFrame with market data
-            
+        
         Returns:
             Tensor representation of state
         """
@@ -190,17 +190,8 @@ class DQNParameterOptimizer:
         autocorr = returns_series.autocorr(lag=1) if len(returns_series.dropna()) > 1 else 0
         state_features.append(autocorr)
         
-        # Feature 6: Natural gas specific - Seasonality
-        if hasattr(market_data.index, 'month'):
-            month = market_data.index[-1].month
-            # One-hot encode quarter
-            q1 = 1 if month in [1, 2, 3] else 0
-            q2 = 1 if month in [4, 5, 6] else 0
-            q3 = 1 if month in [7, 8, 9] else 0
-            q4 = 1 if month in [10, 11, 12] else 0
-            state_features.extend([q1, q2, q3, q4])
-        else:
-            state_features.extend([0, 0, 0, 0])  # Placeholders
+        # TODO: Add crypto/Ethereum-specific state features here (e.g., funding rates, open interest, exchange events)
+        # Placeholder for future features
         
         # Ensure we have exactly feature_size features
         if len(state_features) < self.feature_size:
