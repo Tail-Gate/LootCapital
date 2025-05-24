@@ -7,7 +7,66 @@ import json
 from datetime import datetime
 from .technical_indicators import TechnicalIndicators
 from .order_book_features import calculate_order_flow_imbalance, calculate_volume_pressure
+import multiprocessing as mp
+import gc
+import time
+import psutil
 
+def generate_features_chunk(chunk: pd.DataFrame, order_book_data: Optional[pd.DataFrame], indicators) -> pd.DataFrame:
+    """
+    Top-level function for multiprocessing: generate features for a single chunk.
+    Args:
+        chunk: DataFrame chunk with OHLCV data
+        order_book_data: Optional DataFrame with order book data
+        indicators: TechnicalIndicators instance
+    Returns:
+        DataFrame with generated features
+    """
+    features = pd.DataFrame(index=chunk.index)
+    # Price-based features
+    features['returns'] = chunk['close'].pct_change()
+    features['log_returns'] = np.log1p(features['returns'])
+    # Technical indicators
+    rsi = indicators.calculate_rsi(chunk['close'])
+    atr = indicators.calculate_atr(chunk['high'], chunk['low'], chunk['close'])
+    features['rsi'] = rsi.astype(np.float32)
+    features['atr'] = atr.astype(np.float32)
+    # Bollinger Bands
+    upper, middle, lower = indicators.calculate_bollinger_bands(chunk['close'])
+    features['bb_upper'] = upper.astype(np.float32)
+    features['bb_middle'] = middle.astype(np.float32)
+    features['bb_lower'] = lower.astype(np.float32)
+    features['bb_width'] = ((upper - lower) / middle).astype(np.float32)
+    # Volume features
+    features['volume_ma'] = chunk['volume'].rolling(window=20).mean().astype(np.float32)
+    features['volume_std'] = chunk['volume'].rolling(window=20).std().astype(np.float32)
+    features['volume_surge'] = indicators.calculate_volume_surge_factor(chunk['volume']).astype(np.float32)
+    # Momentum features
+    momentum = indicators.calculate_price_momentum(chunk['close'], 14)
+    vol_regime = indicators.calculate_volatility_regime(chunk['close'])
+    features['price_momentum'] = momentum.astype(np.float32)
+    features['volatility_regime'] = vol_regime.astype(np.float32)
+    # Support/Resistance
+    support, resistance = indicators.calculate_support_resistance(chunk['high'], chunk['low'], chunk['close'])
+    features['support'] = support.astype(np.float32)
+    features['resistance'] = resistance.astype(np.float32)
+    # Breakout detection
+    features['breakout_intensity'] = indicators.calculate_breakout_intensity(chunk['close'], atr).astype(np.float32)
+    # Trend strength
+    features['adx'] = indicators.calculate_directional_movement(chunk['high'], chunk['low'], chunk['close']).astype(np.float32)
+    # Cumulative delta
+    features['cumulative_delta'] = indicators.calculate_cumulative_delta(chunk['close'], chunk['volume']).astype(np.float32)
+    # Add order book features if available
+    if order_book_data is not None:
+        features['bid_ask_spread'] = (
+            order_book_data['ask_prices'].apply(lambda x: x[0]) -
+            order_book_data['bid_prices'].apply(lambda x: x[0])
+        ).astype(np.float32)
+        features['volume_imbalance'] = (
+            (order_book_data['bid_volume_total'] - order_book_data['ask_volume_total']) /
+            (order_book_data['bid_volume_total'] + order_book_data['ask_volume_total'])
+        ).astype(np.float32)
+    return features
 
 class FeatureGenerator:
     """
@@ -44,14 +103,309 @@ class FeatureGenerator:
         self.logger = logging.getLogger(__name__)
         
         self.indicators = TechnicalIndicators()
+        
+        # Memory optimization settings
+        self.optimize_memory = True
+        self.chunk_size = 10000  # Process data in chunks of 10k rows
+        self.dtype_map = {
+            'float32': np.float32,
+            'float64': np.float64,
+            'int32': np.int32,
+            'int64': np.int64
+        }
+        
+        # Batch processing settings
+        self.batch_size = 50000  # Default batch size
+        self.max_batches_in_memory = 2  # Maximum number of batches to keep in memory
+        self.batch_cache = {}  # Cache for batch results
+        
+        # Performance monitoring
+        self.performance_metrics = {
+            'total_processing_time': 0.0,
+            'total_memory_usage': 0.0,
+            'rows_processed': 0,
+            'feature_generation_times': {},
+            'memory_usage_by_feature': {},
+            'batch_processing_metrics': [],
+            'errors': []
+        }
+        self.monitoring_enabled = True
+        self.metrics_file = self.cache_dir / f"performance_metrics_{self.version}.json"
     
+    def _optimize_dtypes(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Optimize DataFrame memory usage by converting to appropriate dtypes.
+        
+        Args:
+            df: Input DataFrame
+            
+        Returns:
+            DataFrame with optimized dtypes
+        """
+        if not self.optimize_memory:
+            return df
+            
+        for col in df.select_dtypes(include=['float64']).columns:
+            df[col] = df[col].astype(np.float32)
+            
+        for col in df.select_dtypes(include=['int64']).columns:
+            df[col] = df[col].astype(np.int32)
+            
+        return df
+    
+    def _process_in_chunks(
+        self,
+        data: pd.DataFrame,
+        func: callable,
+        chunk_size: Optional[int] = None
+    ) -> pd.DataFrame:
+        """
+        Process DataFrame in chunks to reduce memory usage.
+        
+        Args:
+            data: Input DataFrame
+            func: Function to apply to each chunk
+            chunk_size: Size of chunks (defaults to self.chunk_size)
+            
+        Returns:
+            Processed DataFrame
+        """
+        if not self.optimize_memory:
+            return func(data)
+            
+        chunk_size = chunk_size or self.chunk_size
+        chunks = [data[i:i + chunk_size] for i in range(0, len(data), chunk_size)]
+        results = []
+        
+        for chunk in chunks:
+            result = func(chunk)
+            results.append(result)
+            gc.collect()  # Force garbage collection after each chunk
+            
+        return pd.concat(results)
+    
+    def _update_performance_metrics(
+        self,
+        operation: str,
+        start_time: float,
+        start_memory: float,
+        rows_processed: int,
+        error: Optional[str] = None
+    ) -> None:
+        """
+        Update performance metrics for an operation.
+        
+        Args:
+            operation: Name of the operation
+            start_time: Start time of the operation
+            start_memory: Start memory usage
+            rows_processed: Number of rows processed
+            error: Optional error message
+        """
+        if not self.monitoring_enabled:
+            return
+            
+        end_time = time.time()
+        end_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
+        
+        # Update operation-specific metrics
+        if operation not in self.performance_metrics['feature_generation_times']:
+            self.performance_metrics['feature_generation_times'][operation] = []
+            self.performance_metrics['memory_usage_by_feature'][operation] = []
+            
+        self.performance_metrics['feature_generation_times'][operation].append(end_time - start_time)
+        self.performance_metrics['memory_usage_by_feature'][operation].append(end_memory - start_memory)
+        
+        # Update total metrics
+        self.performance_metrics['total_processing_time'] += end_time - start_time
+        self.performance_metrics['total_memory_usage'] += end_memory - start_memory
+        self.performance_metrics['rows_processed'] += rows_processed
+        
+        # Record error if any
+        if error:
+            self.performance_metrics['errors'].append({
+                'operation': operation,
+                'error': error,
+                'timestamp': datetime.now().isoformat()
+            })
+            
+        # Save metrics periodically
+        if self.performance_metrics['rows_processed'] % 100000 == 0:
+            self.save_performance_metrics()
+            
+    def save_performance_metrics(self) -> None:
+        """Save current performance metrics to file."""
+        if not self.monitoring_enabled:
+            return
+            
+        try:
+            with open(self.metrics_file, 'w') as f:
+                json.dump(self.performance_metrics, f, indent=2)
+            self.logger.info(f"Saved performance metrics to {self.metrics_file}")
+        except Exception as e:
+            self.logger.error(f"Error saving performance metrics: {str(e)}")
+            
+    def get_performance_summary(self) -> Dict[str, Any]:
+        """
+        Get a summary of performance metrics.
+        
+        Returns:
+            Dictionary with performance summary
+        """
+        if not self.monitoring_enabled:
+            return {}
+            
+        summary = {
+            'total_rows_processed': self.performance_metrics['rows_processed'],
+            'total_processing_time': self.performance_metrics['total_processing_time'],
+            'total_memory_usage': self.performance_metrics['total_memory_usage'],
+            'average_processing_speed': (
+                self.performance_metrics['rows_processed'] / 
+                self.performance_metrics['total_processing_time']
+                if self.performance_metrics['total_processing_time'] > 0 else 0
+            ),
+            'average_memory_per_row': (
+                self.performance_metrics['total_memory_usage'] / 
+                self.performance_metrics['rows_processed']
+                if self.performance_metrics['rows_processed'] > 0 else 0
+            ),
+            'feature_performance': {},
+            'error_count': len(self.performance_metrics['errors'])
+        }
+        
+        # Calculate per-feature metrics
+        for feature in self.performance_metrics['feature_generation_times']:
+            times = self.performance_metrics['feature_generation_times'][feature]
+            memory = self.performance_metrics['memory_usage_by_feature'][feature]
+            
+            summary['feature_performance'][feature] = {
+                'average_time': np.mean(times) if times else 0,
+                'average_memory': np.mean(memory) if memory else 0,
+                'total_calls': len(times)
+            }
+            
+        return summary
+    
+    def process_batch(
+        self,
+        batch_data: pd.DataFrame,
+        order_book_batch: Optional[pd.DataFrame] = None,
+        batch_id: Optional[str] = None
+    ) -> pd.DataFrame:
+        """
+        Process a single batch of data with memory optimization.
+        
+        Args:
+            batch_data: DataFrame with OHLCV data for the batch
+            order_book_batch: Optional DataFrame with order book data for the batch
+            batch_id: Optional identifier for the batch (for caching)
+            
+        Returns:
+            DataFrame with generated features for the batch
+        """
+        start_time = time.time()
+        start_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
+        
+        try:
+            # Check cache if batch_id is provided
+            if batch_id and batch_id in self.batch_cache:
+                self.logger.debug(f"Using cached results for batch {batch_id}")
+                return self.batch_cache[batch_id]
+            
+            # Optimize input data types
+            batch_data = self._optimize_dtypes(batch_data)
+            if order_book_batch is not None:
+                order_book_batch = self._optimize_dtypes(order_book_batch)
+            
+            # Generate features for the batch
+            features = generate_features_chunk(batch_data, order_book_batch, self.indicators)
+            
+            # Cache results if batch_id is provided
+            if batch_id:
+                # Manage cache size
+                if len(self.batch_cache) >= self.max_batches_in_memory:
+                    # Remove oldest batch
+                    oldest_batch = next(iter(self.batch_cache))
+                    del self.batch_cache[oldest_batch]
+                self.batch_cache[batch_id] = features
+            
+            # Update performance metrics
+            self._update_performance_metrics(
+                'batch_processing',
+                start_time,
+                start_memory,
+                len(batch_data)
+            )
+            
+            return features
+            
+        except Exception as e:
+            error_msg = f"Error processing batch {batch_id}: {str(e)}"
+            self._update_performance_metrics(
+                'batch_processing',
+                start_time,
+                start_memory,
+                len(batch_data),
+                error_msg
+            )
+            raise
+
+    def generate_features_batched(
+        self,
+        ohlcv_data: pd.DataFrame,
+        order_book_data: Optional[pd.DataFrame] = None,
+        batch_size: Optional[int] = None
+    ) -> pd.DataFrame:
+        """
+        Generate features using batch processing for large datasets.
+        
+        Args:
+            ohlcv_data: DataFrame with OHLCV data
+            order_book_data: Optional DataFrame with order book data
+            batch_size: Optional custom batch size
+            
+        Returns:
+            DataFrame with generated features
+        """
+        # Use provided batch size or default
+        batch_size = batch_size or self.batch_size
+        
+        # Calculate number of batches
+        total_rows = len(ohlcv_data)
+        num_batches = (total_rows + batch_size - 1) // batch_size
+        
+        # Process batches
+        all_features = []
+        for i in range(num_batches):
+            start_idx = i * batch_size
+            end_idx = min((i + 1) * batch_size, total_rows)
+            
+            # Create batch
+            batch = ohlcv_data.iloc[start_idx:end_idx]
+            ob_batch = None
+            if order_book_data is not None:
+                ob_batch = order_book_data.iloc[start_idx:end_idx]
+            
+            # Process batch
+            batch_id = f"batch_{i}_{self.version}"
+            features = self.process_batch(batch, ob_batch, batch_id)
+            all_features.append(features)
+            
+            # Force garbage collection after each batch
+            if self.optimize_memory:
+                gc.collect()
+        
+        # Combine results
+        combined = pd.concat(all_features)
+        return self._optimize_dtypes(combined)
+
     def generate_features(
         self,
         ohlcv_data: pd.DataFrame,
         order_book_data: Optional[pd.DataFrame] = None
     ) -> pd.DataFrame:
         """
-        Generate features from OHLCV and order book data.
+        Generate features from OHLCV and order book data. Uses batch processing for large datasets.
         
         Args:
             ohlcv_data: DataFrame with OHLCV data
@@ -60,75 +414,87 @@ class FeatureGenerator:
         Returns:
             DataFrame with generated features
         """
-        features = pd.DataFrame(index=ohlcv_data.index)
+        # Define thresholds for different processing methods
+        small_threshold = 10000  # Use simple processing
+        medium_threshold = 100000  # Use parallel processing
+        large_threshold = 500000  # Use batch processing
         
-        # Price-based features
-        features['returns'] = ohlcv_data['close'].pct_change()
-        features['log_returns'] = np.log1p(features['returns'])
+        total_rows = len(ohlcv_data)
         
-        # Technical indicators
-        features['rsi'] = self.indicators.calculate_rsi(ohlcv_data['close'])
-        features['atr'] = self.indicators.calculate_atr(
-            ohlcv_data['high'],
-            ohlcv_data['low'],
-            ohlcv_data['close']
-        )
+        if total_rows <= small_threshold:
+            # Small dataset: use simple processing
+            return generate_features_chunk(ohlcv_data, order_book_data, self.indicators)
+        elif total_rows <= medium_threshold:
+            # Medium dataset: use parallel processing
+            return self.parallel_feature_generation(ohlcv_data, order_book_data)
+        else:
+            # Large dataset: use batch processing
+            return self.generate_features_batched(ohlcv_data, order_book_data)
+    
+    def parallel_feature_generation(
+        self,
+        ohlcv_data: pd.DataFrame,
+        order_book_data: Optional[pd.DataFrame] = None
+    ) -> pd.DataFrame:
+        """
+        Generate features in parallel for large datasets with memory optimization.
         
-        # Bollinger Bands
-        upper, middle, lower = self.indicators.calculate_bollinger_bands(ohlcv_data['close'])
-        features['bb_upper'] = upper
-        features['bb_middle'] = middle
-        features['bb_lower'] = lower
-        features['bb_width'] = (upper - lower) / middle
-        
-        # Volume features
-        features['volume_ma'] = ohlcv_data['volume'].rolling(window=20).mean()
-        features['volume_std'] = ohlcv_data['volume'].rolling(window=20).std()
-        features['volume_surge'] = self.indicators.calculate_volume_surge_factor(ohlcv_data['volume'])
-        
-        # Momentum features
-        features['price_momentum'] = self.indicators.calculate_price_momentum(ohlcv_data['close'], 14)
-        features['volatility_regime'] = self.indicators.calculate_volatility_regime(ohlcv_data['close'])
-        
-        # Support/Resistance
-        support, resistance = self.indicators.calculate_support_resistance(
-            ohlcv_data['high'],
-            ohlcv_data['low'],
-            ohlcv_data['close']
-        )
-        features['support'] = support
-        features['resistance'] = resistance
-        
-        # Breakout detection
-        features['breakout_intensity'] = self.indicators.calculate_breakout_intensity(
-            ohlcv_data['close'],
-            features['atr']
-        )
-        
-        # Trend strength
-        features['adx'] = self.indicators.calculate_directional_movement(
-            ohlcv_data['high'],
-            ohlcv_data['low'],
-            ohlcv_data['close']
-        )
-        
-        # Cumulative delta
-        features['cumulative_delta'] = self.indicators.calculate_cumulative_delta(
-            ohlcv_data['close'],
-            ohlcv_data['volume']
-        )
-        
-        # Add order book features if available
-        if order_book_data is not None:
-            features['bid_ask_spread'] = order_book_data['ask_prices'].apply(lambda x: x[0]) - \
-                                       order_book_data['bid_prices'].apply(lambda x: x[0])
+        Args:
+            ohlcv_data: DataFrame with OHLCV data
+            order_book_data: Optional DataFrame with order book data
             
-            features['volume_imbalance'] = (order_book_data['bid_volume_total'] - \
-                                          order_book_data['ask_volume_total']) / \
-                                         (order_book_data['bid_volume_total'] + \
-                                          order_book_data['ask_volume_total'])
+        Returns:
+            DataFrame with generated features
+        """
+        # Determine the number of processes to use
+        num_processes = mp.cpu_count()
         
-        return features
+        # Calculate optimal chunk size based on available memory
+        total_rows = len(ohlcv_data)
+        chunk_size = max(10000, total_rows // (num_processes * 4))  # Ensure chunks aren't too small
+        
+        # Split the data into chunks
+        chunks = [ohlcv_data[i:i + chunk_size] for i in range(0, total_rows, chunk_size)]
+        
+        # Split order book data if available
+        ob_chunks = None
+        if order_book_data is not None:
+            ob_chunks = [order_book_data[i:i + chunk_size] for i in range(0, total_rows, chunk_size)]
+        else:
+            ob_chunks = [None] * len(chunks)
+        
+        # Create a pool of processes
+        with mp.Pool(processes=num_processes) as pool:
+            # Map the feature generation function to each chunk
+            results = pool.starmap(
+                generate_features_chunk,
+                zip(chunks, ob_chunks, [self.indicators]*len(chunks))
+            )
+        
+        # Combine the results and optimize memory
+        combined = pd.concat(results)
+        return self._optimize_dtypes(combined)
+    
+    def cleanup(self) -> None:
+        """
+        Clean up resources used by the feature generator.
+        """
+        try:
+            # Clear feature importance
+            self.feature_importance.clear()
+            
+            # Clear feature interactions
+            self.feature_interactions.clear()
+            
+            # Clear indicators
+            self.indicators = None
+            
+            # Force garbage collection
+            gc.collect()
+            
+        except Exception as e:
+            self.logger.error(f"Error during feature generator cleanup: {str(e)}")
+            raise
     
     def generate_technical_features(
         self,
@@ -292,7 +658,7 @@ class FeatureGenerator:
             
             # Market depth features
             df['depth_imbalance'] = self._calculate_depth_imbalance(order_book_data)
-            df['spread'] = order_book_data['ask_price'] - order_book_data['bid_price']
+            df['spread'] = order_book_data['ask_prices'].apply(lambda x: x[0]) - order_book_data['bid_prices'].apply(lambda x: x[0])
         
         return df
     
@@ -443,26 +809,4 @@ class FeatureGenerator:
         with open(path / "config.json", "r") as f:
             self.config = json.load(f)
         
-        self.logger.info(f"Loaded feature generator state from {path}")
-    
-    def cleanup(self) -> None:
-        """
-        Clean up resources used by the feature generator.
-        """
-        try:
-            # Clear feature importance
-            self.feature_importance.clear()
-            
-            # Clear feature interactions
-            self.feature_interactions.clear()
-            
-            # Clear indicators
-            self.indicators = None
-            
-            # Force garbage collection
-            import gc
-            gc.collect()
-            
-        except Exception as e:
-            self.logger.error(f"Error during feature generator cleanup: {str(e)}")
-            raise 
+        self.logger.info(f"Loaded feature generator state from {path}") 

@@ -1,6 +1,11 @@
 import numpy as np
 import pandas as pd
 from typing import Tuple, Dict, Optional
+from functools import lru_cache
+import logging
+import hashlib
+
+logger = logging.getLogger(__name__)
 
 class VolatilityAnalyzer:
     """
@@ -8,34 +13,67 @@ class VolatilityAnalyzer:
     for natural gas and other markets with volatility clustering behavior.
     """
     
-    @staticmethod
-    def calculate_volatility_zscore(
-        returns: pd.Series,
-        short_window: int = 10,
-        long_window: int = 50
-    ) -> pd.Series:
+    def __init__(self, cache_size: int = 128):
         """
-        Calculate z-score of current volatility relative to historical volatility
+        Initialize the volatility analyzer.
         
         Args:
-            returns: Series of price returns
-            short_window: Window for current volatility measurement
-            long_window: Window for historical volatility baseline
-        
-        Returns:
-            Series of volatility z-scores
+            cache_size: Size of the LRU cache for expensive calculations
         """
-        # Current volatility (short-term)
-        current_vol = returns.rolling(window=short_window).std()
+        self.cache_size = cache_size
+        # Initialize cache for GARCH model results
+        self._garch_cache = {}
         
-        # Historical volatility baseline (long-term)
-        hist_vol_mean = current_vol.rolling(window=long_window).mean()
-        hist_vol_std = current_vol.rolling(window=long_window).std()
+    def _hash_series(self, series: pd.Series) -> str:
+        """
+        Create a hash of a pandas Series for caching.
         
-        # Z-score calculation
-        vol_zscore = (current_vol - hist_vol_mean) / hist_vol_std
+        Args:
+            series: Input Series
+            
+        Returns:
+            String hash of the Series
+        """
+        # Convert to numpy array and create hash
+        arr = series.values
+        return hashlib.md5(arr.tobytes()).hexdigest()
         
-        return vol_zscore
+    def _calculate_volatility_zscore(
+        self,
+        returns: pd.Series,
+        short_window: int,
+        long_window: int
+    ) -> pd.Series:
+        """
+        Calculate volatility z-score (cached).
+        
+        Args:
+            returns: Series of returns
+            short_window: Short-term window
+            long_window: Long-term window
+            
+        Returns:
+            Series with volatility z-scores
+        """
+        # Create cache key
+        cache_key = f"vol_zscore_{self._hash_series(returns)}_{short_window}_{long_window}"
+        
+        # Check cache
+        if hasattr(self, '_vol_zscore_cache') and cache_key in self._vol_zscore_cache:
+            logger.debug("Using cached volatility z-score")
+            return self._vol_zscore_cache[cache_key]
+            
+        # Calculate z-score
+        short_vol = returns.rolling(window=short_window).std()
+        long_vol = returns.rolling(window=long_window).std()
+        result = (short_vol - long_vol) / long_vol
+        
+        # Cache result
+        if not hasattr(self, '_vol_zscore_cache'):
+            self._vol_zscore_cache = {}
+        self._vol_zscore_cache[cache_key] = result
+        
+        return result
     
     @staticmethod
     def calculate_volatility_rsi(
@@ -73,37 +111,47 @@ class VolatilityAnalyzer:
         
         return vol_rsi
     
-    @staticmethod
-    def calculate_atr_ratio(
-        high: pd.Series, 
-        low: pd.Series, 
+    def _calculate_atr_ratio(
+        self,
+        high: pd.Series,
+        low: pd.Series,
         close: pd.Series,
-        short_period: int = 5,
-        long_period: int = 20
+        short_period: int,
+        long_period: int
     ) -> pd.Series:
         """
-        Calculate the ratio of short-term ATR to long-term ATR
+        Calculate ATR ratio (cached).
         
         Args:
-            high: Series of high prices
-            low: Series of low prices
-            close: Series of close prices
-            short_period: Short-term ATR period
-            long_period: Long-term ATR period
+            high: High prices
+            low: Low prices
+            close: Close prices
+            short_period: Short-term period
+            long_period: Long-term period
             
         Returns:
-            Ratio of short-term to long-term ATR
+            Series with ATR ratios
         """
+        # Create cache key
+        cache_key = f"atr_ratio_{self._hash_series(high)}_{self._hash_series(low)}_{self._hash_series(close)}_{short_period}_{long_period}"
+        
+        # Check cache
+        if hasattr(self, '_atr_ratio_cache') and cache_key in self._atr_ratio_cache:
+            logger.debug("Using cached ATR ratio")
+            return self._atr_ratio_cache[cache_key]
+            
+        # Calculate ATR ratio
         from utils.technical_indicators import TechnicalIndicators
+        short_atr = TechnicalIndicators.calculate_atr(high, low, close, period=short_period)
+        long_atr = TechnicalIndicators.calculate_atr(high, low, close, period=long_period)
+        result = short_atr / long_atr
         
-        # Calculate short and long ATRs
-        short_atr = TechnicalIndicators.calculate_atr(high, low, close, short_period)
-        long_atr = TechnicalIndicators.calculate_atr(high, low, close, long_period)
+        # Cache result
+        if not hasattr(self, '_atr_ratio_cache'):
+            self._atr_ratio_cache = {}
+        self._atr_ratio_cache[cache_key] = result
         
-        # Calculate ratio
-        atr_ratio = short_atr / long_atr
-        
-        return atr_ratio
+        return result
     
     @staticmethod
     def calculate_volatility_percentile(
@@ -124,10 +172,14 @@ class VolatilityAnalyzer:
             lambda x: pd.Series(x).rank(pct=True).iloc[-1] * 100
         )
     
-    @staticmethod
-    def calculate_garch_features(returns: pd.Series, p: int = 1, q: int = 1) -> pd.DataFrame:
+    def calculate_garch_features(
+        self,
+        returns: pd.Series,
+        p: int = 1,
+        q: int = 1
+    ) -> pd.DataFrame:
         """
-        Calculate GARCH model features for volatility clustering
+        Calculate GARCH model features for volatility clustering (with caching).
         
         Args:
             returns: Series of price returns
@@ -137,6 +189,14 @@ class VolatilityAnalyzer:
         Returns:
             DataFrame with GARCH features
         """
+        # Create cache key
+        cache_key = f"garch_{self._hash_series(returns)}_{p}_{q}"
+        
+        # Check cache
+        if cache_key in self._garch_cache:
+            logger.debug("Using cached GARCH results")
+            return self._garch_cache[cache_key]
+            
         try:
             import arch
             from arch import arch_model
@@ -159,21 +219,23 @@ class VolatilityAnalyzer:
             # Calculate volatility trend
             features['garch_vol_change'] = features['garch_vol'].pct_change(5)
             
+            # Cache results
+            self._garch_cache[cache_key] = features
+            
             return features
             
         except ImportError:
-            # If arch package is not available, return empty DataFrame
-            print("ARCH package not available. GARCH features will not be calculated.")
+            logger.warning("ARCH package not available. GARCH features will not be calculated.")
             return pd.DataFrame(index=returns.index)
         
-    @staticmethod
     def calculate_volume_volatility_features(
+        self,
         returns: pd.Series,
         volume: pd.Series,
         window: int = 20
     ) -> pd.DataFrame:
         """
-        Calculate volume-weighted volatility features
+        Calculate volume-weighted volatility features (cached).
         
         Args:
             returns: Series of price returns
@@ -183,6 +245,15 @@ class VolatilityAnalyzer:
         Returns:
             DataFrame with volume-weighted volatility features
         """
+        # Create cache key
+        cache_key = f"vol_vol_{self._hash_series(returns)}_{self._hash_series(volume)}_{window}"
+        
+        # Check cache
+        if hasattr(self, '_vol_vol_cache') and cache_key in self._vol_vol_cache:
+            logger.debug("Using cached volume volatility features")
+            return self._vol_vol_cache[cache_key]
+            
+        # Calculate features
         features = pd.DataFrame(index=returns.index)
         
         # Volume relative to moving average
@@ -200,11 +271,18 @@ class VolatilityAnalyzer:
         )
         features['vol_adjusted_trend'] = std_dev * np.sign(vol_trend)
         
+        # Cache results
+        if not hasattr(self, '_vol_vol_cache'):
+            self._vol_vol_cache = {}
+        self._vol_vol_cache[cache_key] = features
+        
         return features
     
-    @staticmethod
     def calculate_volatility_regime(
+        self,
         returns: pd.Series,
+        short_window: int = 5,
+        long_window: int = 20,
         vol_z_threshold: float = 1.5
     ) -> pd.Series:
         """
@@ -212,6 +290,8 @@ class VolatilityAnalyzer:
         
         Args:
             returns: Series of price returns
+            short_window: Short-term window for volatility z-score
+            long_window: Long-term window for volatility z-score
             vol_z_threshold: Z-score threshold for regime classification
             
         Returns:
@@ -219,7 +299,7 @@ class VolatilityAnalyzer:
             1 (high vol), 0 (normal vol), -1 (low vol)
         """
         # Calculate volatility z-score
-        vol_zscore = VolatilityAnalyzer.calculate_volatility_zscore(returns)
+        vol_zscore = self._calculate_volatility_zscore(returns, short_window, long_window)
         
         # Classify regimes
         vol_regime = pd.Series(0, index=returns.index)  # Normal volatility
@@ -264,10 +344,13 @@ class VolatilityAnalyzer:
         
         return divergence
     
-    @staticmethod
-    def prepare_volatility_features(data: pd.DataFrame, is_intraday: bool = False) -> pd.DataFrame:
+    def prepare_volatility_features(
+        self,
+        data: pd.DataFrame,
+        is_intraday: bool = False
+    ) -> pd.DataFrame:
         """
-        Prepare comprehensive volatility mean reversion features
+        Prepare comprehensive volatility mean reversion features (with caching).
         
         Args:
             data: DataFrame with OHLCV data
@@ -305,13 +388,13 @@ class VolatilityAnalyzer:
                 df['high'], df['low'], df['close'], period=atr_short
             )
             
-        # Add volatility z-score
-        df['vol_zscore'] = VolatilityAnalyzer.calculate_volatility_zscore(
+        # Add volatility z-score (cached)
+        df['vol_zscore'] = self._calculate_volatility_zscore(
             df['returns'], short_vol_window, long_vol_window
         )
         
-        # Add ATR ratio
-        df['atr_ratio'] = VolatilityAnalyzer.calculate_atr_ratio(
+        # Add ATR ratio (cached)
+        df['atr_ratio'] = self._calculate_atr_ratio(
             df['high'], df['low'], df['close'], atr_short, atr_long
         )
         
@@ -326,8 +409,8 @@ class VolatilityAnalyzer:
         )
         
         # Add volatility regime
-        df['vol_regime'] = VolatilityAnalyzer.calculate_volatility_regime(
-            df['returns']
+        df['vol_regime'] = self.calculate_volatility_regime(
+            df['returns'], short_vol_window, long_vol_window
         )
         
         # Add volatility divergence
@@ -335,9 +418,9 @@ class VolatilityAnalyzer:
             df['close'], df['atr']
         )
         
-        # Add volume-weighted volatility features if volume data exists
+        # Add volume-weighted volatility features if volume data exists (cached)
         if 'volume' in df.columns:
-            vol_features = VolatilityAnalyzer.calculate_volume_volatility_features(
+            vol_features = self.calculate_volume_volatility_features(
                 df['returns'], df['volume']
             )
             df = pd.concat([df, vol_features], axis=1)
@@ -345,13 +428,13 @@ class VolatilityAnalyzer:
         # Add GARCH features for daily data (more stable)
         if not is_intraday and len(df) > 100:
             try:
-                garch_features = VolatilityAnalyzer.calculate_garch_features(
+                garch_features = self.calculate_garch_features(
                     df['returns'].dropna()
                 )
                 if not garch_features.empty:
                     df = pd.concat([df, garch_features], axis=1)
             except Exception as e:
-                print(f"Could not calculate GARCH features: {e}")
+                logger.warning(f"Could not calculate GARCH features: {e}")
                 
         return df
     
