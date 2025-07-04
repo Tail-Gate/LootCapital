@@ -152,4 +152,42 @@ def test_predict_before_training(model_trainer, sample_data):
 def test_save_before_training(model_trainer):
     """Test saving before training."""
     with pytest.raises(ValueError):
-        model_trainer.save_model() 
+        model_trainer.save_model()
+
+def test_model_explanation(model_trainer, sample_data):
+    """Test model explanation functionality."""
+    X, y = sample_data
+    
+    # Train model
+    model_trainer.train(X, y)
+    
+    # Test explaining a prediction
+    with tempfile.TemporaryDirectory() as temp_dir:
+        output_path = Path(temp_dir) / "explanation.png"
+        model_trainer.explain_prediction(X, 0, str(output_path))
+        assert output_path.exists()
+    
+    # Test plotting feature importance
+    with tempfile.TemporaryDirectory() as temp_dir:
+        output_path = Path(temp_dir) / "importance.png"
+        model_trainer.plot_feature_importance(X, str(output_path))
+        assert output_path.exists()
+    
+    # Test plotting feature dependence
+    with tempfile.TemporaryDirectory() as temp_dir:
+        output_path = Path(temp_dir) / "dependence.png"
+        model_trainer.plot_feature_dependence(X, "feature1", str(output_path))
+        assert output_path.exists()
+
+def test_explanation_before_training(model_trainer, sample_data):
+    """Test explanation methods before training."""
+    X, _ = sample_data
+    
+    with pytest.raises(ValueError):
+        model_trainer.explain_prediction(X, 0)
+    
+    with pytest.raises(ValueError):
+        model_trainer.plot_feature_importance(X)
+    
+    with pytest.raises(ValueError):
+        model_trainer.plot_feature_dependence(X, "feature1") 

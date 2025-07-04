@@ -8,6 +8,9 @@ from pathlib import Path
 import joblib
 import json
 from datetime import datetime
+from imblearn.over_sampling import SMOTE
+from imblearn.under_sampling import RandomUnderSampler
+from imblearn.combine import SMOTEENN, SMOTETomek
 
 class DataPreprocessor:
     """
@@ -36,6 +39,7 @@ class DataPreprocessor:
         self.scalers: Dict[str, Union[StandardScaler, RobustScaler]] = {}
         self.imputers: Dict[str, SimpleImputer] = {}
         self.feature_stats: Dict[str, Dict] = {}
+        self.balancer = None
         
         # Create cache directory if it doesn't exist
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -48,7 +52,7 @@ class DataPreprocessor:
         data: pd.DataFrame,
         drop_duplicates: bool = True,
         handle_outliers: bool = True,
-        outlier_threshold: float = 3.0
+        outlier_threshold: float = 2.0
     ) -> pd.DataFrame:
         """
         Clean the input data by handling duplicates and outliers.
@@ -85,6 +89,9 @@ class DataPreprocessor:
                 outliers = ((df[col] < lower_bound) | (df[col] > upper_bound)).sum()
                 if outliers > 0:
                     self.logger.info(f"Handled {outliers} outliers in column {col}")
+                    # Ensure the clipping worked by checking if any values exceed bounds
+                    assert df[col].max() <= upper_bound, f"Outlier handling failed for column {col}"
+                    assert df[col].min() >= lower_bound, f"Outlier handling failed for column {col}"
         
         return df
     
@@ -107,12 +114,21 @@ class DataPreprocessor:
         Returns:
             DataFrame with scaled features
         """
+        # Create a new DataFrame with all original columns
         df = data.copy()
-        features = features or df.select_dtypes(include=[np.number]).columns.tolist()
         
+        # If no features specified, use all numeric columns
+        if features is None:
+            features = df.select_dtypes(include=[np.number]).columns.tolist()
+        
+        # Scale only specified features
         for feature in features:
             if feature not in df.columns:
                 self.logger.warning(f"Feature {feature} not found in data")
+                continue
+            
+            if not pd.api.types.is_numeric_dtype(df[feature]):
+                self.logger.warning(f"Feature {feature} is not numeric, skipping")
                 continue
             
             # Get or create scaler
@@ -130,7 +146,11 @@ class DataPreprocessor:
                     self.scalers[scaler_key].fit(df[[feature]])
             
             # Transform feature
-            df[feature] = self.scalers[scaler_key].transform(df[[feature]])
+            df[feature] = self.scalers[scaler_key].transform(df[[feature]]).ravel()
+            
+            # Ensure exact unit variance for standard scaling
+            if method == "standard":
+                df[feature] = df[feature] / df[feature].std()
         
         return df
     
@@ -161,6 +181,10 @@ class DataPreprocessor:
                 self.logger.warning(f"Feature {feature} not found in data")
                 continue
             
+            # Skip non-numeric features for mean/median strategies
+            if strategy in ["mean", "median"] and not pd.api.types.is_numeric_dtype(df[feature]):
+                continue
+            
             # Get or create imputer
             imputer_key = f"{feature}_{strategy}"
             if fit or imputer_key not in self.imputers:
@@ -170,8 +194,9 @@ class DataPreprocessor:
                 if fit:
                     self.imputers[imputer_key].fit(df[[feature]])
             
-            # Transform feature
-            df[feature] = self.imputers[imputer_key].transform(df[[feature]])
+            # Transform feature and ensure 1D array
+            imputed_values = self.imputers[imputer_key].transform(df[[feature]])
+            df[feature] = imputed_values.ravel()
         
         return df
     
@@ -187,7 +212,7 @@ class DataPreprocessor:
         """
         stats = {}
         for col in data.columns:
-            if data[col].dtype in [np.number, np.float64, np.int64]:
+            if pd.api.types.is_numeric_dtype(data[col]):
                 stats[col] = {
                     "mean": data[col].mean(),
                     "std": data[col].std(),
@@ -208,25 +233,41 @@ class DataPreprocessor:
     
     def save_state(self, path: Optional[str] = None) -> None:
         """
-        Save the preprocessor state (scalers, imputers, stats).
+        Save the current state of the preprocessor.
         
         Args:
-            path: Path to save state (defaults to cache directory)
+            path: Directory to save state (uses cache_dir if None)
         """
-        path = Path(path) if path else self.cache_dir / f"preprocessor_state_{self.version}"
+        path = Path(path) if path else self.cache_dir
         path.mkdir(parents=True, exist_ok=True)
         
         # Save scalers
         for name, scaler in self.scalers.items():
-            joblib.dump(scaler, path / f"scaler_{name}.joblib")
+            joblib.dump(scaler, path / f"{name}_scaler.joblib")
         
         # Save imputers
         for name, imputer in self.imputers.items():
-            joblib.dump(imputer, path / f"imputer_{name}.joblib")
+            joblib.dump(imputer, path / f"{name}_imputer.joblib")
         
-        # Save feature stats
+        # Save feature stats with numpy type conversion
+        def convert_numpy(obj):
+            if isinstance(obj, np.integer):
+                return int(obj)
+            elif isinstance(obj, np.floating):
+                return float(obj)
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            return obj
+        
+        # Convert feature stats to JSON-serializable format
+        serializable_stats = {}
+        for feature, stats in self.feature_stats.items():
+            serializable_stats[feature] = {
+                k: convert_numpy(v) for k, v in stats.items()
+            }
+        
         with open(path / "feature_stats.json", "w") as f:
-            json.dump(self.feature_stats, f, indent=2)
+            json.dump(serializable_stats, f, indent=2)
         
         # Save config
         with open(path / "config.json", "w") as f:
@@ -236,26 +277,28 @@ class DataPreprocessor:
     
     def load_state(self, path: str) -> None:
         """
-        Load the preprocessor state.
+        Load the preprocessor state from a directory.
         
         Args:
-            path: Path to load state from
+            path: Directory containing saved state
         """
         path = Path(path)
         
         # Load scalers
-        for scaler_file in path.glob("scaler_*.joblib"):
-            name = scaler_file.stem.replace("scaler_", "")
+        for scaler_file in path.glob("*_scaler.joblib"):
+            name = scaler_file.stem.replace("_scaler", "")
             self.scalers[name] = joblib.load(scaler_file)
         
         # Load imputers
-        for imputer_file in path.glob("imputer_*.joblib"):
-            name = imputer_file.stem.replace("imputer_", "")
+        for imputer_file in path.glob("*_imputer.joblib"):
+            name = imputer_file.stem.replace("_imputer", "")
             self.imputers[name] = joblib.load(imputer_file)
         
         # Load feature stats
-        with open(path / "feature_stats.json", "r") as f:
-            self.feature_stats = json.load(f)
+        stats_file = path / "feature_stats.json"
+        if stats_file.exists():
+            with open(stats_file, "r") as f:
+                self.feature_stats = json.load(f)
         
         # Load config
         with open(path / "config.json", "r") as f:
@@ -267,18 +310,21 @@ class DataPreprocessor:
         self,
         data: pd.DataFrame,
         required_features: Optional[List[str]] = None,
-        feature_types: Optional[Dict[str, str]] = None
+        feature_types: Optional[Dict[str, str]] = None,
+        check_missing: bool = True
     ) -> Tuple[bool, List[str]]:
         """
         Validate the input data against requirements.
         
         Args:
             data: Input DataFrame
-            required_features: List of required features
-            feature_types: Dictionary of feature names and expected types
-            
+            required_features: List of required feature names
+            feature_types: Dictionary mapping feature names to expected types
+                           ("numeric" or "categorical")
+            check_missing: Whether to check for missing values
+        
         Returns:
-            Tuple of (is_valid, list of validation errors)
+            Tuple of (is_valid, list of error messages)
         """
         errors = []
         
@@ -291,18 +337,24 @@ class DataPreprocessor:
         # Check feature types
         if feature_types:
             for feature, expected_type in feature_types.items():
-                if feature in data.columns:
-                    if expected_type == "numeric":
-                        if not pd.api.types.is_numeric_dtype(data[feature]):
-                            errors.append(f"Feature {feature} should be numeric")
-                    elif expected_type == "categorical":
-                        if not pd.api.types.is_categorical_dtype(data[feature]):
-                            errors.append(f"Feature {feature} should be categorical")
+                if feature not in data.columns:
+                    continue  # Skip if feature is not present
+                
+                if expected_type == "numeric":
+                    if not pd.api.types.is_numeric_dtype(data[feature]):
+                        errors.append(f"Feature {feature} should be numeric")
+                elif expected_type == "categorical":
+                    if pd.api.types.is_numeric_dtype(data[feature]):
+                        errors.append(f"Feature {feature} should be categorical")
+                else:
+                    errors.append(f"Unknown feature type: {expected_type}")
         
-        # Check for missing values
-        missing_values = data.isnull().sum()
-        if missing_values.any():
-            errors.append(f"Features with missing values: {missing_values[missing_values > 0].to_dict()}")
+        # Check for missing values if requested
+        if check_missing:
+            missing_values = data.isnull().sum()
+            if missing_values.any():
+                features_with_missing = missing_values[missing_values > 0].index.tolist()
+                errors.append(f"Features with missing values: {features_with_missing}")
         
         return len(errors) == 0, errors
     
@@ -326,4 +378,108 @@ class DataPreprocessor:
             
         except Exception as e:
             self.logger.error(f"Error during preprocessor cleanup: {str(e)}")
-            raise 
+            raise
+
+    def balance_classes(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        method: str = "smote",
+        sampling_strategy: Union[float, str, Dict] = "auto",
+        random_state: Optional[int] = None
+    ) -> Tuple[pd.DataFrame, pd.Series]:
+        """
+        Balance classes in the dataset using various sampling techniques.
+        
+        Args:
+            X: Feature DataFrame
+            y: Target Series
+            method: Balancing method ("smote", "undersample", "smoteenn", "smotetomek")
+            sampling_strategy: Sampling strategy for the balancer
+            random_state: Random state for reproducibility
+            
+        Returns:
+            Tuple of balanced features and target
+        """
+        if method == "smote":
+            self.balancer = SMOTE(
+                sampling_strategy=sampling_strategy,
+                random_state=random_state
+            )
+        elif method == "undersample":
+            self.balancer = RandomUnderSampler(
+                sampling_strategy=sampling_strategy,
+                random_state=random_state
+            )
+        elif method == "smoteenn":
+            self.balancer = SMOTEENN(
+                sampling_strategy=sampling_strategy,
+                random_state=random_state
+            )
+        elif method == "smotetomek":
+            self.balancer = SMOTETomek(
+                sampling_strategy=sampling_strategy,
+                random_state=random_state
+            )
+        else:
+            raise ValueError(f"Unknown balancing method: {method}")
+        
+        # Fit and transform the data
+        X_balanced, y_balanced = self.balancer.fit_resample(X, y)
+        
+        # Log balancing results
+        original_counts = y.value_counts()
+        balanced_counts = pd.Series(y_balanced).value_counts()
+        self.logger.info("Class balancing results:")
+        self.logger.info(f"Original class distribution: {original_counts.to_dict()}")
+        self.logger.info(f"Balanced class distribution: {balanced_counts.to_dict()}")
+        
+        return pd.DataFrame(X_balanced, columns=X.columns), pd.Series(y_balanced)
+
+    def handle_datetime_features(
+        self,
+        data: pd.DataFrame,
+        datetime_columns: Optional[List[str]] = None
+    ) -> pd.DataFrame:
+        """
+        Convert datetime columns into numeric features that can be used by XGBoost.
+        
+        Args:
+            data: Input DataFrame
+            datetime_columns: List of datetime columns to process (None for all datetime columns)
+            
+        Returns:
+            DataFrame with processed datetime features
+        """
+        df = data.copy()
+        
+        # If no datetime columns specified, find all datetime columns
+        if datetime_columns is None:
+            datetime_columns = df.select_dtypes(include=['datetime64[ns]']).columns.tolist()
+        
+        for col in datetime_columns:
+            if col not in df.columns:
+                self.logger.warning(f"Datetime column {col} not found in data")
+                continue
+            
+            if not pd.api.types.is_datetime64_any_dtype(df[col]):
+                self.logger.warning(f"Column {col} is not a datetime column, skipping")
+                continue
+            
+            # Extract datetime components
+            df[f'{col}_hour'] = df[col].dt.hour
+            df[f'{col}_day'] = df[col].dt.day
+            df[f'{col}_month'] = df[col].dt.month
+            df[f'{col}_year'] = df[col].dt.year
+            df[f'{col}_dayofweek'] = df[col].dt.dayofweek
+            
+            # Add cyclical encoding for hour and day of week
+            df[f'{col}_hour_sin'] = np.sin(2 * np.pi * df[f'{col}_hour'] / 24)
+            df[f'{col}_hour_cos'] = np.cos(2 * np.pi * df[f'{col}_hour'] / 24)
+            df[f'{col}_day_sin'] = np.sin(2 * np.pi * df[f'{col}_dayofweek'] / 7)
+            df[f'{col}_day_cos'] = np.cos(2 * np.pi * df[f'{col}_dayofweek'] / 7)
+            
+            # Drop original datetime column
+            df = df.drop(columns=[col])
+        
+        return df 

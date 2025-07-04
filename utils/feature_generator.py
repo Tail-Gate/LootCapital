@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union, Any
 import logging
 from pathlib import Path
 import json
@@ -11,6 +11,7 @@ import multiprocessing as mp
 import gc
 import time
 import psutil
+from tqdm import tqdm
 
 def generate_features_chunk(chunk: pd.DataFrame, order_book_data: Optional[pd.DataFrame], indicators) -> pd.DataFrame:
     """
@@ -23,49 +24,84 @@ def generate_features_chunk(chunk: pd.DataFrame, order_book_data: Optional[pd.Da
         DataFrame with generated features
     """
     features = pd.DataFrame(index=chunk.index)
+    
     # Price-based features
-    features['returns'] = chunk['close'].pct_change()
-    features['log_returns'] = np.log1p(features['returns'])
+    features.loc[:, 'returns'] = chunk['close'].pct_change()
+    features.loc[:, 'returns'] = features['returns'].replace([np.inf, -np.inf], np.nan)
+    features.loc[:, 'log_returns'] = np.log1p(features['returns'])
+    features.loc[:, 'log_returns'] = features['log_returns'].replace([np.inf, -np.inf], np.nan)
+    
     # Technical indicators
     rsi = indicators.calculate_rsi(chunk['close'])
     atr = indicators.calculate_atr(chunk['high'], chunk['low'], chunk['close'])
-    features['rsi'] = rsi.astype(np.float32)
-    features['atr'] = atr.astype(np.float32)
+    features.loc[:, 'rsi'] = rsi.astype(np.float32)
+    features.loc[:, 'atr'] = atr.astype(np.float32)
+    
     # Bollinger Bands
     upper, middle, lower = indicators.calculate_bollinger_bands(chunk['close'])
-    features['bb_upper'] = upper.astype(np.float32)
-    features['bb_middle'] = middle.astype(np.float32)
-    features['bb_lower'] = lower.astype(np.float32)
-    features['bb_width'] = ((upper - lower) / middle).astype(np.float32)
+    features.loc[:, 'bb_upper'] = upper.astype(np.float32)
+    features.loc[:, 'bb_middle'] = middle.astype(np.float32)
+    features.loc[:, 'bb_lower'] = lower.astype(np.float32)
+    features.loc[:, 'bb_width'] = ((upper - lower) / middle).astype(np.float32)
+    features.loc[:, 'bb_width'] = features['bb_width'].replace([np.inf, -np.inf], np.nan)
+    
     # Volume features
-    features['volume_ma'] = chunk['volume'].rolling(window=20).mean().astype(np.float32)
-    features['volume_std'] = chunk['volume'].rolling(window=20).std().astype(np.float32)
-    features['volume_surge'] = indicators.calculate_volume_surge_factor(chunk['volume']).astype(np.float32)
+    features.loc[:, 'volume'] = chunk['volume'].astype(np.float32)
+    features.loc[:, 'volume_ma'] = chunk['volume'].rolling(window=20).mean().astype(np.float32)
+    features.loc[:, 'volume_std'] = chunk['volume'].rolling(window=20).std().astype(np.float32)
+    features.loc[:, 'volume_surge'] = indicators.calculate_volume_surge_factor(chunk['volume']).astype(np.float32)
+    features.loc[:, 'volume_ratio'] = (chunk['volume'] / features['volume_ma']).astype(np.float32)
+    
+    # MACD features
+    macd, signal, hist = indicators.calculate_macd(chunk['close'])
+    features.loc[:, 'macd'] = macd.astype(np.float32)
+    features.loc[:, 'macd_signal'] = signal.astype(np.float32)
+    features.loc[:, 'macd_hist'] = hist.astype(np.float32)
+    
+    # Moving Average Crossover
+    short_ma = chunk['close'].rolling(window=5).mean()
+    long_ma = chunk['close'].rolling(window=10).mean()
+    features.loc[:, 'ma_crossover'] = (short_ma - long_ma).astype(np.float32)
+    
+    # Swing RSI
+    features.loc[:, 'swing_rsi'] = indicators.calculate_rsi(chunk['close'], period=14).astype(np.float32)
+    
+    # VWAP Ratio
+    vwap = (chunk['volume'] * (chunk['high'] + chunk['low'] + chunk['close']) / 3).cumsum() / chunk['volume'].cumsum()
+    features.loc[:, 'vwap_ratio'] = (chunk['close'] / vwap).astype(np.float32)
+    
     # Momentum features
     momentum = indicators.calculate_price_momentum(chunk['close'], 14)
     vol_regime = indicators.calculate_volatility_regime(chunk['close'])
-    features['price_momentum'] = momentum.astype(np.float32)
-    features['volatility_regime'] = vol_regime.astype(np.float32)
+    features.loc[:, 'price_momentum'] = momentum.astype(np.float32)
+    features.loc[:, 'volatility_regime'] = vol_regime.astype(np.float32)
+    
     # Support/Resistance
     support, resistance = indicators.calculate_support_resistance(chunk['high'], chunk['low'], chunk['close'])
-    features['support'] = support.astype(np.float32)
-    features['resistance'] = resistance.astype(np.float32)
+    features.loc[:, 'support'] = support.astype(np.float32)
+    features.loc[:, 'resistance'] = resistance.astype(np.float32)
+    
     # Breakout detection
-    features['breakout_intensity'] = indicators.calculate_breakout_intensity(chunk['close'], atr).astype(np.float32)
+    features.loc[:, 'breakout_intensity'] = indicators.calculate_breakout_intensity(chunk['close'], atr).astype(np.float32)
+    
     # Trend strength
-    features['adx'] = indicators.calculate_directional_movement(chunk['high'], chunk['low'], chunk['close']).astype(np.float32)
+    features.loc[:, 'adx'] = indicators.calculate_directional_movement(chunk['high'], chunk['low'], chunk['close']).astype(np.float32)
+    
     # Cumulative delta
-    features['cumulative_delta'] = indicators.calculate_cumulative_delta(chunk['close'], chunk['volume']).astype(np.float32)
+    features.loc[:, 'cumulative_delta'] = indicators.calculate_cumulative_delta(chunk['close'], chunk['volume']).astype(np.float32)
+    
     # Add order book features if available
     if order_book_data is not None:
-        features['bid_ask_spread'] = (
+        features.loc[:, 'bid_ask_spread'] = (
             order_book_data['ask_prices'].apply(lambda x: x[0]) -
             order_book_data['bid_prices'].apply(lambda x: x[0])
         ).astype(np.float32)
-        features['volume_imbalance'] = (
+        features.loc[:, 'volume_imbalance'] = (
             (order_book_data['bid_volume_total'] - order_book_data['ask_volume_total']) /
             (order_book_data['bid_volume_total'] + order_book_data['ask_volume_total'])
         ).astype(np.float32)
+        features.loc[:, 'volume_imbalance'] = features['volume_imbalance'].replace([np.inf, -np.inf], np.nan)
+    
     return features
 
 class FeatureGenerator:
@@ -350,54 +386,44 @@ class FeatureGenerator:
             )
             raise
 
-    def generate_features_batched(
-        self,
-        ohlcv_data: pd.DataFrame,
-        order_book_data: Optional[pd.DataFrame] = None,
-        batch_size: Optional[int] = None
-    ) -> pd.DataFrame:
+    def generate_features_batched(self, ohlcv_data: pd.DataFrame, order_book_data: Optional[pd.DataFrame] = None, batch_size: Optional[int] = None) -> pd.DataFrame:
         """
-        Generate features using batch processing for large datasets.
-        
+        Generate features in batches to manage memory usage.
         Args:
             ohlcv_data: DataFrame with OHLCV data
             order_book_data: Optional DataFrame with order book data
-            batch_size: Optional custom batch size
-            
+            batch_size: Size of batches to process (default: 10% of data)
         Returns:
             DataFrame with generated features
         """
-        # Use provided batch size or default
-        batch_size = batch_size or self.batch_size
+        if batch_size is None:
+            batch_size = max(1, len(ohlcv_data) // 10)
         
-        # Calculate number of batches
-        total_rows = len(ohlcv_data)
-        num_batches = (total_rows + batch_size - 1) // batch_size
+        # Initialize empty DataFrame for results
+        all_features = pd.DataFrame(index=ohlcv_data.index)
         
-        # Process batches
-        all_features = []
-        for i in range(num_batches):
+        # Process in batches
+        num_batches = (len(ohlcv_data) + batch_size - 1) // batch_size
+        for i in tqdm(range(num_batches), desc="Generating features"):
             start_idx = i * batch_size
-            end_idx = min((i + 1) * batch_size, total_rows)
+            end_idx = min((i + 1) * batch_size, len(ohlcv_data))
             
-            # Create batch
-            batch = ohlcv_data.iloc[start_idx:end_idx]
-            ob_batch = None
-            if order_book_data is not None:
-                ob_batch = order_book_data.iloc[start_idx:end_idx]
+            # Get batch data
+            batch_ohlcv = ohlcv_data.iloc[start_idx:end_idx]
+            batch_order_book = order_book_data.iloc[start_idx:end_idx] if order_book_data is not None else None
             
-            # Process batch
-            batch_id = f"batch_{i}_{self.version}"
-            features = self.process_batch(batch, ob_batch, batch_id)
-            all_features.append(features)
+            # Generate features for batch
+            batch_features = generate_features_chunk(batch_ohlcv, batch_order_book, self.indicators)
             
-            # Force garbage collection after each batch
+            # Store results
+            for col in batch_features.columns:
+                all_features.loc[batch_features.index, col] = batch_features[col].astype(np.float32)
+            
+            # Force garbage collection if memory optimization is enabled
             if self.optimize_memory:
                 gc.collect()
         
-        # Combine results
-        combined = pd.concat(all_features)
-        return self._optimize_dtypes(combined)
+        return all_features
 
     def generate_features(
         self,
@@ -809,4 +835,12 @@ class FeatureGenerator:
         with open(path / "config.json", "r") as f:
             self.config = json.load(f)
         
-        self.logger.info(f"Loaded feature generator state from {path}") 
+        self.logger.info(f"Loaded feature generator state from {path}")
+    
+    def calculate_historical_volatility(self, close: pd.Series, period: int = 20) -> pd.Series:
+        """Calculate Historical Volatility using rolling standard deviation of returns."""
+        return TechnicalIndicators.calculate_historical_volatility(close, period)
+
+    def calculate_ichimoku_cloud(self, high: pd.Series, low: pd.Series, close: pd.Series, conversion_period: int = 9, base_period: int = 26, lagging_period: int = 52, displacement: int = 26) -> Tuple[pd.Series, pd.Series, pd.Series, pd.Series, pd.Series]:
+        """Calculate Ichimoku Cloud components."""
+        return TechnicalIndicators.calculate_ichimoku_cloud(high, low, close, conversion_period, base_period, lagging_period, displacement) 

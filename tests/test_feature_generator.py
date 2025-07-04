@@ -21,20 +21,26 @@ def sample_ohlcv_data():
 @pytest.fixture
 def sample_order_book_data():
     """Create sample order book data for testing."""
+    n = 100
+    n_levels = 5
+    # Generate random prices and volumes for each level
+    bid_prices = np.random.randn(n, n_levels).cumsum(axis=1) + 99
+    ask_prices = np.random.randn(n, n_levels).cumsum(axis=1) + 101
+    bid_volumes = np.random.randint(100, 1000, (n, n_levels))
+    ask_volumes = np.random.randint(100, 1000, (n, n_levels))
     data = pd.DataFrame({
-        'bid_price': np.random.randn(100).cumsum() + 99,
-        'ask_price': np.random.randn(100).cumsum() + 101,
-        'bid_volume_0': np.random.randint(100, 1000, 100),
-        'ask_volume_0': np.random.randint(100, 1000, 100),
-        'bid_volume_1': np.random.randint(100, 1000, 100),
-        'ask_volume_1': np.random.randint(100, 1000, 100),
-        'bid_volume_2': np.random.randint(100, 1000, 100),
-        'ask_volume_2': np.random.randint(100, 1000, 100),
-        'bid_volume_3': np.random.randint(100, 1000, 100),
-        'ask_volume_3': np.random.randint(100, 1000, 100),
-        'bid_volume_4': np.random.randint(100, 1000, 100),
-        'ask_volume_4': np.random.randint(100, 1000, 100)
+        'bid_prices': [list(row) for row in bid_prices],
+        'ask_prices': [list(row) for row in ask_prices],
+        'bid_volumes': [list(row) for row in bid_volumes],
+        'ask_volumes': [list(row) for row in ask_volumes],
     })
+    # Also add bid_volume_0...bid_volume_4 and ask_volume_0...ask_volume_4 for depth imbalance
+    for i in range(n_levels):
+        data[f'bid_volume_{i}'] = bid_volumes[:, i]
+        data[f'ask_volume_{i}'] = ask_volumes[:, i]
+    # Add total volume columns
+    data['bid_volume_total'] = bid_volumes.sum(axis=1)
+    data['ask_volume_total'] = ask_volumes.sum(axis=1)
     return data
 
 @pytest.fixture
@@ -161,3 +167,22 @@ def test_save_load_state(feature_generator, sample_ohlcv_data):
         # Verify state was loaded correctly
         assert new_generator.feature_importance == feature_generator.feature_importance
         assert new_generator.config == feature_generator.config 
+
+def test_calculate_historical_volatility(feature_generator, sample_ohlcv_data):
+    """Test historical volatility calculation."""
+    volatility = feature_generator.calculate_historical_volatility(sample_ohlcv_data['close'])
+    assert not volatility.isnull().all()
+    assert volatility.dtype == float
+
+def test_calculate_ichimoku_cloud(feature_generator, sample_ohlcv_data):
+    """Test Ichimoku Cloud calculation."""
+    conversion_line, base_line, leading_span_a, leading_span_b, lagging_span = feature_generator.calculate_ichimoku_cloud(
+        sample_ohlcv_data['high'],
+        sample_ohlcv_data['low'],
+        sample_ohlcv_data['close']
+    )
+    assert not conversion_line.isnull().all()
+    assert not base_line.isnull().all()
+    assert not leading_span_a.isnull().all()
+    assert not leading_span_b.isnull().all()
+    assert not lagging_span.isnull().all() 

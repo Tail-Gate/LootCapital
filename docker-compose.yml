@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  lootcapital-wfo:
+    build: .
+    container_name: lootcapital-walk-forward-optimization
+    volumes:
+      # Mount data directories for persistence
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./reports:/app/reports
+      - ./plots:/app/plots
+      - ./logs:/app/logs
+      - ./cache:/app/cache
+      - ./lightning_logs:/app/lightning_logs
+      - ./profiling_results:/app/profiling_results
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+      - CUDA_VISIBLE_DEVICES=""
+    # Override the default command with custom arguments if needed
+    # Example: Run with custom time range and parameters
+    # command: ["python", "scripts/walk_forward_optimization.py", 
+    #           "--start-date", "2020-01-01", 
+    #           "--end-date", "2023-12-31",
+    #           "--train-window-days", "180",
+    #           "--test-window-days", "30",
+    #           "--step-size-days", "15",
+    #           "--output-dir", "/app/models",
+    #           "--reports-dir", "/app/reports",
+    #           "--plots-dir", "/app/plots",
+    #           "--logs-dir", "/app/logs"]
+    restart: unless-stopped
+    # Resource limits for production use
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+          cpus: '4.0'
+        reservations:
+          memory: 4G
+          cpus: '2.0' 

@@ -1,0 +1,93 @@
+# Git and version control
+.git
+.gitignore
+.gitattributes
+
+# Python cache and compiled files
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache
+.coverage
+htmlcov
+
+# Virtual environments
+venv/
+venv_new/
+env/
+ENV/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs and temporary files
+logs/*.log
+*.log
+tmp/
+temp/
+
+# Data files (can be mounted as volumes)
+data/
+cache/
+lightning_logs/
+profiling_results/
+
+# Model files (can be mounted as volumes)
+models/*.pt
+models/*.pkl
+models/*.joblib
+
+# Reports and plots (can be mounted as volumes)
+reports/
+plots/
+
+# Documentation
+README.md
+*.md
+docs/
+
+# Docker files
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Testing files
+tests/
+test_*.py
+
+# Jupyter notebooks
+*.ipynb
+.ipynb_checkpoints/
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Large data files
+*.csv
+*.parquet
+*.h5
+*.hdf5
+*.json
+*.xml
+
+# Backup files
+*.bak
+*.backup 

@@ -197,4 +197,34 @@ class TechnicalIndicators:
         
         return macd_line, signal_line, histogram
     
+    @staticmethod
+    def calculate_historical_volatility(close: pd.Series, period: int = 20) -> pd.Series:
+        """Calculate Historical Volatility using rolling standard deviation of returns."""
+        returns = close.pct_change()
+        return returns.rolling(window=period).std() * np.sqrt(252)  # Annualized
+
+    @staticmethod
+    def calculate_ichimoku_cloud(high: pd.Series, low: pd.Series, close: pd.Series, conversion_period: int = 9, base_period: int = 26, lagging_period: int = 52, displacement: int = 26) -> Tuple[pd.Series, pd.Series, pd.Series, pd.Series, pd.Series]:
+        """Calculate Ichimoku Cloud components.
+        
+        Returns:
+            Tuple of (conversion_line, base_line, leading_span_a, leading_span_b, lagging_span)
+        """
+        # Conversion Line (Tenkan-sen)
+        conversion_line = (high.rolling(window=conversion_period).max() + low.rolling(window=conversion_period).min()) / 2
+        
+        # Base Line (Kijun-sen)
+        base_line = (high.rolling(window=base_period).max() + low.rolling(window=base_period).min()) / 2
+        
+        # Leading Span A (Senkou Span A)
+        leading_span_a = ((conversion_line + base_line) / 2).shift(displacement)
+        
+        # Leading Span B (Senkou Span B)
+        leading_span_b = ((high.rolling(window=lagging_period).max() + low.rolling(window=lagging_period).min()) / 2).shift(displacement)
+        
+        # Lagging Span (Chikou Span)
+        lagging_span = close.shift(-displacement)
+        
+        return conversion_line, base_line, leading_span_a, leading_span_b, lagging_span
+    
     

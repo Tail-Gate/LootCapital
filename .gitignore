@@ -11,11 +11,13 @@ build/
 # Virtual environments
 venv/
 env/
+venv_new/
 
 # IDE files
 .idea/
 .vscode/
 .DS_Store
+.cursor/
 
 # Jupyter Notebook
 .ipynb_checkpoints

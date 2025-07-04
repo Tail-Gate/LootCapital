@@ -47,8 +47,8 @@ class TechnicalConfig:
 class TechnicalStrategy(BaseStrategy, ABC):
     """Abstract base class for all technical trading strategies"""
     
-    def __init__(self, name: str, config: TechnicalConfig = None):
-        super().__init__(name)
+    def __init__(self, name: str, config: TechnicalConfig = None, market_data=None, technical_indicators=None):
+        super().__init__(name, market_data=market_data, technical_indicators=technical_indicators)
         self.config = config or TechnicalConfig()
         self.ti = TechnicalIndicators()
         self.market_regime: Optional[str] = None

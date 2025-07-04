@@ -1,0 +1,7 @@
+bidirectional: true
+dropout: 0.2
+hidden_size: 64
+input_size: 39
+learning_rate: 0.001
+num_layers: 2
+use_attention: true

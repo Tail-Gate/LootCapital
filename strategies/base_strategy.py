@@ -6,9 +6,14 @@ import numpy as np
 import torch
 import os
 import joblib
+from market_analysis.market_data import MarketData
+from market_analysis.technical_indicators import TechnicalIndicators
 
 class TradeType(Enum):
     """Types of trades"""
+    NONE = "none"
+    LONG = "long"
+    SHORT = "short"
     DAY_TRADE = "day"
     SWING_TRADE = "swing"
     POSITION_TRADE = "position"
@@ -16,14 +21,23 @@ class TradeType(Enum):
 class BaseStrategy(ABC):
     """Abstract base class for all trading strategies"""
     
-    def __init__(self, name: str):
+    def __init__(self, 
+                 config: Dict,
+                 market_data: MarketData,
+                 technical_indicators: TechnicalIndicators):
         """
-        Initialize base strategy
+        Initialize the base strategy.
         
         Args:
-            name: Strategy identifier
+            config: Strategy configuration dictionary
+            market_data: MarketData instance for data access
+            technical_indicators: TechnicalIndicators instance for indicator calculations
         """
-        self.name = name
+        self.config = config
+        self.market_data = market_data
+        self.technical_indicators = technical_indicators
+        self.signals: Dict[str, str] = {}
+        self.name = ""
         self.model = None
         self.confidence_threshold = 0.6
         
@@ -285,3 +299,19 @@ class BaseStrategy(ABC):
             from market_analysis.signal_enhancer import NaturalGasSignalEnhancer
             self.signal_enhancer = NaturalGasSignalEnhancer()
             self.signal_enhancer.load_model(state['signal_enhancer_path'])
+
+    def update(self) -> None:
+        """
+        Update the strategy with new market data.
+        This method should be implemented by subclasses.
+        """
+        raise NotImplementedError("Subclasses must implement update()")
+        
+    def get_signals(self) -> Dict[str, str]:
+        """
+        Get the current trading signals.
+        
+        Returns:
+            Dictionary mapping asset symbols to trading signals
+        """
+        return self.signals

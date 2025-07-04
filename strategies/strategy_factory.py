@@ -21,6 +21,7 @@ from strategies.markov_chain_strategy import MarkovChainStrategy, MarkovChainCon
 from strategies.trend_following import TrendFollowingConfig,TrendFollowingStrategy
 from strategies.xgboost_mean_reversion import XGBoostMeanReversionStrategy, XGBoostMeanReversionConfig
 from strategies.lstm_swing_mean_reversion import LSTMSwingMeanReversionStrategy, LSTMSwingMeanReversionConfig
+from strategies.advanced_time_series import AdvancedTimeSeriesStrategy, AdvancedTimeSeriesConfig
 
 @dataclass
 class StrategyConfig:
@@ -51,7 +52,8 @@ class StrategyFactory:
         'markov_chain': MarkovChainStrategy,
         'trend_following': TrendFollowingStrategy,
         'xgboost_mean_reversion': XGBoostMeanReversionStrategy,
-        'lstm_swing_mean_reversion': LSTMSwingMeanReversionStrategy 
+        'lstm_swing_mean_reversion': LSTMSwingMeanReversionStrategy,
+        'advanced_time_series': AdvancedTimeSeriesStrategy
     }
 
     # Update the _configs dictionary
@@ -73,7 +75,8 @@ class StrategyFactory:
         'markov_chain': MarkovChainConfig,
         'trend_following': TrendFollowingConfig,
         'xgboost_mean_reversion': XGBoostMeanReversionConfig,
-        'lstm_swing_mean_reversion': LSTMSwingMeanReversionConfig 
+        'lstm_swing_mean_reversion': LSTMSwingMeanReversionConfig,
+        'advanced_time_series': AdvancedTimeSeriesConfig
     }
     
     @classmethod
