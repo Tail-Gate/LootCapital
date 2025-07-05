@@ -48,3 +48,7 @@ logs/
 
 # Trading output
 backtest_results/
+
+# Temporary and automation files
+auto_git_push.sh
+temp_crontab.txt

@@ -245,8 +245,8 @@ class WalkForwardOptimizer:
             logger.info("Converting to classification targets...")
             y_flat = y.flatten().numpy()
             classes = np.ones(len(y_flat), dtype=int)  # Default to no direction
-            classes[y_flat > self.price_threshold] = 2   # Up
-            classes[y_flat < -self.price_threshold] = 0  # Down
+            classes[y_flat > config.price_threshold] = 2   # Up (use config threshold)
+            classes[y_flat < -config.price_threshold] = 0  # Down (use config threshold)
             y_classes = torch.LongTensor(classes.reshape(y.shape))
             
             # Log class distribution
@@ -294,8 +294,8 @@ class WalkForwardOptimizer:
             
             logger.info(f"Data validation passed - Training: {len(X_train)} samples, Test: {len(X_test)} samples")
             
-            # Calculate class weights from training data with manual adjustments
-            logger.info("Calculating class weights from training data with manual adjustments...")
+            # Calculate class weights from training data with optimized adjustments
+            logger.info("Calculating class weights from training data with optimized adjustments...")
             y_train_flat = y_train.flatten().numpy()
             
             # FIXED: Use the already-calculated class labels from prepare_period_data
@@ -314,21 +314,26 @@ class WalkForwardOptimizer:
             class_counts = Counter(classes)
             total_samples = len(classes)
             class_weights = []
+            
+            # Get optimized class multipliers if available
+            class_multipliers = getattr(self, 'optimized_class_multipliers', {
+                'class_multiplier_0': 3.2,
+                'class_multiplier_1': 2.0,
+                'class_multiplier_2': 3.2
+            })
+            
             for i in range(3):
                 if class_counts[i] > 0:
                     weight = total_samples / (len(class_counts) * class_counts[i])
                     
-                    # --- START Manual Weight Adjustment ---
-                    if i == 0:  # Class 0: Down
-                        weight *= 3.2
-                        logger.info(f"  Applied 3.2x multiplier to Class 0 (Down) weight: {weight:.4f}")
-                    elif i == 1:  # Class 1: No Direction
-                        weight *= 2.0
-                        logger.info(f"  Applied 2.0x multiplier to Class 1 (No Direction) weight: {weight:.4f}")
-                    elif i == 2:  # Class 2: Up
-                        weight *= 3.2   
-                        logger.info(f"  Applied 3.2x multiplier to Class 2 (Up) weight: {weight:.4f}")
-                    # --- END Manual Weight Adjustment ---
+                    # --- START Optimized Weight Adjustment ---
+                    multiplier_key = f'class_multiplier_{i}'
+                    multiplier = class_multipliers.get(multiplier_key, 1.0)
+                    weight *= multiplier
+                    
+                    class_name = {0: 'Down', 1: 'No Direction', 2: 'Up'}[i]
+                    logger.info(f"  Applied {multiplier:.2f}x multiplier to Class {i} ({class_name}) weight: {weight:.4f}")
+                    # --- END Optimized Weight Adjustment ---
                     
                     class_weights.append(weight)
                 else:
@@ -344,7 +349,7 @@ class WalkForwardOptimizer:
             trainer = ClassificationSTGNNTrainer(
                 config, 
                 data_processor, 
-                self.price_threshold,
+                config.price_threshold,  # Use optimized price threshold from config
                 focal_alpha=config.focal_alpha,  # Use config parameter
                 focal_gamma=config.focal_gamma,  # Use config parameter
                 class_weights=class_weights,  # Pass pre-calculated weights
@@ -567,33 +572,133 @@ class WalkForwardOptimizer:
     def optimize_hyperparameters(self, split: dict, period_index: int):
         """Optimize hyperparameters for the current period"""
         
-        # For now, use the initial config
-        # In the future, this could implement Bayesian optimization or grid search
-        config = STGNNConfig(
-            num_nodes=self.initial_config.num_nodes,
-            input_dim=self.initial_config.input_dim,
-            hidden_dim=96,  # Restored complexity for better learning
-            output_dim=3,  # 3 classes: down/no direction/up
-            num_layers=2,  # Restored 2 layers for deeper learning
-            dropout=0.2,  # Keep reduced regularization
-            kernel_size=3,
-            learning_rate=0.0005,  # Restored for stable training
-            batch_size=2,  # Keep small for memory management
-            num_epochs=40,  # Restored for more training time
-            early_stopping_patience=8,  # Restored for more training time
-            seq_len=80,  # Restored for more context
-            prediction_horizon=15,
-            features=self.initial_config.features,
-            assets=self.initial_config.assets,
-            confidence_threshold=0.51,
-            buy_threshold=0.6,
-            sell_threshold=0.4,
-            retrain_interval=24,
-            focal_alpha=1.0,  # Keep this as 1.0 given you have class_weights
-            focal_gamma=2.0   # Default focusing parameter
-        )
+        # Try to load optimized parameters from hyperparameter optimization
+        optimized_params = self.load_optimized_hyperparameters()
+        
+        if optimized_params:
+            logger.info(f"Using optimized hyperparameters for period {period_index}")
+            config = STGNNConfig(
+                num_nodes=self.initial_config.num_nodes,
+                input_dim=self.initial_config.input_dim,
+                hidden_dim=optimized_params.get('hidden_dim', 96),
+                output_dim=3,  # 3 classes: down/no direction/up
+                num_layers=optimized_params.get('num_layers', 2),
+                dropout=optimized_params.get('dropout', 0.2),
+                kernel_size=optimized_params.get('kernel_size', 3),
+                learning_rate=optimized_params.get('learning_rate', 0.0005),
+                batch_size=optimized_params.get('batch_size', 2),
+                num_epochs=40,  # Keep fixed for walk-forward
+                early_stopping_patience=8,
+                seq_len=optimized_params.get('seq_len', 150),  # Increased default for better feature capture
+                prediction_horizon=15,
+                features=self.initial_config.features,
+                assets=self.initial_config.assets,
+                confidence_threshold=0.51,
+                buy_threshold=0.6,
+                sell_threshold=0.4,
+                retrain_interval=24,
+                focal_alpha=optimized_params.get('focal_alpha', 1.0),
+                focal_gamma=optimized_params.get('focal_gamma', 2.0),
+                # Feature engineering parameters
+                rsi_period=optimized_params.get('rsi_period', 14),
+                macd_fast_period=optimized_params.get('macd_fast_period', 12),
+                macd_slow_period=optimized_params.get('macd_slow_period', 26),
+                macd_signal_period=optimized_params.get('macd_signal_period', 9),
+                bb_period=optimized_params.get('bb_period', 20),
+                bb_num_std_dev=optimized_params.get('bb_num_std_dev', 2.0),
+                atr_period=optimized_params.get('atr_period', 14),
+                adx_period=optimized_params.get('adx_period', 14),
+                volume_ma_period=optimized_params.get('volume_ma_period', 20),
+                price_momentum_lookback=optimized_params.get('price_momentum_lookback', 5),
+                price_threshold=optimized_params.get('price_threshold', 0.005)  # 0.5% threshold
+            )
+            
+            # Store optimized class multipliers for use in training
+            self.optimized_class_multipliers = {
+                'class_multiplier_0': optimized_params.get('class_multiplier_0', 3.2),
+                'class_multiplier_1': optimized_params.get('class_multiplier_1', 2.0),
+                'class_multiplier_2': optimized_params.get('class_multiplier_2', 3.2)
+            }
+        else:
+            logger.info(f"Using default hyperparameters for period {period_index}")
+            config = STGNNConfig(
+                num_nodes=self.initial_config.num_nodes,
+                input_dim=self.initial_config.input_dim,
+                hidden_dim=96,  # Restored complexity for better learning
+                output_dim=3,  # 3 classes: down/no direction/up
+                num_layers=2,  # Restored 2 layers for deeper learning
+                dropout=0.2,  # Keep reduced regularization
+                kernel_size=3,
+                learning_rate=0.0005,  # Restored for stable training
+                batch_size=2,  # Keep small for memory management
+                num_epochs=40,  # Restored for more training time
+                early_stopping_patience=8,  # Restored for more training time
+                seq_len=150,  # Increased for better capture of technical indicator patterns
+                prediction_horizon=15,
+                features=self.initial_config.features,
+                assets=self.initial_config.assets,
+                confidence_threshold=0.51,
+                buy_threshold=0.6,
+                sell_threshold=0.4,
+                retrain_interval=24,
+                focal_alpha=1.0,  # Keep this as 1.0 given you have class_weights
+                focal_gamma=2.0,   # Default focusing parameter
+                # Default feature engineering parameters
+                rsi_period=14,
+                macd_fast_period=12,
+                macd_slow_period=26,
+                macd_signal_period=9,
+                bb_period=20,
+                bb_num_std_dev=2.0,
+                atr_period=14,
+                adx_period=14,
+                volume_ma_period=20,
+                price_momentum_lookback=5,
+                price_threshold=0.005  # 0.5% threshold
+            )
+            
+            # Use default class multipliers
+            self.optimized_class_multipliers = {
+                'class_multiplier_0': 3.2,
+                'class_multiplier_1': 2.0,
+                'class_multiplier_2': 3.2
+            }
         
         return config
+    
+    def load_optimized_hyperparameters(self):
+        """Load optimized hyperparameters from hyperparameter optimization results"""
+        import glob
+        import os
+        
+        # Look for the most recent optimized parameters file
+        config_dir = Path('config')
+        if not config_dir.exists():
+            return None
+        
+        # Find all enhanced hyperparameter files
+        pattern = config_dir / 'stgnn_enhanced_best_params_*.json'
+        param_files = list(config_dir.glob('stgnn_enhanced_best_params_*.json'))
+        
+        if not param_files:
+            logger.info("No optimized hyperparameter files found")
+            return None
+        
+        # Get the most recent file
+        latest_file = max(param_files, key=os.path.getctime)
+        
+        try:
+            with open(latest_file, 'r') as f:
+                optimized_params = json.load(f)
+            
+            logger.info(f"Loaded optimized hyperparameters from: {latest_file}")
+            logger.info(f"Optimized parameters: {optimized_params}")
+            
+            return optimized_params
+            
+        except Exception as e:
+            logger.error(f"Failed to load optimized hyperparameters: {e}")
+            return None
     
     def generate_summary_report(self):
         """Generate comprehensive summary report"""
@@ -828,7 +933,7 @@ def create_wfo_config():
         batch_size=2,  # Keep small for memory management
         num_epochs=40,  # Restored for more training time
         early_stopping_patience=8,  # Restored for more training time
-        seq_len=80,  # Restored for more context
+        seq_len=150,  # Increased for better capture of technical indicator patterns
         prediction_horizon=15,
         features=features,
         assets=assets,

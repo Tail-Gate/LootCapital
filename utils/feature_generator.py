@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 import json
 from datetime import datetime
-from .technical_indicators import TechnicalIndicators
+from market_analysis.technical_indicators import TechnicalIndicators
 from .order_book_features import calculate_order_flow_imbalance, calculate_volume_pressure
 import multiprocessing as mp
 import gc
@@ -19,7 +19,7 @@ def generate_features_chunk(chunk: pd.DataFrame, order_book_data: Optional[pd.Da
     Args:
         chunk: DataFrame chunk with OHLCV data
         order_book_data: Optional DataFrame with order book data
-        indicators: TechnicalIndicators instance
+        indicators: TechnicalIndicators instance with configurable parameters
     Returns:
         DataFrame with generated features
     """
@@ -31,63 +31,63 @@ def generate_features_chunk(chunk: pd.DataFrame, order_book_data: Optional[pd.Da
     features.loc[:, 'log_returns'] = np.log1p(features['returns'])
     features.loc[:, 'log_returns'] = features['log_returns'].replace([np.inf, -np.inf], np.nan)
     
-    # Technical indicators
+    # Technical indicators using configurable parameters
     rsi = indicators.calculate_rsi(chunk['close'])
-    atr = indicators.calculate_atr(chunk['high'], chunk['low'], chunk['close'])
+    atr = indicators.calculate_atr(chunk, high=chunk['high'], low=chunk['low'], close=chunk['close'])
     features.loc[:, 'rsi'] = rsi.astype(np.float32)
     features.loc[:, 'atr'] = atr.astype(np.float32)
     
-    # Bollinger Bands
-    upper, middle, lower = indicators.calculate_bollinger_bands(chunk['close'])
-    features.loc[:, 'bb_upper'] = upper.astype(np.float32)
-    features.loc[:, 'bb_middle'] = middle.astype(np.float32)
-    features.loc[:, 'bb_lower'] = lower.astype(np.float32)
-    features.loc[:, 'bb_width'] = ((upper - lower) / middle).astype(np.float32)
+    # Bollinger Bands with configurable parameters
+    bb_result = indicators.calculate_bollinger_bands(chunk['close'])
+    features.loc[:, 'bb_upper'] = bb_result['upper'].astype(np.float32)
+    features.loc[:, 'bb_middle'] = bb_result['middle'].astype(np.float32)
+    features.loc[:, 'bb_lower'] = bb_result['lower'].astype(np.float32)
+    features.loc[:, 'bb_width'] = ((bb_result['upper'] - bb_result['lower']) / bb_result['middle']).astype(np.float32)
     features.loc[:, 'bb_width'] = features['bb_width'].replace([np.inf, -np.inf], np.nan)
     
-    # Volume features
+    # Volume features with configurable parameters
     features.loc[:, 'volume'] = chunk['volume'].astype(np.float32)
-    features.loc[:, 'volume_ma'] = chunk['volume'].rolling(window=20).mean().astype(np.float32)
+    features.loc[:, 'volume_ma'] = indicators.calculate_volume_ma(chunk['volume']).astype(np.float32)
     features.loc[:, 'volume_std'] = chunk['volume'].rolling(window=20).std().astype(np.float32)
     features.loc[:, 'volume_surge'] = indicators.calculate_volume_surge_factor(chunk['volume']).astype(np.float32)
     features.loc[:, 'volume_ratio'] = (chunk['volume'] / features['volume_ma']).astype(np.float32)
     
-    # MACD features
-    macd, signal, hist = indicators.calculate_macd(chunk['close'])
-    features.loc[:, 'macd'] = macd.astype(np.float32)
-    features.loc[:, 'macd_signal'] = signal.astype(np.float32)
-    features.loc[:, 'macd_hist'] = hist.astype(np.float32)
+    # MACD features with configurable parameters
+    macd_result = indicators.calculate_macd(chunk['close'])
+    features.loc[:, 'macd'] = macd_result['macd'].astype(np.float32)
+    features.loc[:, 'macd_signal'] = macd_result['signal'].astype(np.float32)
+    features.loc[:, 'macd_hist'] = macd_result['hist'].astype(np.float32)
     
     # Moving Average Crossover
     short_ma = chunk['close'].rolling(window=5).mean()
     long_ma = chunk['close'].rolling(window=10).mean()
     features.loc[:, 'ma_crossover'] = (short_ma - long_ma).astype(np.float32)
     
-    # Swing RSI
-    features.loc[:, 'swing_rsi'] = indicators.calculate_rsi(chunk['close'], period=14).astype(np.float32)
+    # Swing RSI with configurable parameters
+    features.loc[:, 'swing_rsi'] = indicators.calculate_rsi(chunk['close']).astype(np.float32)
     
     # VWAP Ratio
     vwap = (chunk['volume'] * (chunk['high'] + chunk['low'] + chunk['close']) / 3).cumsum() / chunk['volume'].cumsum()
     features.loc[:, 'vwap_ratio'] = (chunk['close'] / vwap).astype(np.float32)
     
-    # Momentum features
-    momentum = indicators.calculate_price_momentum(chunk['close'], 14)
+    # Momentum features with configurable parameters
+    momentum = indicators.calculate_price_momentum(chunk['close'])
     vol_regime = indicators.calculate_volatility_regime(chunk['close'])
     features.loc[:, 'price_momentum'] = momentum.astype(np.float32)
     features.loc[:, 'volatility_regime'] = vol_regime.astype(np.float32)
     
-    # Support/Resistance
+    # Support/Resistance with configurable parameters
     support, resistance = indicators.calculate_support_resistance(chunk['high'], chunk['low'], chunk['close'])
     features.loc[:, 'support'] = support.astype(np.float32)
     features.loc[:, 'resistance'] = resistance.astype(np.float32)
     
-    # Breakout detection
+    # Breakout detection with configurable parameters
     features.loc[:, 'breakout_intensity'] = indicators.calculate_breakout_intensity(chunk['close'], atr).astype(np.float32)
     
-    # Trend strength
+    # Trend strength with configurable parameters
     features.loc[:, 'adx'] = indicators.calculate_directional_movement(chunk['high'], chunk['low'], chunk['close']).astype(np.float32)
     
-    # Cumulative delta
+    # Cumulative delta with configurable parameters
     features.loc[:, 'cumulative_delta'] = indicators.calculate_cumulative_delta(chunk['close'], chunk['volume']).astype(np.float32)
     
     # Add order book features if available
@@ -106,8 +106,7 @@ def generate_features_chunk(chunk: pd.DataFrame, order_book_data: Optional[pd.Da
 
 class FeatureGenerator:
     """
-    Handles feature engineering for the momentum strategy, including technical indicators,
-    order book features, and custom momentum-specific features.
+    Enhanced feature generator with configurable parameters for hyperparameter optimization.
     """
     
     def __init__(
@@ -120,7 +119,7 @@ class FeatureGenerator:
         Initialize the feature generator.
         
         Args:
-            config: Configuration dictionary for feature generation
+            config: Configuration dictionary for feature generation (includes feature engineering parameters)
             cache_dir: Directory to cache generated features
             version: Version identifier for the feature generator
         """
@@ -138,7 +137,20 @@ class FeatureGenerator:
         # Setup logging
         self.logger = logging.getLogger(__name__)
         
-        self.indicators = TechnicalIndicators()
+        # Initialize TechnicalIndicators with configurable parameters
+        # Extract feature engineering parameters from config
+        feature_config = {}
+        if self.config:
+            feature_params = [
+                'rsi_period', 'macd_fast_period', 'macd_slow_period', 'macd_signal_period',
+                'bb_period', 'bb_num_std_dev', 'atr_period', 'adx_period',
+                'volume_ma_period', 'price_momentum_lookback'
+            ]
+            for param in feature_params:
+                if param in self.config:
+                    feature_config[param] = self.config[param]
+        
+        self.indicators = TechnicalIndicators(feature_config)
         
         # Memory optimization settings
         self.optimize_memory = True

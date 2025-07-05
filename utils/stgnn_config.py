@@ -23,7 +23,7 @@ class STGNNConfig:
     early_stopping_patience: int = 10
     
     # Data parameters
-    seq_len: int = 10
+    seq_len: int = 100  # Increased for better capture of technical indicator patterns
     prediction_horizon: int = 15
     features: List[str] = None
     assets: List[str] = None
@@ -35,8 +35,36 @@ class STGNNConfig:
     retrain_interval: int = 24
     
     # Focal Loss parameters for handling class imbalance
-    focal_alpha: float = 2.0  # Weighting factor for rare class
+    focal_alpha: float = 1.0  # Weighting factor for rare class
     focal_gamma: float = 3.0  # Focusing parameter (1.0, 2.0, 3.0, 5.0)
+    
+    # Feature Engineering Hyperparameters (NEW)
+    # RSI parameters
+    rsi_period: int = 14
+    
+    # MACD parameters
+    macd_fast_period: int = 12
+    macd_slow_period: int = 26
+    macd_signal_period: int = 9
+    
+    # Bollinger Bands parameters
+    bb_period: int = 20
+    bb_num_std_dev: float = 2.0
+    
+    # ATR parameters
+    atr_period: int = 14
+    
+    # ADX parameters
+    adx_period: int = 14
+    
+    # Volume parameters
+    volume_ma_period: int = 20
+    
+    # Momentum parameters
+    price_momentum_lookback: int = 5
+    
+    # Price threshold for classification (fixed for 0.5% movements)
+    price_threshold: float = 0.005  # 0.5% threshold
     
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> 'STGNNConfig':
@@ -67,7 +95,19 @@ class STGNNConfig:
             'sell_threshold': self.sell_threshold,
             'retrain_interval': self.retrain_interval,
             'focal_alpha': self.focal_alpha,
-            'focal_gamma': self.focal_gamma
+            'focal_gamma': self.focal_gamma,
+            # Feature engineering parameters
+            'rsi_period': self.rsi_period,
+            'macd_fast_period': self.macd_fast_period,
+            'macd_slow_period': self.macd_slow_period,
+            'macd_signal_period': self.macd_signal_period,
+            'bb_period': self.bb_period,
+            'bb_num_std_dev': self.bb_num_std_dev,
+            'atr_period': self.atr_period,
+            'adx_period': self.adx_period,
+            'volume_ma_period': self.volume_ma_period,
+            'price_momentum_lookback': self.price_momentum_lookback,
+            'price_threshold': self.price_threshold
         }
     
     def save(self, path: str) -> None:
@@ -106,4 +146,16 @@ class STGNNConfig:
         assert 0 <= self.sell_threshold <= 1, "Sell threshold must be between 0 and 1"
         assert self.retrain_interval > 0, "Retrain interval must be positive"
         assert 0 <= self.focal_alpha <= 1, "Focal alpha must be between 0 and 1"
-        assert self.focal_gamma > 0, "Focal gamma must be positive" 
+        assert self.focal_gamma > 0, "Focal gamma must be positive"
+        # Feature engineering parameter validation
+        assert 5 <= self.rsi_period <= 50, "RSI period must be between 5 and 50"
+        assert 5 <= self.macd_fast_period <= 30, "MACD fast period must be between 5 and 30"
+        assert 20 <= self.macd_slow_period <= 50, "MACD slow period must be between 20 and 50"
+        assert 5 <= self.macd_signal_period <= 20, "MACD signal period must be between 5 and 20"
+        assert 10 <= self.bb_period <= 50, "Bollinger Bands period must be between 10 and 50"
+        assert 1.0 <= self.bb_num_std_dev <= 3.0, "Bollinger Bands std dev must be between 1.0 and 3.0"
+        assert 5 <= self.atr_period <= 30, "ATR period must be between 5 and 30"
+        assert 5 <= self.adx_period <= 30, "ADX period must be between 5 and 30"
+        assert 10 <= self.volume_ma_period <= 50, "Volume MA period must be between 10 and 50"
+        assert 3 <= self.price_momentum_lookback <= 20, "Price momentum lookback must be between 3 and 20"
+        assert 0.001 <= self.price_threshold <= 0.05, "Price threshold must be between 0.1% and 5%" 
