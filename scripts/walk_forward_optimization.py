@@ -968,8 +968,8 @@ Examples:
   python scripts/walk_forward_optimization.py \\
     --start-date 2020-01-01 \\
     --end-date 2023-12-31 \\
-    --output-dir gs://my-bucket/models \\
-    --reports-dir gs://my-bucket/reports
+    --output-dir /path/to/models \\
+    --reports-dir /path/to/reports
 
   # Run with custom parameters
   python scripts/walk_forward_optimization.py \\

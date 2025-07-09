@@ -3,7 +3,6 @@ import numpy as np
 from typing import Dict, List, Optional, Union
 from datetime import datetime, timedelta
 import os
-import gcsfs  # Add this import for Google Cloud Storage support
 
 class MarketData:
     """
@@ -15,24 +14,17 @@ class MarketData:
         Initialize the MarketData class.
         
         Args:
-            data_source_path: Path to data source (local or GCS). 
-                             Defaults to 'gs://lootcapital-test-bucket/' for GCS
+            data_source_path: Path to local data source directory.
+                             Defaults to 'data' for local data
         """
         self.data_cache = {}
-        # Set default GCS path if none provided
-        self.data_source_path = data_source_path or 'gs://lootcapital-test-bucket/'
+        # Set default local path if none provided
+        self.data_source_path = data_source_path or 'data'
         
-        # Initialize GCS filesystem if using GCS
-        self.gcs_fs = None
-        if self.data_source_path.startswith('gs://'):
-            try:
-                # Use gcloud authentication
-                self.gcs_fs = gcsfs.GCSFileSystem(project='delta-crane-464102-a1')
-                print("GCS filesystem initialized with gcloud authentication")
-            except Exception as e:
-                print(f"Warning: Could not initialize GCS filesystem: {e}")
-                print("Falling back to local data source")
-                self.data_source_path = 'data'
+        # Ensure the data directory exists
+        if not os.path.exists(self.data_source_path):
+            os.makedirs(self.data_source_path, exist_ok=True)
+            print(f"Created data directory: {self.data_source_path}")
         
     def get_data(self, symbol: Union[str, List[str]], start_time: Optional[datetime] = None,
                  end_time: Optional[datetime] = None) -> Union[pd.DataFrame, Dict[str, pd.DataFrame]]:
@@ -76,7 +68,7 @@ class MarketData:
     def _load_real_data(self, symbol: str, start_time: Optional[datetime] = None,
                        end_time: Optional[datetime] = None) -> Optional[pd.DataFrame]:
         """
-        Load real market data from CSV files (local or GCS).
+        Load real market data from CSV files (local only).
         
         Args:
             symbol: The trading symbol
@@ -101,27 +93,16 @@ class MarketData:
         
         file_name = symbol_to_file[symbol]
         
-        # Determine if we're using GCS or local path
-        if self.data_source_path.startswith('gs://'):
-            # GCS path
-            file_path = f"{self.data_source_path.rstrip('/')}/{file_name}"
-            print(f"Attempting to load from GCS: {file_path}")
-        else:
-            # Local path
-            file_path = os.path.join(self.data_source_path, 'historical', file_name)
-            print(f"Attempting to load from local: {file_path}")
+        # Local path
+        file_path = os.path.join(self.data_source_path, 'historical', file_name)
+        print(f"Attempting to load from local: {file_path}")
         
         try:
             # Load the CSV file
             print(f"Loading real data from: {file_path}")
             
-            if self.data_source_path.startswith('gs://') and self.gcs_fs is not None:
-                # Use GCS filesystem for reading
-                with self.gcs_fs.open(file_path, 'rb') as f:
-                    data = pd.read_csv(f)
-            else:
-                # Use regular pandas read_csv for local files
-                data = pd.read_csv(file_path)
+            # Use regular pandas read_csv for local files
+            data = pd.read_csv(file_path)
             
             # Convert timestamp to datetime
             data['timestamp'] = pd.to_datetime(data['timestamp'])

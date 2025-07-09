@@ -20,8 +20,6 @@ pytest-asyncio    # for testing async code
 shap>=0.41.0      # for model explanation
 optuna>=3.0.0     # for hyperparameter optimization
 mlflow>=2.0.0     # for experiment tracking
-gcsfs>=2025.5.1   # for Google Cloud Storage
-google-cloud-aiplatform>=1.35.0  # for Google Cloud AI Platform
 tqdm>=4.64.0      # for progress bars
 imbalanced-learn>=0.10.0  # for SMOTE and other imbalanced learning methods
 dataclasses       # for dataclass support (though built-in in Python 3.7+)

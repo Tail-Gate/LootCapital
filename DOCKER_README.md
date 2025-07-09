@@ -27,7 +27,7 @@ chmod +x run_docker.sh
 ./run_docker.sh args --train-window-days 180 --test-window-days 30 --step-size-days 15
 
 # Run with Google Cloud Storage paths (for Vertex AI)
-./run_docker.sh args --output-dir gs://my-bucket/models --reports-dir gs://my-bucket/reports
+./run_docker.sh args --output-dir /path/to/models --reports-dir /path/to/reports
 
 # Or run in detached mode (runs in background)
 ./run_docker.sh detached
@@ -133,14 +133,14 @@ The walk-forward optimization script supports the following command-line argumen
 For running on Google Cloud Vertex AI, you can use Google Cloud Storage paths:
 
 ```bash
-# Example for Vertex AI with GCS paths
+# Example for local execution with custom paths
 ./run_docker.sh args \
   --start-date 2020-01-01 \
   --end-date 2023-12-31 \
-  --output-dir gs://my-bucket/models \
-  --reports-dir gs://my-bucket/reports \
-  --plots-dir gs://my-bucket/plots \
-  --logs-dir gs://my-bucket/logs \
+  --output-dir /path/to/models \
+  --reports-dir /path/to/reports \
+  --plots-dir /path/to/plots \
+  --logs-dir /path/to/logs \
   --train-window-days 180 \
   --test-window-days 30 \
   --step-size-days 15
@@ -151,7 +151,7 @@ For running on Google Cloud Vertex AI, you can use Google Cloud Storage paths:
 When creating a Vertex AI custom job, you can specify the command and arguments:
 
 ```yaml
-# Example Vertex AI custom job configuration
+# Example local execution configuration
 containerSpec:
   imageUri: gcr.io/your-project/lootcapital-wfo:latest
   command: ["python"]
@@ -162,13 +162,13 @@ containerSpec:
     - "--end-date"
     - "2023-12-31"
     - "--output-dir"
-    - "gs://my-bucket/models"
+    - "/app/models"
     - "--reports-dir"
-    - "gs://my-bucket/reports"
+    - "/app/reports"
     - "--plots-dir"
-    - "gs://my-bucket/plots"
+    - "/app/plots"
     - "--logs-dir"
-    - "gs://my-bucket/logs"
+    - "/app/logs"
     - "--train-window-days"
     - "180"
     - "--test-window-days"
@@ -251,14 +251,14 @@ You can adjust these limits in the `docker-compose.yml` file based on your syste
 
 ### Vertex AI Deployment
 ```bash
-# Run with GCS paths for Vertex AI
+# Run with local paths for production
 ./run_docker.sh args \
   --start-date 2020-01-01 \
   --end-date 2023-12-31 \
-  --output-dir gs://my-project-bucket/models \
-  --reports-dir gs://my-project-bucket/reports \
-  --plots-dir gs://my-project-bucket/plots \
-  --logs-dir gs://my-project-bucket/logs \
+  --output-dir /path/to/models \
+  --reports-dir /path/to/reports \
+  --plots-dir /path/to/plots \
+  --logs-dir /path/to/logs \
   --train-window-days 180 \
   --test-window-days 30 \
   --step-size-days 15 \
@@ -283,10 +283,10 @@ You can adjust these limits in the `docker-compose.yml` file based on your syste
    - Ensure the script is executable: `chmod +x run_docker.sh`
    - Check file permissions in mounted directories
 
-4. **GCS Path Issues**
-   - Ensure proper authentication for Google Cloud Storage
-   - Check bucket permissions and existence
-   - Verify gcsfs is properly installed
+4. **Path Issues**
+   - Ensure proper permissions for local directories
+   - Check directory existence and write permissions
+   - Verify all required directories are created
 
 ### Logs and Debugging
 
