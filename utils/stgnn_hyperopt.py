@@ -200,7 +200,7 @@ def objective(trial: optuna.Trial) -> float:
         
         # Use SMALLER time window for hyperparameter optimization to reduce memory usage
         end_time = datetime.now()
-        start_time = end_time - timedelta(days=30)  # Reduced from 60 to 30 days for memory efficiency
+        start_time = end_time - timedelta(days=15)  # Reduced from 30 to 15 days for extreme memory efficiency
         
         # Create data processor with memory-efficient approach
         data_processor = create_classification_data_processor(config)
@@ -216,6 +216,74 @@ def objective(trial: optuna.Trial) -> float:
             start_time=start_time,
             end_time=end_time
         )
+        
+        # DISABLE SMOTE for hyperparameter optimization to prevent memory explosion
+        # Override the train method to skip SMOTE processing
+        original_train = trainer.train
+        
+        def train_without_smote():
+            """Train without SMOTE to save memory during hyperparameter optimization"""
+            # Prepare data
+            X, adj, y_classes = trainer.prepare_classification_data()
+            X_train, y_train, X_val, y_val = trainer.data_processor.split_data(X, y_classes)
+            
+            # Skip SMOTE - use original data directly
+            logger.info("Skipping SMOTE for memory efficiency during hyperparameter optimization")
+            
+            # Create dataloaders with original (unbalanced) training data
+            train_loader = trainer.data_processor.create_dataloader(X_train, y_train, drop_last=True)
+            val_loader = trainer.data_processor.create_dataloader(X_val, y_val, drop_last=False)
+            
+            # Training loop
+            patience_counter = 0
+            
+            for epoch in range(trainer.config.num_epochs):
+                # Train epoch
+                train_loss, train_acc = trainer.train_epoch(train_loader)
+                trainer.train_losses.append(train_loss)
+                trainer.train_accuracies.append(train_acc)
+                
+                # Validate
+                val_loss, val_acc = trainer.validate(val_loader)
+                trainer.val_losses.append(val_loss)
+                trainer.val_accuracies.append(val_acc)
+                
+                # Early stopping
+                if val_loss < trainer.best_val_loss:
+                    trainer.best_val_loss = val_loss
+                    trainer.best_model_state = trainer.model.state_dict().copy()
+                    patience_counter = 0
+                else:
+                    patience_counter += 1
+                    
+                if patience_counter >= trainer.config.early_stopping_patience:
+                    logger.info(f'Early stopping at epoch {epoch + 1}')
+                    break
+                    
+                if (epoch + 1) % 10 == 0:
+                    logger.info(f'Epoch {epoch + 1}/{trainer.config.num_epochs}:')
+                    logger.info(f'Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}')
+                    logger.info(f'Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}')
+                    
+            # Load best model
+            if trainer.best_model_state is not None:
+                trainer.model.load_state_dict(trainer.best_model_state)
+                
+            return {
+                'train_losses': trainer.train_losses,
+                'val_losses': trainer.val_losses,
+                'train_accuracies': trainer.train_accuracies,
+                'val_accuracies': trainer.val_accuracies,
+                'smote_info': {
+                    'class_distribution_before': 'Skipped for memory efficiency',
+                    'class_distribution_after': 'Skipped for memory efficiency',
+                    'original_batch_size': X_train.shape[0],
+                    'balanced_batch_size': X_train.shape[0]  # No change since SMOTE skipped
+                }
+            }
+        
+        # Replace the train method
+        trainer.train = train_without_smote
         
         # Override class weights calculation with multipliers
         def calculate_weighted_class_weights():
@@ -392,7 +460,7 @@ def main():
     # REDUCED number of trials to minimize memory usage and prevent OOM
     study.optimize(
         objective,
-        n_trials=200,  # Reduced from 500 to 200 for memory efficiency
+        n_trials=100,  # Reduced from 200 to 100 for extreme memory efficiency
         timeout=None,    # Remove timeout to allow the study to run to completion or n_trials.
                          # Alternatively, set to a very large value (e.g., 24*3600*7 for a week in seconds).
         gc_after_trial=True, # Enable aggressive garbage collection after each trial.
