@@ -68,6 +68,15 @@ def manage_memory():
     # Force more aggressive cleanup
     if hasattr(sys, 'exc_clear'):
         sys.exc_clear()
+    
+    # Additional memory optimization for HPC
+    if memory_mb > 1000:  # Warning if memory usage > 1GB
+        logger.warning(f"High memory usage detected: {memory_mb:.1f} MB")
+        # Force more aggressive cleanup
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
 
 class EnhancedSTGNNDataProcessor(STGNNDataProcessor):
     """Enhanced STGNN data processor that uses FeatureGenerator for comprehensive features"""

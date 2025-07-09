@@ -10,6 +10,10 @@ import json
 import logging
 from collections import Counter
 from sklearn.metrics import classification_report, precision_recall_fscore_support
+import gc  # For garbage collection
+import psutil  # For memory monitoring
+import os
+import sys
 
 from utils.stgnn_utils import STGNNModel, train_stgnn, predict_stgnn
 from strategies.stgnn_strategy import STGNNStrategy
@@ -24,6 +28,21 @@ from utils.stgnn_data import STGNNDataProcessor
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def manage_memory():
+    """Force garbage collection and log memory usage"""
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    
+    # Log memory usage
+    process = psutil.Process(os.getpid())
+    memory_mb = process.memory_info().rss / 1024 / 1024
+    logger.info(f"Memory usage: {memory_mb:.1f} MB")
+    
+    # Force more aggressive cleanup
+    if hasattr(sys, 'exc_clear'):
+        sys.exc_clear()
 
 def load_stgnn_data(config: Dict[str, Any]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
@@ -85,7 +104,7 @@ def create_classification_data_processor(config: STGNNConfig, start_time=None, e
 
 def objective(trial: optuna.Trial) -> float:
     """
-    Enhanced objective function for hyperparameter optimization with feature engineering parameters
+    Memory-optimized objective function for hyperparameter optimization
     
     Args:
         trial: Optuna trial object
@@ -93,103 +112,95 @@ def objective(trial: optuna.Trial) -> float:
     Returns:
         Validation loss (weighted focal loss or combined metric)
     """
-    # Define enhanced hyperparameter search space including feature engineering parameters
-    config_dict = {
-        'assets': ['ETH/USD'],  # Focus on single asset for optimization
-        'features': ['price', 'volume', 'rsi', 'macd', 'bollinger', 'atr', 'adx', 'stoch', 'williams_r', 'cci', 'mfi', 'obv', 'vwap', 'support', 'resistance'],
-        'learning_rate': trial.suggest_float('learning_rate', 1e-4, 1e-2, log=True),
-        'hidden_dim': trial.suggest_int('hidden_dim', 16, 128, step=16),
-        'num_layers': trial.suggest_int('num_layers', 1, 4),
-        'kernel_size': trial.suggest_int('kernel_size', 2, 5),
-        'dropout': trial.suggest_float('dropout', 0.0, 0.5),
-        'batch_size': trial.suggest_int('batch_size', 16, 64, step=16),
-        'seq_len': trial.suggest_int('seq_len', 50, 200, step=25),  # Much longer sequences for better feature capture
-        'prediction_horizon': 15,  # Fixed as per current requirement
-        'early_stopping_patience': 5,
-        
-        # Focal Loss parameters
-        'focal_alpha': trial.suggest_float('focal_alpha', 0.25, 1.0),
-        'focal_gamma': trial.suggest_float('focal_gamma', 1.0, 5.0),
-        
-        # Class multipliers for individual class weighting
-        'class_multiplier_0': trial.suggest_float('class_multiplier_0', 0.5, 5.0),  # Down class
-        'class_multiplier_1': trial.suggest_float('class_multiplier_1', 0.5, 5.0),  # No Direction class
-        'class_multiplier_2': trial.suggest_float('class_multiplier_2', 0.5, 5.0),  # Up class
-        
-        # NEW: Feature Engineering Hyperparameters for 0.5% event-based prediction
-        'price_threshold': 0.005,  # Fixed 0.5% threshold for classification
-        
-        # RSI parameters
-        'rsi_period': trial.suggest_int('rsi_period', 7, 28),
-        
-        # MACD parameters
-        'macd_fast_period': trial.suggest_int('macd_fast_period', 8, 20),
-        'macd_slow_period': trial.suggest_int('macd_slow_period', 20, 40),
-        'macd_signal_period': trial.suggest_int('macd_signal_period', 5, 15),
-        
-        # Bollinger Bands parameters
-        'bb_period': trial.suggest_int('bb_period', 10, 40),
-        'bb_num_std_dev': trial.suggest_float('bb_num_std_dev', 1.5, 3.0),
-        
-        # ATR parameters
-        'atr_period': trial.suggest_int('atr_period', 7, 21),
-        
-        # ADX parameters
-        'adx_period': trial.suggest_int('adx_period', 7, 21),
-        
-        # Volume parameters
-        'volume_ma_period': trial.suggest_int('volume_ma_period', 10, 40),
-        
-        # Momentum parameters
-        'price_momentum_lookback': trial.suggest_int('price_momentum_lookback', 3, 15),
-    }
-    
-    # Create STGNNConfig with feature engineering parameters
-    config = STGNNConfig(
-        num_nodes=len(config_dict['assets']),
-        input_dim=len(config_dict['features']),
-        hidden_dim=config_dict['hidden_dim'],
-        output_dim=3,  # 3 classes for classification
-        num_layers=config_dict['num_layers'],
-        dropout=config_dict['dropout'],
-        kernel_size=config_dict['kernel_size'],
-        learning_rate=config_dict['learning_rate'],
-        batch_size=config_dict['batch_size'],
-        seq_len=config_dict['seq_len'],
-        prediction_horizon=config_dict['prediction_horizon'],
-        early_stopping_patience=config_dict['early_stopping_patience'],
-        features=config_dict['features'],
-        assets=config_dict['assets'],
-        focal_alpha=config_dict['focal_alpha'],
-        focal_gamma=config_dict['focal_gamma'],
-        # Feature engineering parameters
-        rsi_period=config_dict['rsi_period'],
-        macd_fast_period=config_dict['macd_fast_period'],
-        macd_slow_period=config_dict['macd_slow_period'],
-        macd_signal_period=config_dict['macd_signal_period'],
-        bb_period=config_dict['bb_period'],
-        bb_num_std_dev=config_dict['bb_num_std_dev'],
-        atr_period=config_dict['atr_period'],
-        adx_period=config_dict['adx_period'],
-        volume_ma_period=config_dict['volume_ma_period'],
-        price_momentum_lookback=config_dict['price_momentum_lookback'],
-        price_threshold=config_dict['price_threshold']
-    )
+    # Force memory cleanup at start of trial
+    manage_memory()
     
     try:
-        # Create data processor with feature engineering config
-        data_processor = create_classification_data_processor(config)
+        # Define REDUCED hyperparameter search space to minimize memory usage
+        config_dict = {
+            'assets': ['ETH/USD'],  # Focus on single asset for optimization
+            'features': ['price', 'volume', 'rsi', 'macd', 'bollinger', 'atr', 'adx', 'stoch', 'williams_r', 'cci', 'mfi', 'obv', 'vwap', 'support', 'resistance'],
+            
+            # REDUCED parameter ranges to minimize memory footprint
+            'learning_rate': trial.suggest_float('learning_rate', 1e-4, 5e-3, log=True),  # Reduced upper bound
+            'hidden_dim': trial.suggest_int('hidden_dim', 32, 96, step=16),  # Reduced range
+            'num_layers': trial.suggest_int('num_layers', 1, 3),  # Reduced max layers
+            'kernel_size': trial.suggest_int('kernel_size', 2, 4),  # Reduced range
+            'dropout': trial.suggest_float('dropout', 0.1, 0.4),  # Reduced range
+            'batch_size': trial.suggest_int('batch_size', 8, 32, step=8),  # Reduced batch sizes
+            'seq_len': trial.suggest_int('seq_len', 50, 100, step=25),  # Reduced sequence length
+            'prediction_horizon': 15,  # Fixed as per current requirement
+            'early_stopping_patience': 3,  # Reduced for faster convergence
+            
+            # Focal Loss parameters (reduced ranges)
+            'focal_alpha': trial.suggest_float('focal_alpha', 0.5, 1.0),
+            'focal_gamma': trial.suggest_float('focal_gamma', 1.5, 3.0),
+            
+            # Class multipliers (reduced ranges)
+            'class_multiplier_0': trial.suggest_float('class_multiplier_0', 1.0, 4.0),  # Down class
+            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 1.0, 3.0),  # No Direction class
+            'class_multiplier_2': trial.suggest_float('class_multiplier_2', 1.0, 4.0),  # Up class
+            
+            # Price threshold (fixed)
+            'price_threshold': 0.005,  # Fixed 0.5% threshold for classification
+            
+            # REDUCED feature engineering parameters to minimize memory usage
+            'rsi_period': trial.suggest_int('rsi_period', 10, 20),  # Reduced range
+            'macd_fast_period': trial.suggest_int('macd_fast_period', 10, 16),  # Reduced range
+            'macd_slow_period': trial.suggest_int('macd_slow_period', 20, 30),  # Reduced range
+            'macd_signal_period': trial.suggest_int('macd_signal_period', 7, 12),  # Reduced range
+            'bb_period': trial.suggest_int('bb_period', 15, 25),  # Reduced range
+            'bb_num_std_dev': trial.suggest_float('bb_num_std_dev', 1.8, 2.5),  # Reduced range
+            'atr_period': trial.suggest_int('atr_period', 10, 16),  # Reduced range
+            'adx_period': trial.suggest_int('adx_period', 10, 16),  # Reduced range
+            'volume_ma_period': trial.suggest_int('volume_ma_period', 15, 25),  # Reduced range
+            'price_momentum_lookback': trial.suggest_int('price_momentum_lookback', 5, 10),  # Reduced range
+        }
         
-        # Prepare data for a recent time window (to avoid memory issues)
-        # Use a 90-day window for hyperparameter optimization
+        # Create STGNNConfig with REDUCED parameters
+        config = STGNNConfig(
+            num_nodes=len(config_dict['assets']),
+            input_dim=len(config_dict['features']),
+            hidden_dim=config_dict['hidden_dim'],
+            output_dim=3,  # 3 classes for classification
+            num_layers=config_dict['num_layers'],
+            dropout=config_dict['dropout'],
+            kernel_size=config_dict['kernel_size'],
+            learning_rate=config_dict['learning_rate'],
+            batch_size=config_dict['batch_size'],
+            seq_len=config_dict['seq_len'],
+            prediction_horizon=config_dict['prediction_horizon'],
+            early_stopping_patience=config_dict['early_stopping_patience'],
+            features=config_dict['features'],
+            assets=config_dict['assets'],
+            focal_alpha=config_dict['focal_alpha'],
+            focal_gamma=config_dict['focal_gamma'],
+            # Feature engineering parameters
+            rsi_period=config_dict['rsi_period'],
+            macd_fast_period=config_dict['macd_fast_period'],
+            macd_slow_period=config_dict['macd_slow_period'],
+            macd_signal_period=config_dict['macd_signal_period'],
+            bb_period=config_dict['bb_period'],
+            bb_num_std_dev=config_dict['bb_num_std_dev'],
+            atr_period=config_dict['atr_period'],
+            adx_period=config_dict['adx_period'],
+            volume_ma_period=config_dict['volume_ma_period'],
+            price_momentum_lookback=config_dict['price_momentum_lookback'],
+            price_threshold=config_dict['price_threshold']
+        )
+        
+        # Use SMALLER time window for hyperparameter optimization to reduce memory usage
         end_time = datetime.now()
-        start_time = end_time - timedelta(days=90)
+        start_time = end_time - timedelta(days=60)  # Reduced from 90 to 60 days
+        
+        # Create data processor with memory-efficient approach
+        data_processor = create_classification_data_processor(config)
         
         # Create trainer with optimized parameters
         trainer = ClassificationSTGNNTrainer(
             config=config,
             data_processor=data_processor,
-            price_threshold=config_dict['price_threshold'],  # Use optimized threshold
+            price_threshold=config_dict['price_threshold'],
             focal_alpha=config_dict['focal_alpha'],
             focal_gamma=config_dict['focal_gamma'],
             class_weights=None,  # Will be calculated with multipliers
@@ -229,9 +240,9 @@ def objective(trial: optuna.Trial) -> float:
         # Set the custom class weights calculation
         trainer._calculate_class_weights = calculate_weighted_class_weights
         
-        # Train model (reduced epochs for hyperparameter optimization)
+        # Train model with REDUCED epochs for faster optimization and less memory usage
         original_epochs = trainer.config.num_epochs
-        trainer.config.num_epochs = 5  # Reduced for faster optimization
+        trainer.config.num_epochs = 3  # Reduced from 5 to 3 for faster optimization
         
         training_history = trainer.train()
         
@@ -309,40 +320,47 @@ def objective(trial: optuna.Trial) -> float:
         logger.info(f"  Log Loss: {log_loss_val:.4f}")
         logger.info(f"  Combined Objective: {combined_objective:.4f}")
         
+        # Force memory cleanup after trial
+        manage_memory()
+        
         return combined_objective
         
     except Exception as e:
         logger.error(f"Error in objective function: {e}")
+        # Force memory cleanup on error
+        manage_memory()
         return float('inf')  # Return high penalty for failed trials
 
 def main():
     """
-    Main function to run enhanced hyperparameter optimization for HPC execution
+    Main function to run memory-optimized hyperparameter optimization for HPC execution
     """
-    # Adjust study creation for distributed/parallel execution (already correctly configured for SQLite)
+    # Log initial memory usage
+    manage_memory()
+    
+    # Adjust study creation for distributed/parallel execution with memory optimization
     study = optuna.create_study(
         direction='minimize',
-        study_name='stgnn_enhanced_hyperopt_full_search', # A new name to distinguish studies
-        storage='sqlite:///stgnn_enhanced_hyperopt_full_search.db', # New database for full search
+        study_name='stgnn_memory_optimized_hyperopt',  # New name for memory-optimized version
+        storage='sqlite:///stgnn_memory_optimized_hyperopt.db',  # New database for memory-optimized version
         load_if_exists=True
     )
 
-    # Run optimization with parameters designed for comprehensive HPC utilization
+    # Run optimization with REDUCED parameters for memory efficiency
     # Check if there are any completed trials before trying to access best_trial
     best_params_info = "no"
-    if study.trials: # Checks if the list of trials is not empty
+    if study.trials:  # Checks if the list of trials is not empty
         try:
             best_params_info = study.best_trial.params
         except ValueError:
             # This catch handles cases where trials exist but none are in a 'COMPLETE' state yet
             best_params_info = "no (no completed trials yet)"
-    logger.info(f"Starting Optuna optimization with {best_params_info} previous best parameters.")
+    logger.info(f"Starting memory-optimized Optuna optimization with {best_params_info} previous best parameters.")
     
+    # REDUCED number of trials to minimize memory usage and prevent OOM
     study.optimize(
         objective,
-        n_trials=2000,  # Significantly increased trials for expanded search space.
-                         # This allows more thorough exploration across architectural,
-                         # loss function, and feature engineering hyperparameters.
+        n_trials=500,  # Reduced from 2000 to 500 for memory efficiency
         timeout=None,    # Remove timeout to allow the study to run to completion or n_trials.
                          # Alternatively, set to a very large value (e.g., 24*3600*7 for a week in seconds).
         gc_after_trial=True, # Enable aggressive garbage collection after each trial.
@@ -360,17 +378,20 @@ def main():
     # Save best parameters
     best_params = study.best_trial.params
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    with open(f'config/stgnn_enhanced_best_params_{timestamp}.json', 'w') as f:
+    with open(f'config/stgnn_memory_optimized_best_params_{timestamp}.json', 'w') as f:
         json.dump(best_params, f, indent=4)
     
     # Print optimization summary
-    print(f'\nOptimization Summary:')
+    print(f'\nMemory-Optimized Optimization Summary:')
     print(f'  Total trials: {len(study.trials)}')
     print(f'  Best validation loss: {study.best_trial.value:.4f}')
     print(f'  Best focal_alpha: {best_params.get("focal_alpha", "N/A")}')
     print(f'  Best focal_gamma: {best_params.get("focal_gamma", "N/A")}')
     print(f'  Best class multipliers: [{best_params.get("class_multiplier_0", "N/A")}, '
           f'{best_params.get("class_multiplier_1", "N/A")}, {best_params.get("class_multiplier_2", "N/A")}]')
+    
+    # Final memory cleanup
+    manage_memory()
 
 if __name__ == '__main__':
     main() 
