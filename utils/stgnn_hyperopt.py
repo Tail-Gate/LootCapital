@@ -328,7 +328,16 @@ def main():
     )
 
     # Run optimization with parameters designed for comprehensive HPC utilization
-    logger.info(f"Starting Optuna optimization with {study.best_trial.params if study.best_trial else 'no'} previous best parameters.")
+    # Check if there are any completed trials before trying to access best_trial
+    best_params_info = "no"
+    if study.trials: # Checks if the list of trials is not empty
+        try:
+            best_params_info = study.best_trial.params
+        except ValueError:
+            # This catch handles cases where trials exist but none are in a 'COMPLETE' state yet
+            best_params_info = "no (no completed trials yet)"
+    logger.info(f"Starting Optuna optimization with {best_params_info} previous best parameters.")
+    
     study.optimize(
         objective,
         n_trials=2000,  # Significantly increased trials for expanded search space.
