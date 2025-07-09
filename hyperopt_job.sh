@@ -8,7 +8,7 @@
 #SBATCH --mem=110gb                      # Reduced from 120GB to 110GB to leave buffer
 #SBATCH --time=8:00:00                   # Reduced time limit for faster iteration
 #SBATCH --output=hyperopt_log_%j.txt     # Standard output file, %j is replaced by job number
-#SBATCH --cpus-per-gpu=5                 # Increased to 5 CPUs for better data processing
+#SBATCH --cpus-per-gpu=8                 # Increased to 8 CPUs for better data processing and memory management
 #SBATCH --gres=gpu:1                     # Request 1 GPU
 #SBATCH -n 1                             # Request 1 node for the job
 #SBATCH --exclusive                      # Request exclusive access to the node
@@ -78,7 +78,10 @@ echo "Ensured output directories exist."
 # --- Step 6: Set memory optimization environment variables ---
 export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
 export CUDA_LAUNCH_BLOCKING=1
-export OMP_NUM_THREADS=2
+export OMP_NUM_THREADS=8
+export MKL_NUM_THREADS=8
+export NUMEXPR_NUM_THREADS=8
+export OPENBLAS_NUM_THREADS=8
 
 # --- Step 7: Run your Python script with memory monitoring ---
 echo "Starting memory-optimized stgnn_hyperopt script..."
@@ -86,6 +89,16 @@ echo "Memory optimization settings:"
 echo "  PYTORCH_CUDA_ALLOC_CONF: $PYTORCH_CUDA_ALLOC_CONF"
 echo "  CUDA_LAUNCH_BLOCKING: $CUDA_LAUNCH_BLOCKING"
 echo "  OMP_NUM_THREADS: $OMP_NUM_THREADS"
+echo "  MKL_NUM_THREADS: $MKL_NUM_THREADS"
+echo "  NUMEXPR_NUM_THREADS: $NUMEXPR_NUM_THREADS"
+echo "  OPENBLAS_NUM_THREADS: $OPENBLAS_NUM_THREADS"
+echo ""
+echo "Memory optimization strategy:"
+echo "  - Disabled SMOTE processing to prevent dataset size explosion"
+echo "  - Reduced data window to 15 days"
+echo "  - Reduced trials to 100"
+echo "  - Increased CPU allocation for better parallel processing"
+echo "  - Added aggressive memory cleanup between trials"
 
 python utils/stgnn_hyperopt.py
 
