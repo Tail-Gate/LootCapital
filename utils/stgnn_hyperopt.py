@@ -43,6 +43,15 @@ def manage_memory():
     # Force more aggressive cleanup
     if hasattr(sys, 'exc_clear'):
         sys.exc_clear()
+    
+    # Additional memory optimization for HPC
+    if memory_mb > 1000:  # Warning if memory usage > 1GB
+        logger.warning(f"High memory usage detected: {memory_mb:.1f} MB")
+        # Force more aggressive cleanup
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
 
 def load_stgnn_data(config: Dict[str, Any]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
@@ -128,7 +137,7 @@ def objective(trial: optuna.Trial) -> float:
             'kernel_size': trial.suggest_int('kernel_size', 2, 4),  # Reduced range
             'dropout': trial.suggest_float('dropout', 0.1, 0.4),  # Reduced range
             'batch_size': trial.suggest_int('batch_size', 8, 32, step=8),  # Reduced batch sizes
-            'seq_len': trial.suggest_int('seq_len', 50, 100, step=25),  # Reduced sequence length
+            'seq_len': trial.suggest_int('seq_len', 20, 50, step=10),  # Reduced range for memory efficiency
             'prediction_horizon': 15,  # Fixed as per current requirement
             'early_stopping_patience': 3,  # Reduced for faster convergence
             
@@ -191,7 +200,7 @@ def objective(trial: optuna.Trial) -> float:
         
         # Use SMALLER time window for hyperparameter optimization to reduce memory usage
         end_time = datetime.now()
-        start_time = end_time - timedelta(days=60)  # Reduced from 90 to 60 days
+        start_time = end_time - timedelta(days=30)  # Reduced from 60 to 30 days for memory efficiency
         
         # Create data processor with memory-efficient approach
         data_processor = create_classification_data_processor(config)
@@ -323,6 +332,17 @@ def objective(trial: optuna.Trial) -> float:
         # Force memory cleanup after trial
         manage_memory()
         
+        # Additional cleanup for HPC environment
+        del trainer, data_processor, config
+        if 'X_val' in locals():
+            del X_val, adj_val, y_val, y_val_classes
+        if 'evaluation_results' in locals():
+            del evaluation_results, probabilities, true_labels
+        if 'f1_scores' in locals():
+            del f1_scores, precision_scores, recall_scores
+        if 'log_loss_val' in locals():
+            del log_loss_val
+        
         return combined_objective
         
     except Exception as e:
@@ -337,6 +357,18 @@ def main():
     """
     # Log initial memory usage
     manage_memory()
+    
+    # Monitor memory usage throughout optimization
+    def memory_monitor():
+        process = psutil.Process(os.getpid())
+        memory_gb = process.memory_info().rss / 1024 / 1024 / 1024
+        logger.info(f"Current memory usage: {memory_gb:.2f} GB")
+        if memory_gb > 100:  # Warning at 100GB
+            logger.warning(f"Memory usage is high: {memory_gb:.2f} GB")
+        return memory_gb
+    
+    # Log initial memory
+    memory_monitor()
     
     # Adjust study creation for distributed/parallel execution with memory optimization
     study = optuna.create_study(
@@ -360,12 +392,13 @@ def main():
     # REDUCED number of trials to minimize memory usage and prevent OOM
     study.optimize(
         objective,
-        n_trials=500,  # Reduced from 2000 to 500 for memory efficiency
+        n_trials=200,  # Reduced from 500 to 200 for memory efficiency
         timeout=None,    # Remove timeout to allow the study to run to completion or n_trials.
                          # Alternatively, set to a very large value (e.g., 24*3600*7 for a week in seconds).
         gc_after_trial=True, # Enable aggressive garbage collection after each trial.
                              # Crucial for long-running studies and managing memory on HPC nodes.
-        show_progress_bar=True # Keep for local monitoring, but typically handled by HPC batch system for distributed runs.
+        show_progress_bar=True, # Keep for local monitoring, but typically handled by HPC batch system for distributed runs.
+        callbacks=[lambda study, trial: memory_monitor()]  # Monitor memory after each trial
     )
     
     # Print results
