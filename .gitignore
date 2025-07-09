@@ -52,3 +52,47 @@ backtest_results/
 # Temporary and automation files
 auto_git_push.sh
 temp_crontab.txt
+
+# Generated model files and analysis outputs
+models/probability_analysis/*.npy
+models/probability_analysis/test_*.npy
+models/probability_analysis/*_predictions_*.npy
+models/probability_analysis/*_probabilities_*.npy
+models/probability_analysis/*_true_labels_*.npy
+
+# Generated plots and visualizations
+plots/*.png
+plots/*.jpg
+plots/*.jpeg
+plots/*.svg
+plots/probability_analysis/*.png
+plots/walk_forward_results_*.png
+plots/ethereum_price_shift_analysis_*.png
+plots/price_shift_analysis_*.png
+
+# Generated reports and analysis outputs
+reports/*.txt
+reports/*.csv
+reports/*_analysis_report_*.txt
+
+# Optuna study databases
+*.db
+stgnn_*.db
+
+# Lightning logs and checkpoints
+lightning_logs/
+*.ckpt
+
+# Cache directories
+cache/
+cache/features/
+cache/models/
+cache/preprocessing/
+
+# Profiling results
+profiling_results/
+
+# Test outputs
+test_plots/
+test_probability_analysis/
+test_reports/
