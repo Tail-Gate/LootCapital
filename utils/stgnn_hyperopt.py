@@ -124,16 +124,16 @@ def objective(trial: optuna.Trial) -> float:
         # Define ULTRA-MINIMAL hyperparameter search space to prevent OOM
         config_dict = {
             'assets': ['ETH/USD'],  # Focus on single asset for optimization
-            'features': ['price', 'volume', 'rsi', 'macd', 'bollinger'],  # Reduced feature set
+            'features': ['returns', 'volume'],  # Minimal feature set (only 2 features)
             
             # ULTRA-MINIMAL parameter ranges to prevent OOM
             'learning_rate': trial.suggest_float('learning_rate', 1e-4, 1e-3, log=True),  # Very small range
-            'hidden_dim': trial.suggest_int('hidden_dim', 4, 8, step=2),  # Ultra-small range
+            'hidden_dim': trial.suggest_int('hidden_dim', 4, 6, step=2),  # Ultra-small range
             'num_layers': trial.suggest_int('num_layers', 1, 1),  # Single layer only
-            'kernel_size': trial.suggest_int('kernel_size', 2, 3),  # Minimal range
-            'dropout': trial.suggest_float('dropout', 0.1, 0.2),  # Small range
-            'batch_size': trial.suggest_int('batch_size', 1, 4, step=1),  # Ultra-small batches
-            'seq_len': trial.suggest_int('seq_len', 5, 15, step=5),  # Ultra-short sequences
+            'kernel_size': trial.suggest_int('kernel_size', 2, 2),  # Fixed small value
+            'dropout': trial.suggest_float('dropout', 0.1, 0.1),  # Fixed small value
+            'batch_size': trial.suggest_int('batch_size', 1, 2, step=1),  # Ultra-small batches
+            'seq_len': trial.suggest_int('seq_len', 5, 10, step=5),  # Ultra-short sequences
             'prediction_horizon': 15,  # Fixed as per current requirement
             'early_stopping_patience': 2,  # Very short patience
             
@@ -149,17 +149,17 @@ def objective(trial: optuna.Trial) -> float:
             # Price threshold (fixed)
             'price_threshold': 0.005,  # Fixed 0.5% threshold for classification
             
-            # ULTRA-MINIMAL feature engineering parameters
-            'rsi_period': trial.suggest_int('rsi_period', 10, 14),  # Minimal range
-            'macd_fast_period': trial.suggest_int('macd_fast_period', 10, 12),  # Minimal range
-            'macd_slow_period': trial.suggest_int('macd_slow_period', 20, 26),  # Minimal range
-            'macd_signal_period': trial.suggest_int('macd_signal_period', 7, 9),  # Minimal range
-            'bb_period': trial.suggest_int('bb_period', 15, 20),  # Minimal range
-            'bb_num_std_dev': trial.suggest_float('bb_num_std_dev', 1.8, 2.2),  # Minimal range
-            'atr_period': trial.suggest_int('atr_period', 10, 14),  # Minimal range
-            'adx_period': trial.suggest_int('adx_period', 10, 14),  # Minimal range
-            'volume_ma_period': trial.suggest_int('volume_ma_period', 15, 20),  # Minimal range
-            'price_momentum_lookback': trial.suggest_int('price_momentum_lookback', 3, 5),  # Minimal range
+            # ULTRA-MINIMAL feature engineering parameters (fixed values)
+            'rsi_period': 10,  # Fixed minimal value
+            'macd_fast_period': 10,  # Fixed minimal value
+            'macd_slow_period': 20,  # Fixed minimal value
+            'macd_signal_period': 7,  # Fixed minimal value
+            'bb_period': 15,  # Fixed minimal value
+            'bb_num_std_dev': 2.0,  # Fixed value
+            'atr_period': 10,  # Fixed minimal value
+            'adx_period': 10,  # Fixed minimal value
+            'volume_ma_period': 15,  # Fixed minimal value
+            'price_momentum_lookback': 3,  # Fixed minimal value
         }
         
         # Create STGNNConfig with ULTRA-MINIMAL parameters
@@ -196,7 +196,7 @@ def objective(trial: optuna.Trial) -> float:
         
         # Use ULTRA-SMALL time window to prevent OOM
         end_time = datetime.now()
-        start_time = end_time - timedelta(days=3)  # Use only 3 days to minimize memory usage
+        start_time = end_time - timedelta(days=1)  # Use only 1 day to minimize memory usage
         
         # Create data processor with memory-efficient approach
         data_processor = create_classification_data_processor(config)
@@ -437,15 +437,15 @@ def main():
     # Log initial memory
     memory_monitor()
     
-    # Adjust study creation for distributed/parallel execution with memory optimization
+    # Adjust study creation for distributed/parallel execution with ultra-minimal memory optimization
     study = optuna.create_study(
         direction='minimize',
-        study_name='stgnn_memory_optimized_hyperopt',  # New name for memory-optimized version
-        storage='sqlite:///stgnn_memory_optimized_hyperopt.db',  # New database for memory-optimized version
+        study_name='stgnn_ultra_minimal_hyperopt',  # New name for ultra-minimal version
+        storage='sqlite:///stgnn_ultra_minimal_hyperopt.db',  # New database for ultra-minimal version
         load_if_exists=True
     )
 
-    # Run optimization with REDUCED parameters for memory efficiency
+    # Run optimization with ULTRA-MINIMAL parameters for memory efficiency
     # Check if there are any completed trials before trying to access best_trial
     best_params_info = "no"
     if study.trials:  # Checks if the list of trials is not empty
@@ -454,12 +454,12 @@ def main():
         except ValueError:
             # This catch handles cases where trials exist but none are in a 'COMPLETE' state yet
             best_params_info = "no (no completed trials yet)"
-    logger.info(f"Starting memory-optimized Optuna optimization with {best_params_info} previous best parameters.")
+    logger.info(f"Starting ultra-minimal Optuna optimization with {best_params_info} previous best parameters.")
     
-    # ULTRA REDUCED number of trials to prevent OOM
+    # ULTRA-MINIMAL number of trials to prevent OOM
     study.optimize(
         objective,
-        n_trials=25,  # Reduced to 25 to prevent memory issues
+        n_trials=10,  # Ultra-minimal: only 10 trials to prevent memory issues
         timeout=None,    # Remove timeout to allow the study to run to completion or n_trials.
                          # Alternatively, set to a very large value (e.g., 24*3600*7 for a week in seconds).
         gc_after_trial=True, # Enable aggressive garbage collection after each trial.
@@ -478,11 +478,11 @@ def main():
     # Save best parameters
     best_params = study.best_trial.params
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    with open(f'config/stgnn_memory_optimized_best_params_{timestamp}.json', 'w') as f:
+    with open(f'config/stgnn_ultra_minimal_best_params_{timestamp}.json', 'w') as f:
         json.dump(best_params, f, indent=4)
     
     # Print optimization summary
-    print(f'\nMemory-Optimized Optimization Summary:')
+    print(f'\nUltra-Minimal Optimization Summary:')
     print(f'  Total trials: {len(study.trials)}')
     print(f'  Best validation loss: {study.best_trial.value:.4f}')
     print(f'  Best focal_alpha: {best_params.get("focal_alpha", "N/A")}')

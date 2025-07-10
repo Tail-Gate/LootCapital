@@ -6,9 +6,20 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from utils.stgnn_config import STGNNConfig
 from market_analysis.market_data import MarketData
 from market_analysis.technical_indicators import TechnicalIndicators
+import gc
+import psutil
+import os
+from datetime import timedelta
+
+def manage_memory():
+    """Force garbage collection and log memory usage"""
+    gc.collect()
+    process = psutil.Process(os.getpid())
+    memory_mb = process.memory_info().rss / 1024 / 1024
+    print(f"Memory usage: {memory_mb:.1f} MB")
 
 class STGNNDataProcessor:
-    """Data processor for STGNN model"""
+    """Memory-efficient data processor for STGNN model"""
     
     def __init__(self, config: STGNNConfig, market_data: MarketData, technical_indicators: TechnicalIndicators):
         """
@@ -27,6 +38,10 @@ class STGNNDataProcessor:
         self.scaler = MinMaxScaler(feature_range=(-1, 1))  # Default to MinMaxScaler
         self.scaler_fitted = False
         
+        # Memory optimization settings
+        self.max_sequences = 1000  # Maximum sequences to create
+        self.chunk_size = 1000     # Data points per chunk
+        
     def set_scaler(self, scaler_type: str = 'minmax'):
         """
         Set the scaler type
@@ -44,9 +59,55 @@ class STGNNDataProcessor:
         self.scaler_fitted = False
         print(f"Scaler set to: {scaler_type}")
         
-    def prepare_features(self, data: pd.DataFrame) -> pd.DataFrame:
+    def load_data_in_chunks(self, start_time=None, end_time=None, chunk_size=None):
         """
-        Prepare features for STGNN model
+        Load data in small chunks to prevent memory explosion
+        
+        Args:
+            start_time: Start time for data range
+            end_time: End time for data range
+            chunk_size: Number of data points per chunk
+            
+        Returns:
+            Dictionary mapping asset symbols to concatenated data
+        """
+        if chunk_size is None:
+            chunk_size = self.chunk_size
+            
+        print(f"Loading data in chunks of {chunk_size} data points...")
+        
+        # Load data with optional time window
+        if start_time is not None or end_time is not None:
+            market_data = self.market_data.get_data(self.config.assets, start_time, end_time)
+        else:
+            market_data = self.market_data.get_data(self.config.assets)
+        
+        # Process each asset separately to minimize memory
+        processed_data = {}
+        for asset in self.config.assets:
+            print(f"Processing asset: {asset}")
+            asset_data = market_data[asset]
+            
+            # Process in chunks if data is large
+            if len(asset_data) > chunk_size:
+                chunks = []
+                for i in range(0, len(asset_data), chunk_size):
+                    chunk = asset_data.iloc[i:i + chunk_size]
+                    chunks.append(chunk)
+                    manage_memory()
+                
+                # Concatenate chunks
+                processed_data[asset] = pd.concat(chunks, axis=0)
+                del chunks
+                manage_memory()
+            else:
+                processed_data[asset] = asset_data
+                
+        return processed_data
+        
+    def prepare_features_memory_efficient(self, data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Generate features with minimal memory overhead
         
         Args:
             data: DataFrame with OHLCV data
@@ -54,51 +115,190 @@ class STGNNDataProcessor:
         Returns:
             DataFrame with prepared features
         """
+        print("Preparing features with memory-efficient approach...")
+        
         # Store original price data for event-based analysis
         self._original_prices = data['close'].copy()
         
-        # Calculate basic price features
-        data['returns'] = data['close'].pct_change()
-        data['log_returns'] = np.log1p(data['returns'] + 1e-6)
-        data['volume_ma'] = data['volume'].rolling(window=20).mean()
-        data['volume_ratio'] = data['volume'] / (data['volume_ma'] + 1e-6)
-        try:
-            delta = data['close'].diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-            rs = gain / (loss + 1e-6)
-            data['rsi'] = 100 - (100 / (1 + rs))
-            exp1 = data['close'].ewm(span=12, adjust=False).mean()
-            exp2 = data['close'].ewm(span=26, adjust=False).mean()
-            data['macd'] = exp1 - exp2
-            data['macd_signal'] = data['macd'].ewm(span=9, adjust=False).mean()
-            data['bb_middle'] = data['close'].rolling(window=20).mean()
-            data['bb_std'] = data['close'].rolling(window=20).std()
-            data['bb_upper'] = data['bb_middle'] + (data['bb_std'] * 2)
-            data['bb_lower'] = data['bb_middle'] - (data['bb_std'] * 2)
-        except Exception as e:
-            print(f"Warning: Failed to calculate technical indicators: {e}")
-            data['rsi'] = 50
-            data['macd'] = 0
-            data['macd_signal'] = 0
-            data['bb_middle'] = data['close']
-            data['bb_upper'] = data['close']
-            data['bb_lower'] = data['close']
-        # Always return features in the order specified by config, fill missing with zeros
-        features = pd.DataFrame()
-        for feat in self.config.features:
-            col = 'bb_middle' if feat == 'bollinger_bands' else feat
-            if col in data.columns:
-                features[feat] = data[col]
-            else:
-                features[feat] = 0
+        # Use only essential features to minimize memory
+        essential_features = ['returns', 'volume']
+        if 'rsi' in self.config.features:
+            essential_features.append('rsi')
+        if 'macd' in self.config.features:
+            essential_features.append('macd')
+        if 'bollinger' in self.config.features:
+            essential_features.append('bollinger')
+            
+        features = pd.DataFrame(index=data.index)
+        
+        # Calculate features one by one to avoid large intermediate objects
+        print("Calculating returns...")
+        features['returns'] = data['close'].pct_change()
+        manage_memory()
+        
+        print("Calculating volume...")
+        features['volume'] = data['volume']
+        manage_memory()
+        
+        # Only calculate essential technical indicators
+        if 'rsi' in essential_features:
+            print("Calculating RSI...")
+            try:
+                delta = data['close'].diff()
+                gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                rs = gain / (loss + 1e-6)
+                features['rsi'] = 100 - (100 / (1 + rs))
+                del delta, gain, loss, rs
+                manage_memory()
+            except Exception as e:
+                print(f"Warning: Failed to calculate RSI: {e}")
+                features['rsi'] = 50
+                
+        if 'macd' in essential_features:
+            print("Calculating MACD...")
+            try:
+                exp1 = data['close'].ewm(span=12, adjust=False).mean()
+                exp2 = data['close'].ewm(span=26, adjust=False).mean()
+                features['macd'] = exp1 - exp2
+                del exp1, exp2
+                manage_memory()
+            except Exception as e:
+                print(f"Warning: Failed to calculate MACD: {e}")
+                features['macd'] = 0
+                
+        if 'bollinger' in essential_features:
+            print("Calculating Bollinger Bands...")
+            try:
+                bb_middle = data['close'].rolling(window=20).mean()
+                bb_std = data['close'].rolling(window=20).std()
+                features['bollinger'] = (data['close'] - bb_middle) / (bb_std + 1e-6)
+                del bb_middle, bb_std
+                manage_memory()
+            except Exception as e:
+                print(f"Warning: Failed to calculate Bollinger Bands: {e}")
+                features['bollinger'] = 0
+        
         # Handle missing/infinite values
         features = features.replace([np.inf, -np.inf], np.nan)
         features = features.ffill()
         features = features.fillna(0)
+        
         # Store returns separately for target calculation
-        self._returns = data['returns'] if 'returns' in data.columns else pd.Series(0, index=data.index)
+        self._returns = features['returns'] if 'returns' in features.columns else pd.Series(0, index=data.index)
+        
+        print(f"Features prepared: {list(features.columns)}")
         return features
+        
+    def create_sequences_lazy(self, features: pd.DataFrame, max_sequences=None) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Create sequences on-demand instead of all at once
+        
+        Args:
+            features: DataFrame with technical features
+            max_sequences: Maximum number of sequences to create
+            
+        Returns:
+            Tuple of (X, y) where:
+            - X: Input sequences of shape [batch_size, seq_len, num_features]
+            - y: Target values of shape [batch_size] (event-based analysis results)
+        """
+        if max_sequences is None:
+            max_sequences = self.max_sequences
+            
+        print(f"Creating sequences with lazy generation (max: {max_sequences})...")
+        
+        input_features = [f for f in self.config.features if f in features.columns]
+        total_sequences = len(features) - self.config.seq_len - self.config.prediction_horizon + 1
+        
+        if total_sequences > max_sequences:
+            # Sample sequences instead of creating all
+            print(f"Sampling {max_sequences} sequences from {total_sequences} possible sequences")
+            indices = np.random.choice(total_sequences, max_sequences, replace=False)
+            indices = np.sort(indices)  # Sort for reproducibility
+        else:
+            indices = range(total_sequences)
+            
+        X, y = [], []
+        
+        for i in indices:
+            # Input sequence
+            X.append(features[input_features].iloc[i:i + self.config.seq_len].values)
+            
+            # Event-based target calculation
+            start_idx = i + self.config.seq_len
+            end_idx = start_idx + self.config.prediction_horizon
+            
+            if start_idx < len(self._original_prices) and end_idx <= len(self._original_prices):
+                # Get the starting price
+                start_price = self._original_prices.iloc[start_idx]
+                
+                # Get all prices within the prediction horizon window
+                window_prices = self._original_prices.iloc[start_idx:end_idx]
+                
+                # Calculate all price changes from the starting price
+                price_changes = (window_prices - start_price) / start_price
+                
+                # Find the maximum positive and negative moves within the window
+                max_positive_move = price_changes.max()
+                max_negative_move = price_changes.min()
+                
+                # Use the maximum move in either direction as the target
+                if abs(max_positive_move) > abs(max_negative_move):
+                    target_return = max_positive_move
+                else:
+                    target_return = max_negative_move
+                
+                y.append(target_return)
+            else:
+                # Fallback to original method if index is out of bounds
+                if i + self.config.seq_len + self.config.prediction_horizon - 1 < len(self._returns):
+                    y.append(self._returns.iloc[i + self.config.seq_len + self.config.prediction_horizon - 1])
+                else:
+                    y.append(0.0)  # Default to no change if out of bounds
+        
+        X = np.array(X)
+        y = np.array(y)
+        
+        print(f"Created {len(X)} sequences with shapes X: {X.shape}, y: {y.shape}")
+        manage_memory()
+        
+        return X, y
+        
+    def prepare_data_single_asset(self, asset: str, start_time=None, end_time=None) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Process one asset at a time to minimize memory
+        
+        Args:
+            asset: Asset symbol to process
+            start_time: Start time for data range
+            end_time: End time for data range
+            
+        Returns:
+            Tuple of (X, y) for single asset
+        """
+        print(f"Processing single asset: {asset}")
+        
+        # Load only one asset
+        if start_time is not None or end_time is not None:
+            data = self.market_data.get_data([asset], start_time, end_time)
+        else:
+            data = self.market_data.get_data([asset])
+        
+        asset_data = data[asset]
+        print(f"Loaded {len(asset_data)} data points for {asset}")
+        
+        # Process features
+        features = self.prepare_features_memory_efficient(asset_data)
+        
+        # Create sequences
+        X, y = self.create_sequences_lazy(features)
+        
+        # Clean up immediately
+        del data, asset_data, features
+        manage_memory()
+        
+        return X, y
         
     def fit_scaler(self, features: pd.DataFrame):
         """
@@ -144,7 +344,7 @@ class STGNNDataProcessor:
         
     def create_sequences(self, features: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Create sequences for training using event-based analysis
+        Create sequences for training using event-based analysis (legacy method)
         
         Args:
             features: DataFrame with technical features
@@ -154,47 +354,8 @@ class STGNNDataProcessor:
             - X: Input sequences of shape [batch_size, seq_len, num_features]
             - y: Target values of shape [batch_size] (event-based analysis results)
         """
-        X, y = [], []
-        input_features = [f for f in self.config.features if f in features.columns]
-        
-        for i in range(len(features) - self.config.seq_len - self.config.prediction_horizon + 1):
-            # Input sequence
-            X.append(features[input_features].iloc[i:i + self.config.seq_len].values)
-            
-            # Event-based target calculation
-            start_idx = i + self.config.seq_len
-            end_idx = start_idx + self.config.prediction_horizon
-            
-            if start_idx < len(self._original_prices) and end_idx <= len(self._original_prices):
-                # Get the starting price
-                start_price = self._original_prices.iloc[start_idx]
-                
-                # Get all prices within the prediction horizon window
-                window_prices = self._original_prices.iloc[start_idx:end_idx]
-                
-                # Calculate all price changes from the starting price
-                price_changes = (window_prices - start_price) / start_price
-                
-                # Find the maximum positive and negative moves within the window
-                max_positive_move = price_changes.max()
-                max_negative_move = price_changes.min()
-                
-                # Use the maximum move in either direction as the target
-                # This captures any significant move that occurred within the window
-                if abs(max_positive_move) > abs(max_negative_move):
-                    target_return = max_positive_move
-                else:
-                    target_return = max_negative_move
-                
-                y.append(target_return)
-            else:
-                # Fallback to original method if index is out of bounds
-                if i + self.config.seq_len + self.config.prediction_horizon - 1 < len(self._returns):
-                    y.append(self._returns.iloc[i + self.config.seq_len + self.config.prediction_horizon - 1])
-                else:
-                    y.append(0.0)  # Default to no change if out of bounds
-        
-        return np.array(X), np.array(y)
+        # Use lazy sequence generation instead
+        return self.create_sequences_lazy(features)
         
     def create_adjacency_matrix(self, market_data: Dict[str, pd.DataFrame]) -> np.ndarray:
         """
@@ -206,6 +367,12 @@ class STGNNDataProcessor:
         Returns:
             Adjacency matrix of shape [num_nodes, num_nodes]
         """
+        # For single asset, create simple adjacency matrix
+        if len(self.config.assets) == 1:
+            adj = np.array([[1.0]])
+            print("Single asset adjacency matrix: [[1.0]]")
+            return adj
+            
         # Calculate correlation matrix
         returns = pd.DataFrame({
             asset: data['close'].pct_change().fillna(0)
@@ -235,11 +402,10 @@ class STGNNDataProcessor:
         print(f"Final adjacency matrix (non-negative):\n{adj}")
         
         return adj
-  
         
     def prepare_data(self, start_time=None, end_time=None) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
-        Prepare data for training and prediction with feature scaling
+        Memory-efficient data preparation for training and prediction
         
         Args:
             start_time: Optional start time for data range
@@ -251,41 +417,80 @@ class STGNNDataProcessor:
             - adj: Adjacency matrix of shape [num_nodes, num_nodes]
             - y: Target values of shape [batch_size, num_nodes]
         """
-        # Get market data with optional time window
-        if start_time is not None or end_time is not None:
-            market_data = self.market_data.get_data(self.config.assets, start_time, end_time)
-        else:
-            market_data = self.market_data.get_data(self.config.assets)
+        print("Starting memory-efficient data preparation...")
+        manage_memory()
+        
+        # For single asset, use optimized processing
+        if len(self.config.assets) == 1:
+            print("Using single asset processing for memory efficiency...")
+            asset = self.config.assets[0]
+            X, y = self.prepare_data_single_asset(asset, start_time, end_time)
+            
+            # Reshape for single asset: [batch_size, 1, seq_len, input_dim]
+            X = X.reshape(X.shape[0], 1, X.shape[1], X.shape[2])
+            y = y.reshape(y.shape[0], 1)
+            
+            # Create simple adjacency matrix for single asset
+            adj = np.array([[1.0]])
+            
+            # Convert to tensors
+            X = torch.FloatTensor(X)
+            adj = torch.FloatTensor(adj)
+            y = torch.FloatTensor(y)
+            
+            print(f"Single asset data prepared - X: {X.shape}, adj: {adj.shape}, y: {y.shape}")
+            manage_memory()
+            
+            return X, adj, y
+        
+        # For multiple assets, use chunked processing
+        print("Using chunked processing for multiple assets...")
+        
+        # Load data in chunks
+        market_data = self.load_data_in_chunks(start_time, end_time)
         
         # Prepare features for each asset
         features_dict = {}
         for asset in self.config.assets:
-            features_dict[asset] = self.prepare_features(market_data[asset])
+            print(f"Preparing features for {asset}...")
+            features_dict[asset] = self.prepare_features_memory_efficient(market_data[asset])
+            manage_memory()
         
         # Fit scaler on training data (use first 80% of data)
         if not self.scaler_fitted:
+            print("Fitting scaler...")
             # Combine features from all assets for fitting
             all_features = pd.concat([features_dict[asset] for asset in self.config.assets], axis=0)
             train_size = int(len(all_features) * 0.8)
             train_features = all_features.iloc[:train_size]
             self.fit_scaler(train_features)
+            del all_features, train_features
+            manage_memory()
         
         # Transform features for all assets
         scaled_features_dict = {}
         for asset in self.config.assets:
+            print(f"Transforming features for {asset}...")
             scaled_features_dict[asset] = self.transform_features(features_dict[asset])
+            del features_dict[asset]  # Clean up original features
+            manage_memory()
         
         # Create sequences for each asset
         X_dict = {}
         y_dict = {}
         for asset, features in scaled_features_dict.items():
-            X_dict[asset], y_dict[asset] = self.create_sequences(features)
+            print(f"Creating sequences for {asset}...")
+            X_dict[asset], y_dict[asset] = self.create_sequences_lazy(features)
+            del scaled_features_dict[asset]  # Clean up scaled features
+            manage_memory()
         
         # Stack features and targets
+        print("Stacking features and targets...")
         X = np.stack([X_dict[asset] for asset in self.config.assets], axis=1)  # [batch_size, num_nodes, seq_len, input_dim]
         y = np.stack([y_dict[asset] for asset in self.config.assets], axis=1)  # [batch_size, num_nodes]
         
         # Create adjacency matrix
+        print("Creating adjacency matrix...")
         adj = self.create_adjacency_matrix(market_data)
         
         # Convert to tensors
@@ -300,6 +505,9 @@ class STGNNDataProcessor:
         if torch.isinf(y).any() or torch.isnan(y).any():
             print("Warning: Inf or NaN values found in y, replacing with 0.")
             y = torch.nan_to_num(y, nan=0.0, posinf=0.0, neginf=0.0)
+        
+        print(f"Data preparation completed - X: {X.shape}, adj: {adj.shape}, y: {y.shape}")
+        manage_memory()
         
         return X, adj, y
         
