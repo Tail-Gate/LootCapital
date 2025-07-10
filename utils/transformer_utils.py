@@ -256,7 +256,7 @@ def train_transformer(
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=4,  # Use 4 workers for parallel data loading
+        num_workers=8,  # Use 8 workers for maximum parallel data loading
         pin_memory=True,
         collate_fn=custom_collate_fn
     )
@@ -265,7 +265,7 @@ def train_transformer(
         val_dataset,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=4,  # Use 4 workers for parallel data loading
+        num_workers=8,  # Use 8 workers for maximum parallel data loading
         pin_memory=True,
         collate_fn=custom_collate_fn
     )
@@ -441,7 +441,7 @@ def predict_transformer(
         dataset,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=4,  # Use 4 workers for parallel data loading
+        num_workers=8,  # Use 8 workers for maximum parallel data loading
         pin_memory=True
     )
     

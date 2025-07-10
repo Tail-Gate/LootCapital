@@ -5,11 +5,11 @@
 #SBATCH --job-name=stgnn_hyperopt_gpu    # Job name that appears in squeue
 #SBATCH --mail-type=END,FAIL             # Email notifications for END and FAIL
 #SBATCH --mail-user=eoobon24@stlawu.edu  # Your St. Lawrence email address
-#SBATCH --mem=64gb                       # Reduced to 64GB to leave more buffer
-#SBATCH --time=8:00:00                   # Reduced time limit for faster iteration
+#SBATCH --mem=120gb                      # Maximum memory (node has 128GB)
+#SBATCH --time=24:00:00                  # Maximum time for thorough optimization
 #SBATCH --output=hyperopt_log_%j.txt     # Standard output file, %j is replaced by job number
-#SBATCH --cpus-per-task=12                # Increased to 12 CPUs for better data processing and memory management
-#SBATCH --gres=gpu:1                     # Request 1 GPU (reduce memory usage)
+#SBATCH --cpus-per-task=32               # Use ALL 32 CPUs on the node
+#SBATCH --gres=gpu:2                     # Use BOTH GPUs
 #SBATCH -n 1                             # Request 1 nodes for the job
 #SBATCH --exclusive                      # Request exclusive access to the node
 
@@ -76,14 +76,14 @@ mkdir -p config
 echo "Ensured output directories exist."
 
 # --- Step 6: Set memory optimization environment variables ---
-export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:64
+export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
 export CUDA_LAUNCH_BLOCKING=1
-export OMP_NUM_THREADS=12
-export MKL_NUM_THREADS=12
-export NUMEXPR_NUM_THREADS=12
-export OPENBLAS_NUM_THREADS=12
-# GPU memory management
-export CUDA_VISIBLE_DEVICES=0
+export OMP_NUM_THREADS=32
+export MKL_NUM_THREADS=32
+export NUMEXPR_NUM_THREADS=32
+export OPENBLAS_NUM_THREADS=32
+# Use both GPUs
+export CUDA_VISIBLE_DEVICES=0,1
 
 # --- Step 7: Run your Python script with memory monitoring ---
 echo "Starting memory-optimized stgnn_hyperopt script..."
