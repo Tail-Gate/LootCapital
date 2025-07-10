@@ -10,6 +10,7 @@ import gc
 import psutil
 import os
 from datetime import timedelta
+from datetime import datetime
 
 def manage_memory():
     """Force garbage collection and log memory usage"""
@@ -288,15 +289,114 @@ class STGNNDataProcessor:
         asset_data = data[asset]
         print(f"Loaded {len(asset_data)} data points for {asset}")
         
+        # Check if we have enough data - use real data only
+        if len(asset_data) < 100:  # Need at least 100 data points
+            print(f"Warning: Insufficient real data ({len(asset_data)} points).")
+            print(f"Available data range: {asset_data.index.min()} to {asset_data.index.max()}")
+            print(f"Requested range: {start_time} to {end_time}")
+            
+            # Use a larger time window to get more data
+            if len(asset_data) == 0:
+                # If no data loaded, try loading more historical data
+                print("No data loaded. Trying to load more historical data...")
+                end_time = datetime.now() - timedelta(days=1)  # Use yesterday as end
+                start_time = end_time - timedelta(days=30)     # Use 30 days of data
+                data = self.market_data.get_data([asset], start_time, end_time)
+                asset_data = data[asset]
+                print(f"Loaded {len(asset_data)} data points with extended range")
+        
         # Process features
         features = self.prepare_features_memory_efficient(asset_data)
         
         # Create sequences
         X, y = self.create_sequences_lazy(features)
         
+        # Check if we have sequences
+        if len(X) == 0:
+            print("Warning: No sequences created from real data.")
+            print(f"Features shape: {features.shape}")
+            print(f"Sequence length: {self.config.seq_len}")
+            print(f"Prediction horizon: {self.config.prediction_horizon}")
+            print(f"Available data points: {len(features)}")
+            
+            # Try with shorter sequence length
+            original_seq_len = self.config.seq_len
+            self.config.seq_len = min(5, len(features) // 2)
+            print(f"Trying with shorter sequence length: {self.config.seq_len}")
+            X, y = self.create_sequences_lazy(features)
+            self.config.seq_len = original_seq_len  # Restore original
+        
         # Clean up immediately
         del data, asset_data, features
         manage_memory()
+        
+        return X, y
+        
+    def _create_synthetic_data(self, asset: str, num_points: int) -> pd.DataFrame:
+        """Create synthetic data for testing when real data is not available"""
+        print(f"Creating synthetic data for {asset} with {num_points} points...")
+        
+        # Create time index
+        end_time = datetime.now()
+        start_time = end_time - timedelta(days=num_points // 96)  # 96 15-min intervals per day
+        time_index = pd.date_range(start=start_time, end=end_time, periods=num_points, freq='15T')
+        
+        # Create synthetic OHLCV data
+        np.random.seed(42)  # For reproducibility
+        
+        # Start with a base price
+        base_price = 2000.0  # ETH-like price
+        prices = [base_price]
+        
+        # Generate price movements
+        for i in range(1, num_points):
+            # Random walk with some trend
+            change = np.random.normal(0, 0.01)  # 1% volatility
+            new_price = prices[-1] * (1 + change)
+            prices.append(new_price)
+        
+        # Create OHLCV data
+        data = pd.DataFrame({
+            'open': prices,
+            'high': [p * (1 + abs(np.random.normal(0, 0.005))) for p in prices],
+            'low': [p * (1 - abs(np.random.normal(0, 0.005))) for p in prices],
+            'close': prices,
+            'volume': np.random.uniform(1000, 10000, num_points)
+        }, index=time_index)
+        
+        # Ensure high >= open, close and low <= open, close
+        data['high'] = data[['open', 'high', 'close']].max(axis=1)
+        data['low'] = data[['open', 'low', 'close']].min(axis=1)
+        
+        print(f"Synthetic data created with shape: {data.shape}")
+        return data
+        
+    def _create_synthetic_sequences(self, features: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
+        """Create synthetic sequences when no real sequences can be created"""
+        print("Creating synthetic sequences...")
+        
+        # Create minimal sequences for testing
+        num_sequences = min(100, len(features) - self.config.seq_len - self.config.prediction_horizon + 1)
+        
+        if num_sequences <= 0:
+            # Create completely synthetic sequences
+            num_sequences = 50
+            X = np.random.randn(num_sequences, self.config.seq_len, len(self.config.features))
+            y = np.random.randn(num_sequences)
+            print(f"Created {num_sequences} completely synthetic sequences")
+        else:
+            # Use available features to create sequences
+            X, y = [], []
+            for i in range(num_sequences):
+                if i + self.config.seq_len <= len(features):
+                    X.append(features.iloc[i:i + self.config.seq_len].values)
+                    y.append(np.random.normal(0, 0.01))  # Small random return
+                else:
+                    break
+            
+            X = np.array(X)
+            y = np.array(y)
+            print(f"Created {len(X)} sequences from available features")
         
         return X, y
         
@@ -426,9 +526,20 @@ class STGNNDataProcessor:
             asset = self.config.assets[0]
             X, y = self.prepare_data_single_asset(asset, start_time, end_time)
             
-            # Reshape for single asset: [batch_size, 1, seq_len, input_dim]
+                    # Check if we have valid sequences
+        if len(X) == 0:
+            print("Warning: No sequences created from real data.")
+            print(f"Available data points: {len(features) if 'features' in locals() else 'unknown'}")
+            print("This indicates insufficient real data for the requested time range.")
+            raise ValueError("No sequences could be created from real data. Check data availability and time range.")
+        
+        # Reshape for single asset: [batch_size, 1, seq_len, input_dim]
+        if len(X.shape) == 3:  # (batch, seq_len, features)
             X = X.reshape(X.shape[0], 1, X.shape[1], X.shape[2])
             y = y.reshape(y.shape[0], 1)
+        else:
+            print(f"Warning: Unexpected X shape: {X.shape}")
+            raise ValueError(f"Unexpected X shape: {X.shape}. Expected 3D array.")
             
             # Create simple adjacency matrix for single asset
             adj = np.array([[1.0]])
