@@ -19,7 +19,7 @@ class STGNNTrainer:
         """
         self.config = config
         self.data_processor = data_processor
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device('cpu')  # Force CPU for reliability
         
         # Initialize model
         self.model = STGNNModel(

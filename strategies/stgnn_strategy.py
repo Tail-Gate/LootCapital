@@ -65,8 +65,8 @@ class STGNNStrategy(BaseStrategy):
             kernel_size=self.kernel_size
         )
         
-        # Set device
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # Set device - force CPU for reliability
+        self.device = torch.device('cpu')
         self.model = self.model.to(self.device)
         
         # Initialize signals

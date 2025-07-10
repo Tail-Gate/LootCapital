@@ -55,10 +55,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def manage_memory():
-    """Force garbage collection and log memory usage"""
+    """Force garbage collection and log memory usage for CPU-only training"""
     gc.collect()
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
+    # No CUDA operations for CPU-only training
     
     # Log memory usage
     process = psutil.Process(os.getpid())
@@ -74,9 +73,6 @@ def manage_memory():
         logger.warning(f"High memory usage detected: {memory_mb:.1f} MB")
         # Force more aggressive cleanup
         gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            torch.cuda.synchronize()
 
 class EnhancedSTGNNDataProcessor(STGNNDataProcessor):
     """Enhanced STGNN data processor that uses FeatureGenerator for comprehensive features"""

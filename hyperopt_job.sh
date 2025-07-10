@@ -9,7 +9,7 @@
 #SBATCH --time=24:00:00                  # Maximum time for thorough optimization
 #SBATCH --output=hyperopt_log_%j.txt     # Standard output file, %j is replaced by job number
 #SBATCH --cpus-per-task=32               # Use ALL 32 CPUs on the node
-#SBATCH --gres=gpu:2                     # Use BOTH GPUs
+#SBATCH --gres=gpu:0                     # No GPU needed for CPU-only training
 #SBATCH -n 1                             # Request 1 nodes for the job
 #SBATCH --exclusive                      # Request exclusive access to the node
 
@@ -82,8 +82,8 @@ export OMP_NUM_THREADS=32
 export MKL_NUM_THREADS=32
 export NUMEXPR_NUM_THREADS=32
 export OPENBLAS_NUM_THREADS=32
-# Use both GPUs
-export CUDA_VISIBLE_DEVICES=0,1
+# CPU-only training - no GPU needed
+export CUDA_VISIBLE_DEVICES=""
 
 # --- Step 7: Run your Python script with memory monitoring ---
 echo "Starting memory-optimized stgnn_hyperopt script..."
@@ -95,12 +95,12 @@ echo "  MKL_NUM_THREADS: $MKL_NUM_THREADS"
 echo "  NUMEXPR_NUM_THREADS: $NUMEXPR_NUM_THREADS"
 echo "  OPENBLAS_NUM_THREADS: $OPENBLAS_NUM_THREADS"
 echo ""
-echo "Memory optimization strategy:"
-echo "  - Disabled SMOTE processing to prevent dataset size explosion"
-echo "  - Reduced data window to 30 days"
-echo "  - Reduced trials to 200"
-echo "  - Reduced parameter ranges to prevent OOM"
-echo "  - Added aggressive memory cleanup between trials"
+echo "CPU optimization strategy:"
+echo "  - Using CPU-only training for reliability"
+echo "  - Using all 32 cores for parallel processing"
+echo "  - Full parameter ranges for comprehensive optimization"
+echo "  - 60-day data window for thorough training"
+echo "  - 500 trials for comprehensive hyperparameter search"
 
 python utils/stgnn_hyperopt.py
 

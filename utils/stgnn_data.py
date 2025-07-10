@@ -343,7 +343,7 @@ class STGNNDataProcessor:
             dataset,
             batch_size=batch_size,
             shuffle=True,
-            num_workers=4,  # Use 4 workers to reduce memory usage
-            pin_memory=True,  # Enable pin memory for faster GPU transfer
+            num_workers=16,  # Use 16 workers for CPU parallel processing
+            pin_memory=False,  # Disable pin memory for CPU training
             drop_last=drop_last
         ) 
