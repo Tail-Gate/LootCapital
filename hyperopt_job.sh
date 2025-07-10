@@ -97,9 +97,9 @@ echo "  OPENBLAS_NUM_THREADS: $OPENBLAS_NUM_THREADS"
 echo ""
 echo "Memory optimization strategy:"
 echo "  - Disabled SMOTE processing to prevent dataset size explosion"
-echo "  - Reduced data window to 15 days"
-echo "  - Reduced trials to 100"
-echo "  - Increased CPU allocation for better parallel processing"
+echo "  - Reduced data window to 30 days"
+echo "  - Reduced trials to 200"
+echo "  - Reduced parameter ranges to prevent OOM"
 echo "  - Added aggressive memory cleanup between trials"
 
 python utils/stgnn_hyperopt.py

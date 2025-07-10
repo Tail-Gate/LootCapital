@@ -130,14 +130,14 @@ def objective(trial: optuna.Trial) -> float:
             'assets': ['ETH/USD'],  # Focus on single asset for optimization
             'features': ['price', 'volume', 'rsi', 'macd', 'bollinger', 'atr', 'adx', 'stoch', 'williams_r', 'cci', 'mfi', 'obv', 'vwap', 'support', 'resistance'],
             
-                    # MAXIMIZED parameter ranges for thorough optimization
-        'learning_rate': trial.suggest_float('learning_rate', 1e-5, 1e-2, log=True),  # Full range
-        'hidden_dim': trial.suggest_int('hidden_dim', 32, 256, step=32),  # Much larger range
-        'num_layers': trial.suggest_int('num_layers', 1, 5),  # More layers
-        'kernel_size': trial.suggest_int('kernel_size', 2, 8),  # Larger range
-        'dropout': trial.suggest_float('dropout', 0.1, 0.6),  # Larger range
-        'batch_size': trial.suggest_int('batch_size', 16, 128, step=16),  # Much larger batches
-        'seq_len': trial.suggest_int('seq_len', 50, 200, step=25),  # Much longer sequences
+                    # REDUCED parameter ranges to prevent OOM
+        'learning_rate': trial.suggest_float('learning_rate', 1e-4, 1e-2, log=True),  # Smaller range
+        'hidden_dim': trial.suggest_int('hidden_dim', 32, 128, step=32),  # Reduced range
+        'num_layers': trial.suggest_int('num_layers', 1, 3),  # Fewer layers
+        'kernel_size': trial.suggest_int('kernel_size', 2, 6),  # Smaller range
+        'dropout': trial.suggest_float('dropout', 0.1, 0.5),  # Smaller range
+        'batch_size': trial.suggest_int('batch_size', 8, 64, step=8),  # Smaller batches
+        'seq_len': trial.suggest_int('seq_len', 30, 100, step=10),  # Shorter sequences
             'prediction_horizon': 15,  # Fixed as per current requirement
             'early_stopping_patience': 3,  # Reduced for faster convergence
             
@@ -198,9 +198,9 @@ def objective(trial: optuna.Trial) -> float:
             price_threshold=config_dict['price_threshold']
         )
         
-        # Use LARGER time window for thorough hyperparameter optimization
+        # Use SMALLER time window to prevent OOM
         end_time = datetime.now()
-        start_time = end_time - timedelta(days=60)  # Use 60 days for comprehensive optimization
+        start_time = end_time - timedelta(days=30)  # Use 30 days to reduce memory usage
         
         # Create data processor with memory-efficient approach
         data_processor = create_classification_data_processor(config)
@@ -317,9 +317,9 @@ def objective(trial: optuna.Trial) -> float:
         # Set the custom class weights calculation
         trainer._calculate_class_weights = calculate_weighted_class_weights
         
-        # Train model with MORE epochs for thorough optimization
+        # Train model with FEWER epochs to prevent OOM
         original_epochs = trainer.config.num_epochs
-        trainer.config.num_epochs = 10  # Increased for better optimization
+        trainer.config.num_epochs = 5  # Reduced to prevent memory issues
         
         training_history = trainer.train()
         
@@ -457,10 +457,10 @@ def main():
             best_params_info = "no (no completed trials yet)"
     logger.info(f"Starting memory-optimized Optuna optimization with {best_params_info} previous best parameters.")
     
-    # MAXIMIZED number of trials for thorough optimization
+    # REDUCED number of trials to prevent OOM
     study.optimize(
         objective,
-        n_trials=500,  # Increased to 500 for comprehensive optimization
+        n_trials=200,  # Reduced to 200 to prevent memory issues
         timeout=None,    # Remove timeout to allow the study to run to completion or n_trials.
                          # Alternatively, set to a very large value (e.g., 24*3600*7 for a week in seconds).
         gc_after_trial=True, # Enable aggressive garbage collection after each trial.
