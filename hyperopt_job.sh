@@ -95,12 +95,14 @@ echo "  MKL_NUM_THREADS: $MKL_NUM_THREADS"
 echo "  NUMEXPR_NUM_THREADS: $NUMEXPR_NUM_THREADS"
 echo "  OPENBLAS_NUM_THREADS: $OPENBLAS_NUM_THREADS"
 echo ""
-echo "CPU optimization strategy:"
+echo "Maximum resource utilization strategy:"
 echo "  - Using CPU-only training for reliability"
 echo "  - Using all 32 cores for parallel processing"
-echo "  - Full parameter ranges for comprehensive optimization"
-echo "  - 60-day data window for thorough training"
-echo "  - 500 trials for comprehensive hyperparameter search"
+echo "  - Using 16 workers for maximum data loading"
+echo "  - Using 120GB memory (maximum available)"
+echo "  - Reduced parameter ranges to prevent OOM"
+echo "  - 15-day data window to minimize memory usage"
+echo "  - 50 trials for faster optimization"
 
 python utils/stgnn_hyperopt.py
 

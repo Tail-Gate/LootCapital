@@ -343,7 +343,7 @@ class STGNNDataProcessor:
             dataset,
             batch_size=batch_size,
             shuffle=True,
-            num_workers=16,  # Use 16 workers for CPU parallel processing
+            num_workers=16,  # Use 16 workers for maximum CPU parallel processing
             pin_memory=False,  # Disable pin memory for CPU training
             drop_last=drop_last
         ) 
