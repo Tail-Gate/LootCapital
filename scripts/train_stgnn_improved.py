@@ -305,6 +305,12 @@ class ClassificationSTGNNTrainer:
             dropout=config.dropout,
             kernel_size=config.kernel_size
         ).to(self.device)
+        # Enable multi-GPU support if available
+        if torch.cuda.device_count() > 1:
+            logger.info(f"Multiple GPUs detected ({torch.cuda.device_count()}); using DataParallel.")
+            self.model = torch.nn.DataParallel(self.model)
+        else:
+            logger.info("Single GPU or CPU detected; not using DataParallel.")
         
         # Initialize optimizer
         self.optimizer = torch.optim.Adam(

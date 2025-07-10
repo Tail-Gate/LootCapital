@@ -8,9 +8,9 @@
 #SBATCH --mem=110gb                      # Reduced from 120GB to 110GB to leave buffer
 #SBATCH --time=8:00:00                   # Reduced time limit for faster iteration
 #SBATCH --output=hyperopt_log_%j.txt     # Standard output file, %j is replaced by job number
-#SBATCH --cpus-per-gpu=12                # Increased to 12 CPUs for better data processing and memory management
-#SBATCH --gres=gpu:1                     # Request 1 GPU
-#SBATCH -n 1                             # Request 1 node for the job
+#SBATCH --cpus-per-task=12                # Increased to 12 CPUs for better data processing and memory management
+#SBATCH --gres=gpu:2                     # Request 1 GPU
+#SBATCH -n 1                             # Request 1 nodes for the job
 #SBATCH --exclusive                      # Request exclusive access to the node
 
 echo "STARTED JOB AT: $(date)"

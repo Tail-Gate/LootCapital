@@ -343,5 +343,7 @@ class STGNNDataProcessor:
             dataset,
             batch_size=batch_size,
             shuffle=True,
+            num_workers=4,  # Use 4 workers for parallel data loading
+            pin_memory=True,  # Enable pin memory for faster GPU transfer
             drop_last=drop_last
         ) 
