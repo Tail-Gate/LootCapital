@@ -589,8 +589,11 @@ class STGNNDataProcessor:
         # Create sequences for each asset
         X_dict = {}
         y_dict = {}
-        for asset, features in scaled_features_dict.items():
+        # Collect keys to avoid modifying dict during iteration
+        assets_to_process = list(scaled_features_dict.keys())
+        for asset in assets_to_process:
             print(f"Creating sequences for {asset}...")
+            features = scaled_features_dict[asset]
             X_dict[asset], y_dict[asset] = self.create_sequences_lazy(features)
             del scaled_features_dict[asset]  # Clean up scaled features
             manage_memory()
