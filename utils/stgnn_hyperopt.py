@@ -109,7 +109,7 @@ def create_classification_data_processor(config: STGNNConfig, start_time=None, e
 
 def objective(trial: optuna.Trial) -> float:
     """
-    Memory-optimized objective function for hyperparameter optimization
+    Ultra-minimal memory-optimized objective function for hyperparameter optimization
     
     Args:
         trial: Optuna trial object
@@ -121,48 +121,48 @@ def objective(trial: optuna.Trial) -> float:
     manage_memory()
     
     try:
-        # Define REDUCED hyperparameter search space to minimize memory usage
+        # Define ULTRA-MINIMAL hyperparameter search space to prevent OOM
         config_dict = {
             'assets': ['ETH/USD'],  # Focus on single asset for optimization
-            'features': ['price', 'volume', 'rsi', 'macd', 'bollinger', 'atr', 'adx', 'stoch', 'williams_r', 'cci', 'mfi', 'obv', 'vwap', 'support', 'resistance'],
+            'features': ['price', 'volume', 'rsi', 'macd', 'bollinger'],  # Reduced feature set
             
-                    # REDUCED parameter ranges to prevent OOM
-        'learning_rate': trial.suggest_float('learning_rate', 1e-4, 1e-2, log=True),  # Smaller range
-        'hidden_dim': trial.suggest_int('hidden_dim', 16, 64, step=16),  # Much smaller range
-        'num_layers': trial.suggest_int('num_layers', 1, 2),  # Very few layers
-        'kernel_size': trial.suggest_int('kernel_size', 2, 4),  # Small range
-        'dropout': trial.suggest_float('dropout', 0.1, 0.4),  # Small range
-        'batch_size': trial.suggest_int('batch_size', 4, 32, step=4),  # Very small batches
-        'seq_len': trial.suggest_int('seq_len', 20, 60, step=10),  # Very short sequences
+            # ULTRA-MINIMAL parameter ranges to prevent OOM
+            'learning_rate': trial.suggest_float('learning_rate', 1e-4, 1e-3, log=True),  # Very small range
+            'hidden_dim': trial.suggest_int('hidden_dim', 4, 8, step=2),  # Ultra-small range
+            'num_layers': trial.suggest_int('num_layers', 1, 1),  # Single layer only
+            'kernel_size': trial.suggest_int('kernel_size', 2, 3),  # Minimal range
+            'dropout': trial.suggest_float('dropout', 0.1, 0.2),  # Small range
+            'batch_size': trial.suggest_int('batch_size', 1, 4, step=1),  # Ultra-small batches
+            'seq_len': trial.suggest_int('seq_len', 5, 15, step=5),  # Ultra-short sequences
             'prediction_horizon': 15,  # Fixed as per current requirement
-            'early_stopping_patience': 3,  # Reduced for faster convergence
+            'early_stopping_patience': 2,  # Very short patience
             
-            # Focal Loss parameters (reduced ranges)
-            'focal_alpha': trial.suggest_float('focal_alpha', 0.5, 1.0),
-            'focal_gamma': trial.suggest_float('focal_gamma', 1.5, 3.0),
+            # Focal Loss parameters (minimal ranges)
+            'focal_alpha': trial.suggest_float('focal_alpha', 0.8, 1.0),
+            'focal_gamma': trial.suggest_float('focal_gamma', 1.5, 2.0),
             
-            # Class multipliers (reduced ranges)
-            'class_multiplier_0': trial.suggest_float('class_multiplier_0', 1.0, 4.0),  # Down class
-            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 1.0, 3.0),  # No Direction class
-            'class_multiplier_2': trial.suggest_float('class_multiplier_2', 1.0, 4.0),  # Up class
+            # Class multipliers (minimal ranges)
+            'class_multiplier_0': trial.suggest_float('class_multiplier_0', 1.0, 2.0),  # Down class
+            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 1.0, 1.5),  # No Direction class
+            'class_multiplier_2': trial.suggest_float('class_multiplier_2', 1.0, 2.0),  # Up class
             
             # Price threshold (fixed)
             'price_threshold': 0.005,  # Fixed 0.5% threshold for classification
             
-            # REDUCED feature engineering parameters to minimize memory usage
-            'rsi_period': trial.suggest_int('rsi_period', 10, 20),  # Reduced range
-            'macd_fast_period': trial.suggest_int('macd_fast_period', 10, 16),  # Reduced range
-            'macd_slow_period': trial.suggest_int('macd_slow_period', 20, 30),  # Reduced range
-            'macd_signal_period': trial.suggest_int('macd_signal_period', 7, 12),  # Reduced range
-            'bb_period': trial.suggest_int('bb_period', 15, 25),  # Reduced range
-            'bb_num_std_dev': trial.suggest_float('bb_num_std_dev', 1.8, 2.5),  # Reduced range
-            'atr_period': trial.suggest_int('atr_period', 10, 16),  # Reduced range
-            'adx_period': trial.suggest_int('adx_period', 10, 16),  # Reduced range
-            'volume_ma_period': trial.suggest_int('volume_ma_period', 15, 25),  # Reduced range
-            'price_momentum_lookback': trial.suggest_int('price_momentum_lookback', 5, 10),  # Reduced range
+            # ULTRA-MINIMAL feature engineering parameters
+            'rsi_period': trial.suggest_int('rsi_period', 10, 14),  # Minimal range
+            'macd_fast_period': trial.suggest_int('macd_fast_period', 10, 12),  # Minimal range
+            'macd_slow_period': trial.suggest_int('macd_slow_period', 20, 26),  # Minimal range
+            'macd_signal_period': trial.suggest_int('macd_signal_period', 7, 9),  # Minimal range
+            'bb_period': trial.suggest_int('bb_period', 15, 20),  # Minimal range
+            'bb_num_std_dev': trial.suggest_float('bb_num_std_dev', 1.8, 2.2),  # Minimal range
+            'atr_period': trial.suggest_int('atr_period', 10, 14),  # Minimal range
+            'adx_period': trial.suggest_int('adx_period', 10, 14),  # Minimal range
+            'volume_ma_period': trial.suggest_int('volume_ma_period', 15, 20),  # Minimal range
+            'price_momentum_lookback': trial.suggest_int('price_momentum_lookback', 3, 5),  # Minimal range
         }
         
-        # Create STGNNConfig with REDUCED parameters
+        # Create STGNNConfig with ULTRA-MINIMAL parameters
         config = STGNNConfig(
             num_nodes=len(config_dict['assets']),
             input_dim=len(config_dict['features']),
@@ -194,14 +194,14 @@ def objective(trial: optuna.Trial) -> float:
             price_threshold=config_dict['price_threshold']
         )
         
-        # Use SMALLER time window to prevent OOM
+        # Use ULTRA-SMALL time window to prevent OOM
         end_time = datetime.now()
-        start_time = end_time - timedelta(days=15)  # Use 15 days to minimize memory usage
+        start_time = end_time - timedelta(days=3)  # Use only 3 days to minimize memory usage
         
         # Create data processor with memory-efficient approach
         data_processor = create_classification_data_processor(config)
         
-        # Create trainer with optimized parameters
+        # Create trainer with ultra-minimal parameters
         trainer = ClassificationSTGNNTrainer(
             config=config,
             data_processor=data_processor,
@@ -256,7 +256,7 @@ def objective(trial: optuna.Trial) -> float:
                     logger.info(f'Early stopping at epoch {epoch + 1}')
                     break
                     
-                if (epoch + 1) % 10 == 0:
+                if (epoch + 1) % 5 == 0:  # Log every 5 epochs for ultra-minimal training
                     logger.info(f'Epoch {epoch + 1}/{trainer.config.num_epochs}:')
                     logger.info(f'Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}')
                     logger.info(f'Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}')
@@ -313,9 +313,9 @@ def objective(trial: optuna.Trial) -> float:
         # Set the custom class weights calculation
         trainer._calculate_class_weights = calculate_weighted_class_weights
         
-        # Train model with FEWER epochs to prevent OOM
+        # Train model with ULTRA-FEW epochs to prevent OOM
         original_epochs = trainer.config.num_epochs
-        trainer.config.num_epochs = 3  # Reduced to prevent memory issues
+        trainer.config.num_epochs = 1  # Ultra-minimal: only 1 epoch
         
         training_history = trainer.train()
         
@@ -387,7 +387,10 @@ def objective(trial: optuna.Trial) -> float:
             return float('inf')
         
         # Log trial results for monitoring
-        logger.info(f"Trial Results:")
+        logger.info(f"Ultra-Minimal Trial Results:")
+        logger.info(f"  Hidden dim: {config_dict['hidden_dim']}, Layers: {config_dict['num_layers']}")
+        logger.info(f"  Batch size: {config_dict['batch_size']}, Seq len: {config_dict['seq_len']}")
+        logger.info(f"  Data window: 3 days, Epochs: 1")
         logger.info(f"  F1 Scores: Down={f1_scores[0]:.4f}, NoDir={f1_scores[1]:.4f}, Up={f1_scores[2]:.4f}")
         logger.info(f"  Precision: Down={precision_scores[0]:.4f}, NoDir={precision_scores[1]:.4f}, Up={precision_scores[2]:.4f}")
         logger.info(f"  Log Loss: {log_loss_val:.4f}")
@@ -410,7 +413,7 @@ def objective(trial: optuna.Trial) -> float:
         return combined_objective
         
     except Exception as e:
-        logger.error(f"Error in objective function: {e}")
+        logger.error(f"Error in ultra-minimal objective function: {e}")
         # Force memory cleanup on error
         manage_memory()
         return float('inf')  # Return high penalty for failed trials
@@ -453,10 +456,10 @@ def main():
             best_params_info = "no (no completed trials yet)"
     logger.info(f"Starting memory-optimized Optuna optimization with {best_params_info} previous best parameters.")
     
-    # REDUCED number of trials to prevent OOM
+    # ULTRA REDUCED number of trials to prevent OOM
     study.optimize(
         objective,
-        n_trials=50,  # Reduced to 50 to prevent memory issues
+        n_trials=25,  # Reduced to 25 to prevent memory issues
         timeout=None,    # Remove timeout to allow the study to run to completion or n_trials.
                          # Alternatively, set to a very large value (e.g., 24*3600*7 for a week in seconds).
         gc_after_trial=True, # Enable aggressive garbage collection after each trial.
