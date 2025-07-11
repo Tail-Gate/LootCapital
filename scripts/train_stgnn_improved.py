@@ -554,6 +554,17 @@ class ClassificationSTGNNTrainer:
             total += y_batch.size(0)
             correct += (predicted == y_batch).sum().item()
 
+        # DEBUG: Check for division by zero issues in train_epoch
+        if len(train_loader) == 0:
+            logger.error("DEBUG: train_loader is unexpectedly empty immediately before division!")
+            logger.error(f"DEBUG: current correct: {correct}, total: {total}")
+            raise ZeroDivisionError("train_loader is empty, preventing loss/accuracy calculation.")
+        
+        if total == 0:
+            logger.error("DEBUG: 'total' samples processed is zero in training. This will cause ZeroDivisionError for accuracy.")
+            # For training, we can't proceed with zero samples
+            raise ZeroDivisionError("No samples processed in training, preventing accuracy calculation.")
+
         return total_loss / len(train_loader), correct / total
     
     def validate(self, val_loader):
@@ -625,6 +636,17 @@ class ClassificationSTGNNTrainer:
                 _, predicted = torch.max(logits, 1)
                 total += y_batch.size(0)
                 correct += (predicted == y_batch).sum().item()
+
+        # DEBUG: Check for division by zero issues in validate
+        if len(val_loader) == 0:
+            logger.error("DEBUG: val_loader is unexpectedly empty immediately before division!")
+            logger.error(f"DEBUG: current correct: {correct}, total: {total}")
+            raise ZeroDivisionError("val_loader is empty, preventing loss/accuracy calculation.")
+        
+        if total == 0:
+            logger.error("DEBUG: 'total' samples processed is zero in validation. This will cause ZeroDivisionError for accuracy.")
+            # For validation, we can't proceed with zero samples
+            raise ZeroDivisionError("No samples processed in validation, preventing accuracy calculation.")
 
         return total_loss / len(val_loader), correct / total
     

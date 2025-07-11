@@ -419,10 +419,16 @@ def objective(trial: optuna.Trial) -> float:
             
             logger.info(f"DataLoader validation passed - Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
             
+            # DEBUG: Double-check DataLoader state immediately after validation
+            logger.info(f"DEBUG: Immediately after validation check - Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
+            
             # Training loop
             patience_counter = 0
             
             for epoch in range(trainer.config.num_epochs):
+                # DEBUG: Check DataLoader state at start of each epoch
+                logger.info(f"DEBUG: Epoch {epoch + 1} - Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
+                
                 # Train epoch
                 train_loss, train_acc = trainer.train_epoch(train_loader)
                 
@@ -433,6 +439,13 @@ def objective(trial: optuna.Trial) -> float:
                 
                 trainer.train_losses.append(train_loss)
                 trainer.train_accuracies.append(train_acc)
+                
+                # DEBUG: Check val_loader state right before validation
+                logger.info(f"DEBUG: About to call validate - val_loader length: {len(val_loader)}")
+                if len(val_loader) == 0:
+                    logger.error("DEBUG: val_loader is empty right before validate call!")
+                    logger.error("DEBUG: This suggests the DataLoader was exhausted or corrupted between validation check and actual validation")
+                    return float('inf')
                 
                 # Validate
                 val_loss, val_acc = trainer.validate(val_loader)
