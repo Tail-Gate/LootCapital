@@ -414,43 +414,75 @@ class ClassificationSTGNNTrainer:
         
         for X_batch, y_batch in train_loader:
             # Move data to device and ensure proper shapes
-            X_batch = X_batch.to(self.device)
-            y_batch = y_batch.to(self.device)
-            
+            # X_batch and y_batch should be moved by DataLoader with pin_memory=True
+            # But let's add a defensive check here to be absolutely sure:
+            if X_batch.device != self.device:
+                logger.error(f"X_batch is not on device! Current: {X_batch.device}, Expected: {self.device}")
+                X_batch = X_batch.to(self.device, non_blocking=True)  # Force move
+                logger.error(f"X_batch moved to: {X_batch.device}")
+
             # Ensure adjacency matrix is on correct device
+            # This line should already be here and correctly move self.adj to self.device
             if self.adj is not None:
-                self.adj = self.adj.to(self.device)
-            
+                if self.adj.device != self.device:
+                    logger.error(f"self.adj is not on device! Current: {self.adj.device}, Expected: {self.device}")
+                    self.adj = self.adj.to(self.device, non_blocking=True)  # Force move
+                    logger.error(f"self.adj moved to: {self.adj.device}")
+            else:
+                logger.error("self.adj is None right before model forward pass!")
+                # This should not happen after the fix in hyperopt.py, but serves as a safeguard.
+                return float('inf')  # Fail fast if adj is still None
+
+            # CRITICAL CHECK POINT 1: Verify devices and memory before forward pass
+            logger.info(f"Pre-forward pass check: X_batch device: {X_batch.device}, adj device: {self.adj.device}")
+            # This should log cuda:0 for both.
+
+            # Get PyTorch's reported CUDA memory usage
+            if torch.cuda.is_available():
+                allocated_mb = torch.cuda.memory_allocated(self.device) / 1024 / 1024
+                cached_mb = torch.cuda.memory_reserved(self.device) / 1024 / 1024
+                logger.info(f"Pre-forward pass GPU Memory (PyTorch): {allocated_mb:.1f}MB allocated, {cached_mb:.1f}MB cached")
+
             # Forward pass
             self.optimizer.zero_grad()
             logits, _ = self.model(X_batch, self.adj)
+
+            # CRITICAL CHECK POINT 2: Verify GPU memory *after* forward pass
+            if torch.cuda.is_available():
+                allocated_mb = torch.cuda.memory_allocated(self.device) / 1024 / 1024
+                cached_mb = torch.cuda.memory_reserved(self.device) / 1024 / 1024
+                logger.info(f"Post-forward pass GPU Memory (PyTorch): {allocated_mb:.1f}MB allocated, {cached_mb:.1f}MB cached")
+                # At this point, you should see non-zero allocated_mb. If not, the issue is within model(X_batch, self.adj) itself.
+
+            # The rest of your existing train_epoch code follows below:
+            # ... (your existing code for loss calculation, backward pass, etc.)
             
             # Model now returns logits in shape [batch_size * num_nodes, num_classes]
             # and y_batch needs to be flattened to [batch_size * num_nodes]
             y_batch = y_batch.view(-1)  # [batch_size * num_nodes]
-            
+
             # Validate shapes before loss calculation
             if logits.shape[0] != y_batch.shape[0]:
                 raise ValueError(f"Shape mismatch: logits {logits.shape} vs y_batch {y_batch.shape}")
-            
+
             loss = self.criterion(logits, y_batch)
-            
+
             # Check for infinite or NaN loss
             if torch.isnan(loss) or torch.isinf(loss):
                 logger.error(f"Invalid loss detected: {loss.item()}")
                 continue
-            
+
             # Backward pass
             loss.backward()
             self.optimizer.step()
-            
+
             total_loss += loss.item()
-            
+
             # Calculate accuracy
             _, predicted = torch.max(logits, 1)
             total += y_batch.size(0)
             correct += (predicted == y_batch).sum().item()
-        
+
         return total_loss / len(train_loader), correct / total
     
     def validate(self, val_loader):
@@ -463,38 +495,63 @@ class ClassificationSTGNNTrainer:
         with torch.no_grad():
             for X_batch, y_batch in val_loader:
                 # Move data to device and ensure proper shapes
-                X_batch = X_batch.to(self.device)
-                y_batch = y_batch.to(self.device)
-                
+                # X_batch and y_batch should be moved by DataLoader with pin_memory=True
+                # But let's add a defensive check here to be absolutely sure:
+                if X_batch.device != self.device:
+                    logger.error(f"X_batch is not on device! Current: {X_batch.device}, Expected: {self.device}")
+                    X_batch = X_batch.to(self.device, non_blocking=True)  # Force move
+                    logger.error(f"X_batch moved to: {X_batch.device}")
+
                 # Ensure adjacency matrix is on correct device
                 if self.adj is not None:
-                    self.adj = self.adj.to(self.device)
-                
+                    if self.adj.device != self.device:
+                        logger.error(f"self.adj is not on device! Current: {self.adj.device}, Expected: {self.device}")
+                        self.adj = self.adj.to(self.device, non_blocking=True)  # Force move
+                        logger.error(f"self.adj moved to: {self.adj.device}")
+                else:
+                    logger.error("self.adj is None right before model forward pass!")
+                    return float('inf')  # Fail fast if adj is still None
+
+                # CRITICAL CHECK POINT 1: Verify devices and memory before forward pass
+                logger.info(f"Pre-validation forward pass check: X_batch device: {X_batch.device}, adj device: {self.adj.device}")
+
+                # Get PyTorch's reported CUDA memory usage
+                if torch.cuda.is_available():
+                    allocated_mb = torch.cuda.memory_allocated(self.device) / 1024 / 1024
+                    cached_mb = torch.cuda.memory_reserved(self.device) / 1024 / 1024
+                    logger.info(f"Pre-validation forward pass GPU Memory (PyTorch): {allocated_mb:.1f}MB allocated, {cached_mb:.1f}MB cached")
+
                 # Forward pass
                 logits, _ = self.model(X_batch, self.adj)
-                
+
+                # CRITICAL CHECK POINT 2: Verify GPU memory *after* forward pass
+                if torch.cuda.is_available():
+                    allocated_mb = torch.cuda.memory_allocated(self.device) / 1024 / 1024
+                    cached_mb = torch.cuda.memory_reserved(self.device) / 1024 / 1024
+                    logger.info(f"Post-validation forward pass GPU Memory (PyTorch): {allocated_mb:.1f}MB allocated, {cached_mb:.1f}MB cached")
+
                 # Model now returns logits in shape [batch_size * num_nodes, num_classes]
                 # and y_batch needs to be flattened to [batch_size * num_nodes]
                 y_batch = y_batch.view(-1)  # [batch_size * num_nodes]
-                
+
                 # Validate shapes before loss calculation
                 if logits.shape[0] != y_batch.shape[0]:
                     raise ValueError(f"Shape mismatch: logits {logits.shape} vs y_batch {y_batch.shape}")
-                
+
                 loss = self.criterion(logits, y_batch)
-                
+
                 # Check for infinite or NaN loss
                 if torch.isnan(loss) or torch.isinf(loss):
                     logger.error(f"Invalid loss detected: {loss.item()}")
                     continue
-                
+
                 total_loss += loss.item()
-                
+
                 # Calculate accuracy
                 _, predicted = torch.max(logits, 1)
                 total += y_batch.size(0)
                 correct += (predicted == y_batch).sum().item()
-        
+
         return total_loss / len(val_loader), correct / total
     
     def train(self):
