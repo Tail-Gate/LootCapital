@@ -278,6 +278,13 @@ def objective(trial: optuna.Trial) -> float:
         if hasattr(trainer, 'model') and trainer.model is not None:
             trainer.model = trainer.model.to(device)
             logger.info(f"Model moved to device: {device}")
+            
+            # Verify model is actually on the correct device
+            if next(trainer.model.parameters()).device != device:
+                logger.error(f"Model device mismatch: {next(trainer.model.parameters()).device} vs {device}")
+                return float('inf')
+                
+            logger.info(f"Model successfully moved to device: {device}")
         else:
             logger.error("Trainer model is None")
             return float('inf')
@@ -301,12 +308,18 @@ def objective(trial: optuna.Trial) -> float:
                 
             logger.info(f"Data shapes - X: {X.shape}, adj: {adj.shape}, y: {y.shape}")
             
+            # Move data to device
+            X = X.to(device)
+            adj = adj.to(device)
+            y = y.to(device)
+            logger.info(f"Data moved to device: {device}")
+            
             # Convert to classification targets using optimized price threshold
-            y_flat = y.flatten().numpy()
+            y_flat = y.flatten().cpu().numpy()
             classes = np.ones(len(y_flat), dtype=int)  # Default to no direction
             classes[y_flat > config_dict['price_threshold']] = 2   # Up
             classes[y_flat < -config_dict['price_threshold']] = 0  # Down
-            y_classes = torch.LongTensor(classes.reshape(y.shape))
+            y_classes = torch.LongTensor(classes.reshape(y.shape)).to(device)
             
             logger.info(f"Classification targets shape: {y_classes.shape}")
             logger.info(f"Class distribution: {np.bincount(classes)}")
@@ -327,11 +340,23 @@ def objective(trial: optuna.Trial) -> float:
             for epoch in range(trainer.config.num_epochs):
                 # Train epoch
                 train_loss, train_acc = trainer.train_epoch(train_loader)
+                
+                # Check for infinite values
+                if np.isinf(train_loss) or np.isnan(train_loss):
+                    logger.error(f"Training loss is infinite/NaN: {train_loss}")
+                    return float('inf')
+                
                 trainer.train_losses.append(train_loss)
                 trainer.train_accuracies.append(train_acc)
                 
                 # Validate
                 val_loss, val_acc = trainer.validate(val_loader)
+                
+                # Check for infinite values
+                if np.isinf(val_loss) or np.isnan(val_loss):
+                    logger.error(f"Validation loss is infinite/NaN: {val_loss}")
+                    return float('inf')
+                
                 trainer.val_losses.append(val_loss)
                 trainer.val_accuracies.append(val_acc)
                 
@@ -414,6 +439,10 @@ def objective(trial: optuna.Trial) -> float:
         
         # Add validation to ensure training completes successfully
         try:
+            # Verify device placement before training
+            logger.info(f"Training on device: {device}")
+            logger.info(f"Model device: {next(trainer.model.parameters()).device}")
+            
             training_history = trainer.train()
             
             # Validate training history
@@ -426,10 +455,19 @@ def objective(trial: optuna.Trial) -> float:
                 logger.error("No training losses recorded - training may have failed")
                 return float('inf')
                 
+            # Check for infinite or NaN losses
+            train_losses = training_history.get('train_losses', [])
+            if any(np.isnan(loss) or np.isinf(loss) for loss in train_losses):
+                logger.error("Training produced NaN or infinite losses")
+                return float('inf')
+                
             logger.info(f"Training completed successfully with {len(training_history['train_losses'])} epochs")
+            logger.info(f"Final training loss: {train_losses[-1] if train_losses else 'N/A'}")
             
         except Exception as e:
             logger.error(f"Training failed with error: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return float('inf')
         
         # Force memory cleanup after training

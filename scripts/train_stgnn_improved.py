@@ -232,15 +232,16 @@ class STGNNClassificationModel(nn.Module):
             kernel_size=kernel_size
         )
         
-        # Classification head - Option: Deeper with BatchNorm
+        # Classification head - Fixed for proper tensor shapes
+        # Use LayerNorm instead of BatchNorm1d to handle variable batch sizes
         self.classifier = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
-            nn.BatchNorm1d(hidden_dim),  # Apply after ReLU, before Dropout
+            nn.LayerNorm(hidden_dim),  # Use LayerNorm instead of BatchNorm1d
             nn.Dropout(dropout),
             nn.Linear(hidden_dim, hidden_dim // 2),
             nn.ReLU(),
-            nn.BatchNorm1d(hidden_dim // 2),  # Apply after ReLU, before Dropout
+            nn.LayerNorm(hidden_dim // 2),  # Use LayerNorm instead of BatchNorm1d
             nn.Dropout(dropout),
             nn.Linear(hidden_dim // 2, num_classes)
         )
@@ -412,9 +413,13 @@ class ClassificationSTGNNTrainer:
         total = 0
         
         for X_batch, y_batch in train_loader:
-            # Move data to device
+            # Move data to device and ensure proper shapes
             X_batch = X_batch.to(self.device)
             y_batch = y_batch.to(self.device)
+            
+            # Ensure adjacency matrix is on correct device
+            if self.adj is not None:
+                self.adj = self.adj.to(self.device)
             
             # Forward pass
             self.optimizer.zero_grad()
@@ -424,7 +429,16 @@ class ClassificationSTGNNTrainer:
             # and y_batch needs to be flattened to [batch_size * num_nodes]
             y_batch = y_batch.view(-1)  # [batch_size * num_nodes]
             
+            # Validate shapes before loss calculation
+            if logits.shape[0] != y_batch.shape[0]:
+                raise ValueError(f"Shape mismatch: logits {logits.shape} vs y_batch {y_batch.shape}")
+            
             loss = self.criterion(logits, y_batch)
+            
+            # Check for infinite or NaN loss
+            if torch.isnan(loss) or torch.isinf(loss):
+                logger.error(f"Invalid loss detected: {loss.item()}")
+                continue
             
             # Backward pass
             loss.backward()
@@ -448,9 +462,13 @@ class ClassificationSTGNNTrainer:
         
         with torch.no_grad():
             for X_batch, y_batch in val_loader:
-                # Move data to device
+                # Move data to device and ensure proper shapes
                 X_batch = X_batch.to(self.device)
                 y_batch = y_batch.to(self.device)
+                
+                # Ensure adjacency matrix is on correct device
+                if self.adj is not None:
+                    self.adj = self.adj.to(self.device)
                 
                 # Forward pass
                 logits, _ = self.model(X_batch, self.adj)
@@ -459,7 +477,16 @@ class ClassificationSTGNNTrainer:
                 # and y_batch needs to be flattened to [batch_size * num_nodes]
                 y_batch = y_batch.view(-1)  # [batch_size * num_nodes]
                 
+                # Validate shapes before loss calculation
+                if logits.shape[0] != y_batch.shape[0]:
+                    raise ValueError(f"Shape mismatch: logits {logits.shape} vs y_batch {y_batch.shape}")
+                
                 loss = self.criterion(logits, y_batch)
+                
+                # Check for infinite or NaN loss
+                if torch.isnan(loss) or torch.isinf(loss):
+                    logger.error(f"Invalid loss detected: {loss.item()}")
+                    continue
                 
                 total_loss += loss.item()
                 

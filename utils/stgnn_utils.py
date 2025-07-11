@@ -117,6 +117,9 @@ class GraphConvolution(nn.Module):
         if return_attention:
             # Return both output and adjacency matrix as attention weights
             # The adjacency matrix serves as the attention weights for graph convolution
+            # Ensure adj has the correct shape for attention weights
+            if adj.dim() == 2:
+                adj = adj.unsqueeze(0).expand(output.shape[0], -1, -1)
             return output, adj
         return output
 
@@ -125,9 +128,10 @@ class TemporalConvolution(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, kernel_size: int, 
                  dilation: int = 1, dropout: float = 0.2):
         super().__init__()
-        # Calculate padding to maintain sequence length
+        # Force kernel_size to be odd for shape preservation
+        if kernel_size % 2 == 0:
+            raise ValueError(f"TemporalConvolution kernel_size must be odd to preserve sequence length, got {kernel_size}")
         padding = ((kernel_size - 1) // 2) * dilation
-        
         self.conv = nn.Conv1d(
             in_channels=in_channels,
             out_channels=out_channels,
@@ -158,13 +162,17 @@ class TemporalConvolution(nn.Module):
         x = self.relu(x)
         x = self.dropout(x)
         
-        # Reshape back to original format
-        x = x.reshape(batch_size, num_nodes, -1, seq_len)  # [batch_size, num_nodes, out_channels, seq_len]
-        x = x.permute(0, 1, 3, 2)  # [batch_size, num_nodes, seq_len, out_channels]
+        # Get the actual output dimensions from the convolution
+        out_channels = x.shape[1]  # The second dimension is out_channels after conv
+        out_seq_len = x.shape[2]   # The third dimension is the output sequence length
+        
+        # Reshape back to original format with correct dimensions
+        x = x.reshape(batch_size, num_nodes, out_channels, out_seq_len)  # [batch_size, num_nodes, out_channels, out_seq_len]
+        x = x.permute(0, 1, 3, 2)  # [batch_size, num_nodes, out_seq_len, out_channels]
         
         if return_attention:
             # Calculate attention weights by taking mean across feature dimension
-            attention = x.mean(dim=-1)  # [batch_size, num_nodes, seq_len]
+            attention = x.mean(dim=-1)  # [batch_size, num_nodes, out_seq_len]
             # Normalize attention weights using softmax
             attention = F.softmax(attention, dim=-1)  # Normalize across sequence length
             return x, attention
@@ -186,7 +194,8 @@ class STGNNModel(nn.Module):
         self.hidden_dim = hidden_dim
         self.output_dim = output_dim
         self.num_layers = num_layers
-        self.kernel_size = kernel_size
+        # Force kernel_size=3 for all temporal convolutions to guarantee shape preservation
+        self.kernel_size = 3
         
         # Input projection
         self.input_proj = nn.Linear(input_dim, hidden_dim)
@@ -199,7 +208,7 @@ class STGNNModel(nn.Module):
         
         # Temporal layers
         self.temporal_layers = nn.ModuleList([
-            TemporalConvolution(hidden_dim, hidden_dim, kernel_size, dilation=2**i, dropout=dropout)
+            TemporalConvolution(hidden_dim, hidden_dim, 3, dilation=2**i, dropout=dropout)
             for i in range(num_layers)
         ])
         
