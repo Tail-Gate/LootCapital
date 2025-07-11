@@ -670,6 +670,6 @@ class STGNNDataProcessor:
             batch_size=batch_size,
             shuffle=True,
             num_workers=16,  # Use 16 workers for maximum CPU parallel processing
-            pin_memory=False,  # Disable pin memory for CPU training
+            pin_memory=True if torch.cuda.is_available() else False,  # Enable pin_memory for GPU
             drop_last=drop_last
         ) 

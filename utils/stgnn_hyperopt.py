@@ -30,9 +30,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def get_device():
-    """Get the best available device for training"""
+    """Get the best available device for training, explicitly cuda:0 if available."""
     if torch.cuda.is_available():
-        device = torch.device('cuda')
+        device = torch.device('cuda:0')  # Explicitly use cuda:0
         logger.info(f"GPU available: {torch.cuda.get_device_name(0)}")
         logger.info(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024 / 1024 / 1024:.1f} GB")
         return device
@@ -157,14 +157,14 @@ def objective(trial: optuna.Trial) -> float:
                 'vwap_ratio', 'cumulative_delta'
             ],  # Full feature set (23 features, removed problematic adx)
             
-            # ULTRA-MINIMAL parameter ranges to prevent OOM
+            # ULTRA-MINIMAL parameter ranges to prevent OOM (slightly increased for stability)
             'learning_rate': trial.suggest_float('learning_rate', 1e-4, 1e-3, log=True),  # Very small range
-            'hidden_dim': trial.suggest_int('hidden_dim', 4, 6, step=2),  # Ultra-small range
+            'hidden_dim': trial.suggest_int('hidden_dim', 8, 16, step=4),  # Slightly increased for stability
             'num_layers': trial.suggest_int('num_layers', 1, 1),  # Single layer only
             'kernel_size': trial.suggest_int('kernel_size', 2, 2),  # Fixed small value
             'dropout': trial.suggest_float('dropout', 0.1, 0.1),  # Fixed small value
-            'batch_size': trial.suggest_int('batch_size', 1, 2, step=1),  # Ultra-small batches
-            'seq_len': trial.suggest_int('seq_len', 5, 10, step=5),  # Ultra-short sequences
+            'batch_size': trial.suggest_int('batch_size', 2, 4, step=1),  # Slightly increased for stability
+            'seq_len': trial.suggest_int('seq_len', 10, 20, step=5),  # Slightly increased for stability
             'prediction_horizon': 15,  # Fixed as per current requirement
             'early_stopping_patience': 2,  # Very short patience
             
@@ -274,23 +274,23 @@ def objective(trial: optuna.Trial) -> float:
             logger.error("Trainer creation failed")
             return float('inf')
             
-        # Ensure model is on correct device
+        # Ensure model is on correct device immediately
         if hasattr(trainer, 'model') and trainer.model is not None:
-            trainer.model = trainer.model.to(device)
+            # Move trainer's model to the determined device
+            trainer.model.to(device)  # This ensures the model is on cuda:0
             logger.info(f"Model moved to device: {device}")
-            
-            # Verify model is actually on the correct device
-            model_device = next(trainer.model.parameters()).device
-            if model_device != device and str(model_device) != str(device):
-                logger.error(f"Model device mismatch: {model_device} vs {device}")
-                # Try to fix device placement
-                trainer.model = trainer.model.to(device)
-                model_device = next(trainer.model.parameters()).device
-                if model_device != device and str(model_device) != str(device):
-                    logger.error(f"Failed to fix device placement: {model_device} vs {device}")
-                    return float('inf')
-                
-            logger.info(f"Model successfully moved to device: {device}")
+
+            # Re-check device to confirm (the previous check was causing the error)
+            # We can simplify this check because we explicitly moved it.
+            # The previous error "Failed to fix device placement: cuda:0 vs cuda"
+            # was because you were checking str(model_device) != str(device)
+            # where device was `torch.device('cuda')` and model_device was `torch.device('cuda:0')`.
+            # By making device also `cuda:0`, this exact string comparison issue should go away.
+            model_device_actual = next(trainer.model.parameters()).device
+            if model_device_actual != device:  # Simple object comparison is best now
+                logger.error(f"FATAL: Model is not on the correct device after move: {model_device_actual} vs {device}")
+                return float('inf')
+            logger.info(f"Model successfully verified on device: {device}")
         else:
             logger.error("Trainer model is None")
             return float('inf')
@@ -314,18 +314,20 @@ def objective(trial: optuna.Trial) -> float:
                 
             logger.info(f"Data shapes - X: {X.shape}, adj: {adj.shape}, y: {y.shape}")
             
-            # Move data to device
+            # Move all prepared data tensors to the *exact same* device object.
+            # It's crucial that adj (adjacency matrix) also goes to the GPU.
             X = X.to(device)
             adj = adj.to(device)
-            y = y.to(device)
-            logger.info(f"Data moved to device: {device}")
-            
+            y = y.to(device)  # y is currently float, will be converted to long later
+            logger.info(f"Data X, adj, y moved to device: {device}")
+
             # Convert to classification targets using optimized price threshold
             y_flat = y.flatten().cpu().numpy()
             classes = np.ones(len(y_flat), dtype=int)  # Default to no direction
             classes[y_flat > config_dict['price_threshold']] = 2   # Up
             classes[y_flat < -config_dict['price_threshold']] = 0  # Down
-            y_classes = torch.LongTensor(classes.reshape(y.shape)).to(device)
+            y_classes = torch.LongTensor(classes.reshape(y.shape)).to(device)  # Ensure this is on device
+            logger.info(f"Classification targets y_classes moved to device: {device}")
             
             logger.info(f"Classification targets shape: {y_classes.shape}")
             logger.info(f"Class distribution: {np.bincount(classes)}")
