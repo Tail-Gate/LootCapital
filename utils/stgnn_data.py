@@ -664,12 +664,15 @@ class STGNNDataProcessor:
         if batch_size is None:
             batch_size = self.config.batch_size
         
+        # Dynamically get number of CPU cores with fallback
+        num_workers = os.cpu_count() if os.cpu_count() is not None else 8
+        
         dataset = torch.utils.data.TensorDataset(X, y)
         return torch.utils.data.DataLoader(
             dataset,
             batch_size=batch_size,
             shuffle=True,
-            num_workers=0,  # Set to 0 to prevent multiprocessing issues
-            pin_memory=True if torch.cuda.is_available() else False,  # Enable pin_memory for GPU
+            num_workers=num_workers,  # Use dynamic CPU core count
+            pin_memory=False,  # Disable pin_memory for CPU operations
             drop_last=drop_last
         ) 

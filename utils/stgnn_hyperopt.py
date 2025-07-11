@@ -30,33 +30,18 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def get_device():
-    """Get the best available device for training, explicitly cuda:0 if available."""
-    if torch.cuda.is_available():
-        device = torch.device('cuda:0')  # Explicitly use cuda:0
-        logger.info(f"GPU available: {torch.cuda.get_device_name(0)}")
-        logger.info(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024 / 1024 / 1024:.1f} GB")
-        return device
-    else:
-        device = torch.device('cpu')
-        logger.info("GPU not available, using CPU")
-        return device
+    """Get CPU device for training."""
+    device = torch.device('cpu')
+    return device
 
 def manage_memory():
-    """Force garbage collection and log memory usage for GPU training"""
+    """Force garbage collection and log memory usage for CPU training"""
     gc.collect()
     
     # Log CPU memory usage
     process = psutil.Process(os.getpid())
     memory_mb = process.memory_info().rss / 1024 / 1024
     logger.info(f"CPU Memory usage: {memory_mb:.1f} MB")
-    
-    # Log GPU memory usage if available
-    if torch.cuda.is_available():
-        for i in range(torch.cuda.device_count()):
-            gpu_memory_mb = torch.cuda.get_device_properties(i).total_memory / 1024 / 1024
-            gpu_memory_allocated = torch.cuda.memory_allocated(i) / 1024 / 1024
-            gpu_memory_cached = torch.cuda.memory_reserved(i) / 1024 / 1024
-            logger.info(f"GPU {i} Memory: {gpu_memory_allocated:.1f}MB allocated, {gpu_memory_cached:.1f}MB cached, {gpu_memory_mb:.1f}MB total")
     
     # Force more aggressive cleanup
     if hasattr(sys, 'exc_clear'):
@@ -67,10 +52,6 @@ def manage_memory():
         logger.warning(f"High CPU memory usage detected: {memory_mb:.1f} MB")
         # Force more aggressive cleanup
         gc.collect()
-    
-    # Clear GPU cache if available
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
 
 def load_stgnn_data(config: Dict[str, Any]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
@@ -649,19 +630,11 @@ def objective(trial: optuna.Trial) -> float:
 
 def main():
     """
-    Main function to run memory-optimized hyperparameter optimization for HPC execution
+    Main function to run memory-optimized hyperparameter optimization for CPU execution
     """
     # Log initial device and memory information
     device = get_device()
     logger.info(f"Starting hyperparameter optimization with device: {device}")
-    
-    if device.type == 'cuda':
-        logger.info(f"GPU Information:")
-        for i in range(torch.cuda.device_count()):
-            props = torch.cuda.get_device_properties(i)
-            logger.info(f"  GPU {i}: {props.name}")
-            logger.info(f"  Memory: {props.total_memory / 1024 / 1024 / 1024:.1f} GB")
-            logger.info(f"  Compute Capability: {props.major}.{props.minor}")
     
     # Log initial memory usage
     manage_memory()
@@ -672,16 +645,6 @@ def main():
         memory_gb = process.memory_info().rss / 1024 / 1024 / 1024
         logger.info(f"Current CPU memory usage: {memory_gb:.2f} GB")
         
-        # Monitor GPU memory if available
-        if torch.cuda.is_available():
-            for i in range(torch.cuda.device_count()):
-                gpu_memory_gb = torch.cuda.memory_allocated(i) / 1024 / 1024 / 1024
-                gpu_memory_total_gb = torch.cuda.get_device_properties(i).total_memory / 1024 / 1024 / 1024
-                logger.info(f"GPU {i} memory usage: {gpu_memory_gb:.2f} GB / {gpu_memory_total_gb:.2f} GB")
-                
-                if gpu_memory_gb > gpu_memory_total_gb * 0.8:  # Warning at 80% GPU memory
-                    logger.warning(f"GPU {i} memory usage is high: {gpu_memory_gb:.2f} GB / {gpu_memory_total_gb:.2f} GB")
-        
         if memory_gb > 100:  # Warning at 100GB
             logger.warning(f"CPU memory usage is high: {memory_gb:.2f} GB")
         return memory_gb
@@ -690,7 +653,7 @@ def main():
     memory_monitor()
     
     # Adjust study creation for distributed/parallel execution with ultra-minimal memory optimization
-    device_suffix = "gpu" if device.type == 'cuda' else "cpu"
+    device_suffix = "cpu"
     study = optuna.create_study(
         direction='minimize',
         study_name=f'stgnn_ultra_minimal_hyperopt_{device_suffix}',  # Include device in study name
@@ -731,12 +694,12 @@ def main():
     # Save best parameters
     best_params = study.best_trial.params
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    device_suffix = "gpu" if device.type == 'cuda' else "cpu"
+    device_suffix = "cpu"
     with open(f'config/stgnn_ultra_minimal_best_params_{device_suffix}_{timestamp}.json', 'w') as f:
         json.dump(best_params, f, indent=4)
     
     # Print optimization summary
-    device_suffix = "GPU" if device.type == 'cuda' else "CPU"
+    device_suffix = "CPU"
     print(f'\nUltra-Minimal Optimization Summary ({device_suffix}):')
     print(f'  Device: {device}')
     print(f'  Total trials: {len(study.trials)}')
