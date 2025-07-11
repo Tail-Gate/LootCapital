@@ -264,7 +264,7 @@ class STGNNClassificationModel(nn.Module):
 class ClassificationSTGNNTrainer:
     """Trainer for STGNN classification model"""
     
-    def __init__(self, config, data_processor, price_threshold=0.018, focal_alpha=1.0, focal_gamma=2.0, class_weights=None, start_time=None, end_time=None):
+    def __init__(self, config, data_processor, price_threshold=0.018, focal_alpha=1.0, focal_gamma=2.0, class_weights=None, start_time=None, end_time=None, device=None):
         """
         Initialize trainer
         
@@ -277,6 +277,7 @@ class ClassificationSTGNNTrainer:
             class_weights: Pre-calculated class weights
             start_time: Optional start time for data range
             end_time: Optional end time for data range
+            device: Device to use for training (cuda/cpu)
         """
         self.config = config
         self.data_processor = data_processor
@@ -284,9 +285,17 @@ class ClassificationSTGNNTrainer:
         self.start_time = start_time
         self.end_time = end_time
         
-        # Force CPU usage for reliable training
-        self.device = torch.device('cpu')
-        logger.info(f"Using device: {self.device} (CPU-only for reliability)")
+        # Use provided device or auto-detect
+        if device is None:
+            if torch.cuda.is_available():
+                self.device = torch.device('cuda')
+                logger.info(f"Using GPU: {torch.cuda.get_device_name(0)}")
+            else:
+                self.device = torch.device('cpu')
+                logger.info("GPU not available, using CPU")
+        else:
+            self.device = device
+            logger.info(f"Using device: {self.device}")
         
         # Initialize model
         num_nodes = len(config.assets)
@@ -300,8 +309,13 @@ class ClassificationSTGNNTrainer:
             dropout=config.dropout,
             kernel_size=config.kernel_size
         ).to(self.device)
-        # CPU-only training - no GPU needed
-        logger.info("CPU-only training mode - using all 32 cores for parallel processing")
+        
+        # Log device and model info
+        if self.device.type == 'cuda':
+            logger.info(f"GPU training mode - using {torch.cuda.get_device_name(0)}")
+            logger.info(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024 / 1024 / 1024:.1f} GB")
+        else:
+            logger.info("CPU training mode - using all available cores for parallel processing")
         
         # Initialize optimizer
         self.optimizer = torch.optim.Adam(
@@ -322,8 +336,10 @@ class ClassificationSTGNNTrainer:
             logger.info(f"Using pre-calculated class weights: {class_weights}")
         else:
             # Calculate class weights from data
+            calculated_weights = self._calculate_class_weights()
+            calculated_weights = calculated_weights.to(self.device)
             self.criterion = WeightedFocalLoss(
-                class_weights=self._calculate_class_weights(),
+                class_weights=calculated_weights,
                 alpha=focal_alpha,
                 gamma=focal_gamma
             )
@@ -383,8 +399,8 @@ class ClassificationSTGNNTrainer:
         # Reshape back to [batch_size, num_nodes]
         y_classes = y_classes.reshape(y.shape)
         
-        # Convert to tensors
-        y_classes = torch.LongTensor(y_classes)
+        # Convert to tensors and move to device
+        y_classes = torch.LongTensor(y_classes).to(self.device)
         
         return X, adj, y_classes
     
@@ -396,6 +412,7 @@ class ClassificationSTGNNTrainer:
         total = 0
         
         for X_batch, y_batch in train_loader:
+            # Move data to device
             X_batch = X_batch.to(self.device)
             y_batch = y_batch.to(self.device)
             
@@ -431,6 +448,7 @@ class ClassificationSTGNNTrainer:
         
         with torch.no_grad():
             for X_batch, y_batch in val_loader:
+                # Move data to device
                 X_batch = X_batch.to(self.device)
                 y_batch = y_batch.to(self.device)
                 
