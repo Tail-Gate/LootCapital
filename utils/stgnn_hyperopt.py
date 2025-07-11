@@ -280,9 +280,15 @@ def objective(trial: optuna.Trial) -> float:
             logger.info(f"Model moved to device: {device}")
             
             # Verify model is actually on the correct device
-            if next(trainer.model.parameters()).device != device:
-                logger.error(f"Model device mismatch: {next(trainer.model.parameters()).device} vs {device}")
-                return float('inf')
+            model_device = next(trainer.model.parameters()).device
+            if model_device != device and str(model_device) != str(device):
+                logger.error(f"Model device mismatch: {model_device} vs {device}")
+                # Try to fix device placement
+                trainer.model = trainer.model.to(device)
+                model_device = next(trainer.model.parameters()).device
+                if model_device != device and str(model_device) != str(device):
+                    logger.error(f"Failed to fix device placement: {model_device} vs {device}")
+                    return float('inf')
                 
             logger.info(f"Model successfully moved to device: {device}")
         else:
@@ -443,6 +449,10 @@ def objective(trial: optuna.Trial) -> float:
             logger.info(f"Training on device: {device}")
             logger.info(f"Model device: {next(trainer.model.parameters()).device}")
             
+            # Add more detailed logging for debugging
+            logger.info(f"Starting training with config: hidden_dim={config_dict['hidden_dim']}, "
+                       f"seq_len={config_dict['seq_len']}, batch_size={config_dict['batch_size']}")
+            
             training_history = trainer.train()
             
             # Validate training history
@@ -459,6 +469,7 @@ def objective(trial: optuna.Trial) -> float:
             train_losses = training_history.get('train_losses', [])
             if any(np.isnan(loss) or np.isinf(loss) for loss in train_losses):
                 logger.error("Training produced NaN or infinite losses")
+                logger.error(f"Loss values: {train_losses}")
                 return float('inf')
                 
             logger.info(f"Training completed successfully with {len(training_history['train_losses'])} epochs")
@@ -478,17 +489,26 @@ def objective(trial: optuna.Trial) -> float:
         
         # Evaluate on validation data using memory-efficient loading
         logger.info("Evaluating on validation data using memory-efficient loading...")
-        X_val, adj_val, y_val = data_processor.prepare_data(start_time, end_time)
-        
-        # Convert to classification targets using optimized threshold
-        y_val_flat = y_val.flatten().numpy()
-        classes_val = np.ones(len(y_val_flat), dtype=int)  # Default to no direction
-        classes_val[y_val_flat > config_dict['price_threshold']] = 2   # Up
-        classes_val[y_val_flat < -config_dict['price_threshold']] = 0  # Down
-        y_val_classes = torch.LongTensor(classes_val.reshape(y_val.shape))
-        
-        # Evaluate model with validation
         try:
+            X_val, adj_val, y_val = data_processor.prepare_data(start_time, end_time)
+            
+            # Validate data
+            if X_val is None or adj_val is None or y_val is None:
+                logger.error("Validation data preparation returned None values")
+                return float('inf')
+                
+            logger.info(f"Validation data shapes - X: {X_val.shape}, adj: {adj_val.shape}, y: {y_val.shape}")
+            
+            # Convert to classification targets using optimized threshold
+            y_val_flat = y_val.flatten().numpy()
+            classes_val = np.ones(len(y_val_flat), dtype=int)  # Default to no direction
+            classes_val[y_val_flat > config_dict['price_threshold']] = 2   # Up
+            classes_val[y_val_flat < -config_dict['price_threshold']] = 0  # Down
+            y_val_classes = torch.LongTensor(classes_val.reshape(y_val.shape))
+            
+            logger.info(f"Validation class distribution: {np.bincount(classes_val)}")
+            
+            # Evaluate model with validation
             evaluation_results = trainer.evaluate(X_val, y_val_classes)
             
             # Validate evaluation results
@@ -507,6 +527,8 @@ def objective(trial: optuna.Trial) -> float:
             
         except Exception as e:
             logger.error(f"Evaluation failed with error: {e}")
+            import traceback
+            logger.error(f"Evaluation traceback: {traceback.format_exc()}")
             return float('inf')
         
         # Force memory cleanup after evaluation
