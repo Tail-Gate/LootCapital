@@ -147,7 +147,15 @@ def objective(trial: optuna.Trial) -> float:
         # Define ULTRA-MINIMAL hyperparameter search space to prevent OOM
         config_dict = {
             'assets': ['ETH/USD'],  # Focus on single asset for optimization
-            'features': ['returns', 'volume'],  # Minimal feature set (only 2 features)
+            'features': [
+                'returns', 'log_returns',
+                'rsi', 'atr', 'macd', 'macd_signal', 'macd_hist',
+                'bb_upper', 'bb_middle', 'bb_lower', 'bb_width',
+                'volume', 'volume_ma', 'volume_std', 'volume_surge', 'volume_ratio',
+                'ma_crossover', 'price_momentum', 'volatility_regime',
+                'support', 'resistance', 'breakout_intensity',
+                'vwap_ratio', 'cumulative_delta'
+            ],  # Full feature set (23 features, removed problematic adx)
             
             # ULTRA-MINIMAL parameter ranges to prevent OOM
             'learning_rate': trial.suggest_float('learning_rate', 1e-4, 1e-3, log=True),  # Very small range
@@ -166,7 +174,7 @@ def objective(trial: optuna.Trial) -> float:
             
             # Class multipliers (minimal ranges)
             'class_multiplier_0': trial.suggest_float('class_multiplier_0', 1.0, 2.0),  # Down class
-            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 1.0, 1.5),  # No Direction class
+            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 1.0, 1.5),
             'class_multiplier_2': trial.suggest_float('class_multiplier_2', 1.0, 2.0),  # Up class
             
             # Price threshold (fixed)

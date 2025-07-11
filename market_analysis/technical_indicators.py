@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from typing import Union, Optional, Dict, Any
+import logging
 
 class TechnicalIndicators:
     """
@@ -195,23 +196,31 @@ class TechnicalIndicators:
         tr2 = abs(high - close.shift())
         tr3 = abs(low - close.shift())
         tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-        
+
         # Calculate Directional Movement
         up_move = high - high.shift()
         down_move = low.shift() - low
-        
+
         plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0)
         minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0)
-        
+
         # Calculate smoothed averages
         tr_smoothed = tr.rolling(window=period).sum()
         plus_di = 100 * pd.Series(plus_dm).rolling(window=period).sum() / tr_smoothed
         minus_di = 100 * pd.Series(minus_dm).rolling(window=period).sum() / tr_smoothed
-        
+
         # Calculate ADX
         dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di)
         adx = dx.rolling(window=period).mean()
-        
+
+        # Debug logging for NaNs
+        logger = logging.getLogger("ADXDebug")
+        logger.warning(f"ADX: tr_smoothed NaNs: {tr_smoothed.isna().sum()} (first: {tr_smoothed[tr_smoothed.isna()].index.tolist()[:5]})")
+        logger.warning(f"ADX: plus_di NaNs: {plus_di.isna().sum()} (first: {plus_di[plus_di.isna()].index.tolist()[:5]})")
+        logger.warning(f"ADX: minus_di NaNs: {minus_di.isna().sum()} (first: {minus_di[minus_di.isna()].index.tolist()[:5]})")
+        logger.warning(f"ADX: dx NaNs: {dx.isna().sum()} (first: {dx[dx.isna()].index.tolist()[:5]})")
+        logger.warning(f"ADX: adx NaNs: {adx.isna().sum()} (first: {adx[adx.isna()].index.tolist()[:5]})")
+
         return pd.DataFrame({
             'adx': adx,
             'plus_di': plus_di,

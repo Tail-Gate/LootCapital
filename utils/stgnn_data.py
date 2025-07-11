@@ -11,6 +11,7 @@ import psutil
 import os
 from datetime import timedelta
 from datetime import datetime
+from utils.feature_generator import FeatureGenerator
 
 def manage_memory():
     """Force garbage collection and log memory usage"""
@@ -42,6 +43,8 @@ class STGNNDataProcessor:
         # Memory optimization settings
         self.max_sequences = 1000  # Maximum sequences to create
         self.chunk_size = 1000     # Data points per chunk
+        
+        self.feature_generator = FeatureGenerator(config=config.to_dict())
         
     def set_scaler(self, scaler_type: str = 'minmax'):
         """
@@ -305,8 +308,10 @@ class STGNNDataProcessor:
                 asset_data = data[asset]
                 print(f"Loaded {len(asset_data)} data points with extended range")
         
-        # Process features
-        features = self.prepare_features_memory_efficient(asset_data)
+        # Use full feature generator
+        features = self.feature_generator.generate_features(asset_data)
+        # Store original price data for event-based analysis
+        self._original_prices = asset_data['close'].copy()
         
         # Create sequences
         X, y = self.create_sequences_lazy(features)
@@ -517,12 +522,12 @@ class STGNNDataProcessor:
             - adj: Adjacency matrix of shape [num_nodes, num_nodes]
             - y: Target values of shape [batch_size, num_nodes]
         """
-        print("Starting memory-efficient data preparation...")
+        print("Starting full feature generator data preparation...")
         manage_memory()
         
         # For single asset, use optimized processing
         if len(self.config.assets) == 1:
-            print("Using single asset processing for memory efficiency...")
+            print("Using single asset processing with full feature generator...")
             asset = self.config.assets[0]
             X, y = self.prepare_data_single_asset(asset, start_time, end_time)
             
@@ -554,7 +559,7 @@ class STGNNDataProcessor:
             return X, adj, y
         
         # For multiple assets, use chunked processing
-        print("Using chunked processing for multiple assets...")
+        print("Using chunked processing for multiple assets with full feature generator...")
         
         # Load data in chunks
         market_data = self.load_data_in_chunks(start_time, end_time)
@@ -562,8 +567,8 @@ class STGNNDataProcessor:
         # Prepare features for each asset
         features_dict = {}
         for asset in self.config.assets:
-            print(f"Preparing features for {asset}...")
-            features_dict[asset] = self.prepare_features_memory_efficient(market_data[asset])
+            print(f"Preparing features for {asset} with full feature generator...")
+            features_dict[asset] = self.feature_generator.generate_features(market_data[asset])
             manage_memory()
         
         # Fit scaler on training data (use first 80% of data)
