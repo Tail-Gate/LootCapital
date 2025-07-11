@@ -21,7 +21,7 @@ from market_analysis.market_data import MarketData
 from market_analysis.technical_indicators import TechnicalIndicators
 
 # Import the classification model and trainer
-from scripts.train_stgnn_improved import STGNNClassificationModel, ClassificationSTGNNTrainer
+from scripts.train_stgnn_improved import STGNNClassificationModel, ClassificationSTGNNTrainer, WeightedFocalLoss
 from utils.stgnn_config import STGNNConfig
 from utils.stgnn_data import STGNNDataProcessor
 
@@ -334,6 +334,19 @@ def objective(trial: optuna.Trial) -> float:
             trainer.adj = adj.to(device)  # Move the adjacency matrix to the GPU once
             logger.info(f"Adjacency matrix moved to device: {trainer.adj.device}")
 
+            # Calculate class weights using the prepared data to ensure consistency
+            logger.info("Calculating class weights using prepared data...")
+            class_weights = calculate_weighted_class_weights(y_orig_returns)
+            class_weights = class_weights.to(device)
+            
+            # Update the trainer's criterion with the calculated weights
+            trainer.criterion = WeightedFocalLoss(
+                class_weights=class_weights,
+                alpha=config_dict['focal_alpha'],
+                gamma=config_dict['focal_gamma']
+            )
+            logger.info(f"Updated criterion with class weights: {class_weights}")
+
             # Skip SMOTE - use original data directly
             logger.info("Skipping SMOTE for memory efficiency during hyperparameter optimization")
 
@@ -415,14 +428,12 @@ def objective(trial: optuna.Trial) -> float:
         trainer.train = train_without_smote
         
         # Override class weights calculation with multipliers
-        def calculate_weighted_class_weights():
-            """Calculate class weights with trial multipliers using memory-efficient loading"""
-            logger.info("Calculating class weights using memory-efficient data loading...")
-            # Get class distribution from training data using memory-efficient loading
-            X, adj, y = data_processor.prepare_data(start_time, end_time)
-            y_flat = y.flatten().numpy()
+        def calculate_weighted_class_weights(y_orig_returns):
+            """Calculate class weights with trial multipliers using provided data"""
+            logger.info("Calculating class weights using provided data...")
             
             # Convert to classes using optimized price threshold
+            y_flat = y_orig_returns.flatten().numpy()
             classes = np.ones(len(y_flat), dtype=int)  # Default to no direction
             classes[y_flat > config_dict['price_threshold']] = 2   # Up
             classes[y_flat < -config_dict['price_threshold']] = 0  # Down
@@ -443,9 +454,6 @@ def objective(trial: optuna.Trial) -> float:
                     class_weights.append(0.0)
             
             return torch.FloatTensor(class_weights)
-        
-        # Set the custom class weights calculation
-        trainer._calculate_class_weights = calculate_weighted_class_weights
         
         # Train model with ULTRA-FEW epochs to prevent OOM
         original_epochs = trainer.config.num_epochs
