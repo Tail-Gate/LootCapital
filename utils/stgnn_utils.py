@@ -115,6 +115,8 @@ class GraphConvolution(nn.Module):
             output += self.bias
             
         if return_attention:
+            # Return both output and adjacency matrix as attention weights
+            # The adjacency matrix serves as the attention weights for graph convolution
             return output, adj
         return output
 
