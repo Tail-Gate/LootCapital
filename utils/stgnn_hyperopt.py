@@ -304,10 +304,10 @@ def objective(trial: optuna.Trial) -> float:
             logger.info("Using memory-efficient data loading for hyperparameter optimization")
 
             # Load data in chunks using the data processor's memory-efficient methods
-            X, adj, y = data_processor.prepare_data(start_time, end_time)
+            X, adj, y_orig_returns = data_processor.prepare_data(start_time, end_time)  # Let's rename y to y_orig_returns for clarity
 
             # Validate data shapes
-            if X is None or adj is None or y is None:
+            if X is None or adj is None or y_orig_returns is None:
                 logger.error("Data preparation returned None values")
                 return float('inf')
 
@@ -321,18 +321,31 @@ def objective(trial: optuna.Trial) -> float:
 
             # Convert to classification targets using optimized price threshold
             # Ensure y is on CPU for this numpy operation if it somehow ended up on GPU
-            y_flat = y.flatten().cpu().numpy()
+            y_flat = y_orig_returns.flatten().cpu().numpy()
             classes = np.ones(len(y_flat), dtype=int)  # Default to no direction
             classes[y_flat > config_dict['price_threshold']] = 2   # Up
             classes[y_flat < -config_dict['price_threshold']] = 0  # Down
 
             # Ensure y_classes is a CPU tensor for the DataLoader initially
-            y_classes = torch.LongTensor(classes.reshape(y.shape)) # No .to(device) here
+            y_classes = torch.LongTensor(classes.reshape(y_orig_returns.shape))  # No .to(device) here
             logger.info(f"Classification targets y_classes prepared on CPU: {y_classes.shape}")
 
             # Split data. X_train, y_train, X_val, y_val should remain on CPU here.
             # Use .cpu() to explicitly ensure they are on CPU before DataLoader creation
             X_train, y_train, X_val, y_val = data_processor.split_data(X.cpu(), y_classes.cpu())
+
+            # --- NEW CRITICAL CHECK ---
+            if len(X_val) == 0:
+                logger.error(f"Validation set is empty! X_val shape: {X_val.shape}, total X samples: {len(X)}")
+                return float('inf')  # Fail fast if validation set is empty
+            if len(X_train) == 0:
+                logger.error(f"Training set is empty! X_train shape: {X_train.shape}, total X samples: {len(X)}")
+                return float('inf')
+            
+            # Log data statistics for debugging
+            logger.info(f"Data statistics - X: {X.shape}, X_train: {X_train.shape}, X_val: {X_val.shape}")
+            logger.info(f"Batch size: {config.batch_size}, Train samples: {len(X_train)}, Val samples: {len(X_val)}")
+            # --- END NEW CRITICAL CHECK ---
 
             # !!! Crucial Fix: Update trainer.adj attribute !!!
             # The 'adj' here is the local variable from data_processor.prepare_data()
@@ -347,6 +360,15 @@ def objective(trial: optuna.Trial) -> float:
             # X_train and y_train are now CPU tensors, so pin_memory will work.
             train_loader = data_processor.create_dataloader(X_train, y_train, drop_last=True)
             val_loader = data_processor.create_dataloader(X_val, y_val, drop_last=False)
+
+            # --- NEW CRITICAL CHECK for DataLoader length ---
+            if len(train_loader) == 0:
+                logger.error(f"Train DataLoader is empty! Number of samples: {len(X_train)}, Batch size: {config.batch_size}")
+                return float('inf')
+            if len(val_loader) == 0:
+                logger.error(f"Validation DataLoader is empty! Number of samples: {len(X_val)}, Batch size: {config.batch_size}")
+                return float('inf')
+            # --- END NEW CRITICAL CHECK ---
             
             # Training loop
             patience_counter = 0
