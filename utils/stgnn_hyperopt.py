@@ -292,33 +292,21 @@ def objective(trial: optuna.Trial) -> float:
                 logger.error("Data preparation returned None values")
                 return float('inf')
 
-            # --- REMOVE OR COMMENT OUT THESE LINES ---
-            # logger.info(f"Data shapes - X: {X.shape}, adj: {adj.shape}, y: {y.shape}")
-            # X = X.to(device)
-            # adj = adj.to(device) # adj will be moved to device inside train_epoch, that's fine.
-            # y = y.to(device)
-            # logger.info(f"Data X, adj, y moved to device: {device}")
-            # ----------------------------------------
-
             # Convert to classification targets using optimized price threshold
-            # Ensure y is on CPU for this numpy operation if it somehow ended up on GPU
             y_flat = y_orig_returns.flatten().cpu().numpy()
             classes = np.ones(len(y_flat), dtype=int)  # Default to no direction
             classes[y_flat > config_dict['price_threshold']] = 2   # Up
             classes[y_flat < -config_dict['price_threshold']] = 0  # Down
 
-            # Ensure y_classes is a CPU tensor for the DataLoader initially
-            y_classes = torch.LongTensor(classes.reshape(y_orig_returns.shape))  # No .to(device) here
+            y_classes = torch.LongTensor(classes.reshape(y_orig_returns.shape))
             logger.info(f"Classification targets y_classes prepared on CPU: {y_classes.shape}")
 
             # Split data. X_train, y_train, X_val, y_val should remain on CPU here.
-            # Use .cpu() to explicitly ensure they are on CPU before DataLoader creation
             X_train, y_train, X_val, y_val = data_processor.split_data(X.cpu(), y_classes.cpu())
 
-            # --- NEW CRITICAL CHECK ---
             if len(X_val) == 0:
                 logger.error(f"Validation set is empty! X_val shape: {X_val.shape}, total X samples: {len(X)}")
-                return float('inf')  # Fail fast if validation set is empty
+                return float('inf')
             if len(X_train) == 0:
                 logger.error(f"Training set is empty! X_train shape: {X_train.shape}, total X samples: {len(X)}")
                 return float('inf')
@@ -326,12 +314,11 @@ def objective(trial: optuna.Trial) -> float:
             # Log data statistics for debugging
             logger.info(f"Data statistics - X: {X.shape}, X_train: {X_train.shape}, X_val: {X_val.shape}")
             logger.info(f"Batch size: {config.batch_size}, Train samples: {len(X_train)}, Val samples: {len(X_val)}")
-            # --- END NEW CRITICAL CHECK ---
 
             # !!! Crucial Fix: Update trainer.adj attribute !!!
             # The 'adj' here is the local variable from data_processor.prepare_data()
             # It must be moved to the correct device and assigned to the trainer's attribute.
-            trainer.adj = adj.to(device)  # Move the adjacency matrix to the GPU once
+            trainer.adj = adj.to(device)
             logger.info(f"Adjacency matrix moved to device: {trainer.adj.device}")
 
             # Calculate class weights using the prepared data to ensure consistency
@@ -347,22 +334,19 @@ def objective(trial: optuna.Trial) -> float:
             )
             logger.info(f"Updated criterion with class weights: {class_weights}")
 
-            # Skip SMOTE - use original data directly
+            # Skipping SMOTE for memory efficiency during hyperparameter optimization
             logger.info("Skipping SMOTE for memory efficiency during hyperparameter optimization")
 
             # Create dataloaders with original (unbalanced) training data
-            # X_train and y_train are now CPU tensors, so pin_memory will work.
             train_loader = data_processor.create_dataloader(X_train, y_train, drop_last=True)
             val_loader = data_processor.create_dataloader(X_val, y_val, drop_last=False)
 
-            # --- NEW CRITICAL CHECK for DataLoader length ---
             if len(train_loader) == 0:
                 logger.error(f"Train DataLoader is empty! Number of samples: {len(X_train)}, Batch size: {config.batch_size}")
                 return float('inf')
             if len(val_loader) == 0:
                 logger.error(f"Validation DataLoader is empty! Number of samples: {len(X_val)}, Batch size: {config.batch_size}")
                 return float('inf')
-            # --- END NEW CRITICAL CHECK ---
             
             # Training loop
             patience_counter = 0
@@ -416,6 +400,8 @@ def objective(trial: optuna.Trial) -> float:
                 'val_losses': trainer.val_losses,
                 'train_accuracies': trainer.train_accuracies,
                 'val_accuracies': trainer.val_accuracies,
+                'X_val': X_val,  # Store validation data for evaluation
+                'y_val': y_val,   # Store validation labels for evaluation
                 'smote_info': {
                     'class_distribution_before': 'Skipped for memory efficiency',
                     'class_distribution_after': 'Skipped for memory efficiency',
@@ -506,29 +492,14 @@ def objective(trial: optuna.Trial) -> float:
         # Restore original epochs
         trainer.config.num_epochs = original_epochs
         
-        # Evaluate on validation data using memory-efficient loading
-        logger.info("Evaluating on validation data using memory-efficient loading...")
+        # Use the same validation data that was used during training
+        logger.info("Evaluating on validation data using consistent dataset...")
         try:
-            X_val, adj_val, y_val = data_processor.prepare_data(start_time, end_time)
-            
-            # Validate data
-            if X_val is None or adj_val is None or y_val is None:
-                logger.error("Validation data preparation returned None values")
-                return float('inf')
-                
-            logger.info(f"Validation data shapes - X: {X_val.shape}, adj: {adj_val.shape}, y: {y_val.shape}")
-            
-            # Convert to classification targets using optimized threshold
-            y_val_flat = y_val.flatten().numpy()
-            classes_val = np.ones(len(y_val_flat), dtype=int)  # Default to no direction
-            classes_val[y_val_flat > config_dict['price_threshold']] = 2   # Up
-            classes_val[y_val_flat < -config_dict['price_threshold']] = 0  # Down
-            y_val_classes = torch.LongTensor(classes_val.reshape(y_val.shape))
-            
-            logger.info(f"Validation class distribution: {np.bincount(classes_val)}")
-            
-            # Evaluate model with validation
-            evaluation_results = trainer.evaluate(X_val, y_val_classes)
+            # Use the validation data that was already prepared and split during training
+            # This ensures we're evaluating on the exact same data used for validation during training
+            X_val = training_history['X_val']
+            y_val = training_history['y_val']
+            evaluation_results = trainer.evaluate(X_val, y_val)
             
             # Validate evaluation results
             if evaluation_results is None:
