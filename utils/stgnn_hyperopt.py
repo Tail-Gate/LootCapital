@@ -301,44 +301,50 @@ def objective(trial: optuna.Trial) -> float:
         
         def train_without_smote():
             """Train without SMOTE to save memory during hyperparameter optimization"""
-            # Use memory-efficient data loading
             logger.info("Using memory-efficient data loading for hyperparameter optimization")
-            
+
             # Load data in chunks using the data processor's memory-efficient methods
             X, adj, y = data_processor.prepare_data(start_time, end_time)
-            
+
             # Validate data shapes
             if X is None or adj is None or y is None:
                 logger.error("Data preparation returned None values")
                 return float('inf')
-                
-            logger.info(f"Data shapes - X: {X.shape}, adj: {adj.shape}, y: {y.shape}")
-            
-            # Move all prepared data tensors to the *exact same* device object.
-            # It's crucial that adj (adjacency matrix) also goes to the GPU.
-            X = X.to(device)
-            adj = adj.to(device)
-            y = y.to(device)  # y is currently float, will be converted to long later
-            logger.info(f"Data X, adj, y moved to device: {device}")
+
+            # --- REMOVE OR COMMENT OUT THESE LINES ---
+            # logger.info(f"Data shapes - X: {X.shape}, adj: {adj.shape}, y: {y.shape}")
+            # X = X.to(device)
+            # adj = adj.to(device) # adj will be moved to device inside train_epoch, that's fine.
+            # y = y.to(device)
+            # logger.info(f"Data X, adj, y moved to device: {device}")
+            # ----------------------------------------
 
             # Convert to classification targets using optimized price threshold
+            # Ensure y is on CPU for this numpy operation if it somehow ended up on GPU
             y_flat = y.flatten().cpu().numpy()
             classes = np.ones(len(y_flat), dtype=int)  # Default to no direction
             classes[y_flat > config_dict['price_threshold']] = 2   # Up
             classes[y_flat < -config_dict['price_threshold']] = 0  # Down
-            y_classes = torch.LongTensor(classes.reshape(y.shape)).to(device)  # Ensure this is on device
-            logger.info(f"Classification targets y_classes moved to device: {device}")
-            
-            logger.info(f"Classification targets shape: {y_classes.shape}")
-            logger.info(f"Class distribution: {np.bincount(classes)}")
-            
-            # Split data using memory-efficient approach
-            X_train, y_train, X_val, y_val = data_processor.split_data(X, y_classes)
-            
+
+            # Ensure y_classes is a CPU tensor for the DataLoader initially
+            y_classes = torch.LongTensor(classes.reshape(y.shape)) # No .to(device) here
+            logger.info(f"Classification targets y_classes prepared on CPU: {y_classes.shape}")
+
+            # Split data. X_train, y_train, X_val, y_val should remain on CPU here.
+            # Use .cpu() to explicitly ensure they are on CPU before DataLoader creation
+            X_train, y_train, X_val, y_val = data_processor.split_data(X.cpu(), y_classes.cpu())
+
+            # Now, adj (adjacency matrix) needs to be moved to the device once.
+            # It's already handled in ClassificationSTGNNTrainer's train_epoch and validate methods.
+            # We also ensure the trainer's adj attribute is set.
+            # This is already done in ClassificationSTGNNTrainer.__init__ and prepare_classification_data.
+            # Just confirming it remains.
+
             # Skip SMOTE - use original data directly
             logger.info("Skipping SMOTE for memory efficiency during hyperparameter optimization")
-            
+
             # Create dataloaders with original (unbalanced) training data
+            # X_train and y_train are now CPU tensors, so pin_memory will work.
             train_loader = data_processor.create_dataloader(X_train, y_train, drop_last=True)
             val_loader = data_processor.create_dataloader(X_val, y_val, drop_last=False)
             
