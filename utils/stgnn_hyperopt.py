@@ -334,11 +334,11 @@ def objective(trial: optuna.Trial) -> float:
             # Use .cpu() to explicitly ensure they are on CPU before DataLoader creation
             X_train, y_train, X_val, y_val = data_processor.split_data(X.cpu(), y_classes.cpu())
 
-            # Now, adj (adjacency matrix) needs to be moved to the device once.
-            # It's already handled in ClassificationSTGNNTrainer's train_epoch and validate methods.
-            # We also ensure the trainer's adj attribute is set.
-            # This is already done in ClassificationSTGNNTrainer.__init__ and prepare_classification_data.
-            # Just confirming it remains.
+            # !!! Crucial Fix: Update trainer.adj attribute !!!
+            # The 'adj' here is the local variable from data_processor.prepare_data()
+            # It must be moved to the correct device and assigned to the trainer's attribute.
+            trainer.adj = adj.to(device)  # Move the adjacency matrix to the GPU once
+            logger.info(f"Adjacency matrix moved to device: {trainer.adj.device}")
 
             # Skip SMOTE - use original data directly
             logger.info("Skipping SMOTE for memory efficiency during hyperparameter optimization")
