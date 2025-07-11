@@ -192,6 +192,26 @@ class EnhancedSTGNNDataProcessor(STGNNDataProcessor):
         # Use FeatureGenerator to generate comprehensive features
         features = self.feature_generator.generate_features(data)
         
+        # CRITICAL DEBUG: Add comprehensive NaN/Inf checks after feature generation
+        if features.isnull().any().any() or (features == np.inf).any().any() or (features == -np.inf).any().any():
+            logger.error(f"DEBUG: NaN/Inf detected in 'features' DataFrame after feature generation. Shape: {features.shape}")
+            logger.error("--- Head of problematic features ---")
+            logger.error(features.head())
+            logger.error("--- Tail of problematic features ---")
+            logger.error(features.tail())
+            logger.error("--- Columns with NaN/Inf values ---")
+            nan_inf_cols = []
+            for col in features.columns:
+                if features[col].isnull().any() or (features[col] == np.inf).any() or (features[col] == -np.inf).any():
+                    nan_inf_cols.append(col)
+                    logger.error(f"  Column '{col}' has NaN/Inf.")
+                    # Print statistics for the problematic column
+                    col_data = features[col].replace([np.inf, -np.inf], np.nan)
+                    logger.error(f"    Stats for {col}: min={col_data.min()}, max={col_data.max()}, mean={col_data.mean()}, NaNs={col_data.isnull().sum()}")
+            # Optionally, save the problematic DataFrame to a CSV for manual inspection
+            # features.to_csv("problematic_features_after_generation.csv")
+            raise ValueError("NaN/Inf detected in features after generation. Stopping to debug.")
+        
         # Store returns separately for target calculation
         self._returns = features['returns'] if 'returns' in features.columns else pd.Series(0, index=data.index)
         

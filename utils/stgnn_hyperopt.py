@@ -300,6 +300,24 @@ def objective(trial: optuna.Trial) -> float:
                 logger.error("Data preparation returned empty y tensor")
                 return float('inf')
             
+            # CRITICAL DEBUG: Check for NaN/Inf in X before any processing
+            if torch.isnan(X).any() or torch.isinf(X).any():
+                logger.error(f"CRITICAL: NaN/Inf detected in X tensor BEFORE any processing!")
+                logger.error(f"X shape: {X.shape}")
+                logger.error(f"X stats: min={X.min().item()}, max={X.max().item()}, mean={X.mean().item()}")
+                logger.error(f"NaN count: {torch.isnan(X).sum().item()}")
+                logger.error(f"Inf count: {torch.isinf(X).sum().item()}")
+                return float('inf')
+            
+            # CRITICAL DEBUG: Check for NaN/Inf in adj before any processing
+            if torch.isnan(adj).any() or torch.isinf(adj).any():
+                logger.error(f"CRITICAL: NaN/Inf detected in adj tensor BEFORE any processing!")
+                logger.error(f"adj shape: {adj.shape}")
+                logger.error(f"adj stats: min={adj.min().item()}, max={adj.max().item()}, mean={adj.mean().item()}")
+                logger.error(f"NaN count: {torch.isnan(adj).sum().item()}")
+                logger.error(f"Inf count: {torch.isinf(adj).sum().item()}")
+                return float('inf')
+            
             logger.info(f"Data validation passed - X shape: {X.shape}, y shape: {y_orig_returns.shape}")
 
             # Convert to classification targets using optimized price threshold
@@ -378,6 +396,25 @@ def objective(trial: optuna.Trial) -> float:
             if len(val_loader) == 0:
                 logger.error(f"Validation DataLoader is empty! Number of samples: {len(X_val)}, Batch size: {config.batch_size}")
                 logger.error(f"Val samples: {len(X_val)}, Batch size: {config.batch_size}, Drop last: False")
+                return float('inf')
+            
+            # CRITICAL DEBUG: Check first batch for NaN/Inf values
+            try:
+                first_train_batch = next(iter(train_loader))
+                X_batch, y_batch = first_train_batch
+                
+                if torch.isnan(X_batch).any() or torch.isinf(X_batch).any():
+                    logger.error(f"CRITICAL: NaN/Inf detected in first train batch!")
+                    logger.error(f"X_batch shape: {X_batch.shape}")
+                    logger.error(f"X_batch stats: min={X_batch.min().item()}, max={X_batch.max().item()}, mean={X_batch.mean().item()}")
+                    logger.error(f"NaN count: {torch.isnan(X_batch).sum().item()}")
+                    logger.error(f"Inf count: {torch.isinf(X_batch).sum().item()}")
+                    return float('inf')
+                
+                logger.info(f"First train batch validation passed - X_batch shape: {X_batch.shape}")
+                
+            except Exception as e:
+                logger.error(f"Error checking first train batch: {e}")
                 return float('inf')
             
             logger.info(f"DataLoader validation passed - Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
