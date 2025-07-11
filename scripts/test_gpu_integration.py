@@ -143,10 +143,29 @@ def test_gpu_integration():
         data_processor = STGNNDataProcessor(config, market_data, technical_indicators)
         logger.info("Data processor created")
         
-        # Use valid date range in March 2025 (data goes up to May 2025)
-        end_time = datetime(2025, 3, 15, 12, 0, 0)  # March 15, 2025
-        start_time = end_time - timedelta(days=1)  # March 14, 2025
-        logger.info(f"Using date range: {start_time} to {end_time}")
+        # Dynamically determine the full data range (5 years)
+        data_file_path = 'data/historical/ETH-USDT-SWAP_ohlcv_15m.csv'
+        try:
+            # Read the data file to get the full date range
+            data_df = pd.read_csv(data_file_path)
+            data_df['timestamp'] = pd.to_datetime(data_df['timestamp'])
+            latest_date = data_df['timestamp'].max()
+            earliest_date = data_df['timestamp'].min()
+            
+            # Use the full data range (5 years)
+            end_time = latest_date
+            start_time = earliest_date
+            
+            logger.info(f"Data file date range: {earliest_date} to {latest_date}")
+            logger.info(f"Using full 5-year data range: {start_time} to {end_time}")
+            logger.info(f"Total data span: {(end_time - start_time).days} days")
+            
+        except Exception as e:
+            logger.warning(f"Could not read data file to determine date range: {e}")
+            # Fallback to a known good date range
+            end_time = datetime(2025, 3, 15, 12, 0, 0)
+            start_time = end_time - timedelta(days=1)
+            logger.info(f"Using fallback date range: {start_time} to {end_time}")
         
         # Create trainer with device
         trainer = ClassificationSTGNNTrainer(

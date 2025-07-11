@@ -526,21 +526,20 @@ class STGNNDataProcessor:
             asset = self.config.assets[0]
             X, y = self.prepare_data_single_asset(asset, start_time, end_time)
             
-                    # Check if we have valid sequences
-        if len(X) == 0:
-            print("Warning: No sequences created from real data.")
-            print(f"Available data points: {len(features) if 'features' in locals() else 'unknown'}")
-            print("This indicates insufficient real data for the requested time range.")
-            raise ValueError("No sequences could be created from real data. Check data availability and time range.")
-        
-        # Reshape for single asset: [batch_size, 1, seq_len, input_dim]
-        if len(X.shape) == 3:  # (batch, seq_len, features)
-            X = X.reshape(X.shape[0], 1, X.shape[1], X.shape[2])
-            y = y.reshape(y.shape[0], 1)
-        else:
-            print(f"Warning: Unexpected X shape: {X.shape}")
-            raise ValueError(f"Unexpected X shape: {X.shape}. Expected 3D array.")
+            # Check if we have valid sequences
+            if len(X) == 0:
+                print("Warning: No sequences created from real data.")
+                print("This indicates insufficient real data for the requested time range.")
+                raise ValueError("No sequences could be created from real data. Check data availability and time range.")
             
+            # Reshape for single asset: [batch_size, 1, seq_len, input_dim]
+            if len(X.shape) == 3:  # (batch, seq_len, features)
+                X = X.reshape(X.shape[0], 1, X.shape[1], X.shape[2])
+                y = y.reshape(y.shape[0], 1)
+            else:
+                print(f"Warning: Unexpected X shape: {X.shape}")
+                raise ValueError(f"Unexpected X shape: {X.shape}. Expected 3D array.")
+                
             # Create simple adjacency matrix for single asset
             adj = np.array([[1.0]])
             

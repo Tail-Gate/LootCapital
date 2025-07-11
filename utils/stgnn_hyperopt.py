@@ -217,9 +217,29 @@ def objective(trial: optuna.Trial) -> float:
             price_threshold=config_dict['price_threshold']
         )
         
-        # Use ULTRA-SMALL time window to prevent OOM
-        end_time = datetime.now()
-        start_time = end_time - timedelta(days=1)  # Use only 1 day to minimize memory usage
+        # Dynamically determine the full data range (5 years)
+        data_file_path = 'data/historical/ETH-USDT-SWAP_ohlcv_15m.csv'
+        try:
+            # Read the data file to get the full date range
+            data_df = pd.read_csv(data_file_path)
+            data_df['timestamp'] = pd.to_datetime(data_df['timestamp'])
+            latest_date = data_df['timestamp'].max()
+            earliest_date = data_df['timestamp'].min()
+            
+            # Use the full data range (5 years)
+            end_time = latest_date
+            start_time = earliest_date
+            
+            logger.info(f"Data file date range: {earliest_date} to {latest_date}")
+            logger.info(f"Using full 5-year data range: {start_time} to {end_time}")
+            logger.info(f"Total data span: {(end_time - start_time).days} days")
+            
+        except Exception as e:
+            logger.warning(f"Could not read data file to determine date range: {e}")
+            # Fallback to a known good date range
+            end_time = datetime(2025, 3, 15, 12, 0, 0)
+            start_time = end_time - timedelta(days=1)
+            logger.info(f"Using fallback date range: {start_time} to {end_time}")
         
         # Create data processor with memory-efficient approach
         data_processor = create_classification_data_processor(config)
@@ -247,16 +267,28 @@ def objective(trial: optuna.Trial) -> float:
         
         def train_without_smote():
             """Train without SMOTE to save memory during hyperparameter optimization"""
-            # Prepare data
-            X, adj, y_classes = trainer.prepare_classification_data()
-            X_train, y_train, X_val, y_val = trainer.data_processor.split_data(X, y_classes)
+            # Use memory-efficient data loading
+            logger.info("Using memory-efficient data loading for hyperparameter optimization")
+            
+            # Load data in chunks using the data processor's memory-efficient methods
+            X, adj, y = data_processor.prepare_data(start_time, end_time)
+            
+            # Convert to classification targets using optimized price threshold
+            y_flat = y.flatten().numpy()
+            classes = np.ones(len(y_flat), dtype=int)  # Default to no direction
+            classes[y_flat > config_dict['price_threshold']] = 2   # Up
+            classes[y_flat < -config_dict['price_threshold']] = 0  # Down
+            y_classes = torch.LongTensor(classes.reshape(y.shape))
+            
+            # Split data using memory-efficient approach
+            X_train, y_train, X_val, y_val = data_processor.split_data(X, y_classes)
             
             # Skip SMOTE - use original data directly
             logger.info("Skipping SMOTE for memory efficiency during hyperparameter optimization")
             
             # Create dataloaders with original (unbalanced) training data
-            train_loader = trainer.data_processor.create_dataloader(X_train, y_train, drop_last=True)
-            val_loader = trainer.data_processor.create_dataloader(X_val, y_val, drop_last=False)
+            train_loader = data_processor.create_dataloader(X_train, y_train, drop_last=True)
+            val_loader = data_processor.create_dataloader(X_val, y_val, drop_last=False)
             
             # Training loop
             patience_counter = 0
@@ -311,8 +343,9 @@ def objective(trial: optuna.Trial) -> float:
         
         # Override class weights calculation with multipliers
         def calculate_weighted_class_weights():
-            """Calculate class weights with trial multipliers"""
-            # Get class distribution from training data
+            """Calculate class weights with trial multipliers using memory-efficient loading"""
+            logger.info("Calculating class weights using memory-efficient data loading...")
+            # Get class distribution from training data using memory-efficient loading
             X, adj, y = data_processor.prepare_data(start_time, end_time)
             y_flat = y.flatten().numpy()
             
@@ -345,12 +378,19 @@ def objective(trial: optuna.Trial) -> float:
         original_epochs = trainer.config.num_epochs
         trainer.config.num_epochs = 1  # Ultra-minimal: only 1 epoch
         
+        # Force memory cleanup before training
+        manage_memory()
+        
         training_history = trainer.train()
+        
+        # Force memory cleanup after training
+        manage_memory()
         
         # Restore original epochs
         trainer.config.num_epochs = original_epochs
         
-        # Evaluate on validation data
+        # Evaluate on validation data using memory-efficient loading
+        logger.info("Evaluating on validation data using memory-efficient loading...")
         X_val, adj_val, y_val = data_processor.prepare_data(start_time, end_time)
         
         # Convert to classification targets using optimized threshold
@@ -362,6 +402,9 @@ def objective(trial: optuna.Trial) -> float:
         
         # Evaluate model
         evaluation_results = trainer.evaluate(X_val, y_val_classes)
+        
+        # Force memory cleanup after evaluation
+        manage_memory()
         
         # Extract metrics for objective calculation
         f1_scores = evaluation_results['f1']  # [down_f1, no_dir_f1, up_f1]
