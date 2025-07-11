@@ -102,6 +102,30 @@ def generate_features_chunk(chunk: pd.DataFrame, order_book_data: Optional[pd.Da
         ).astype(np.float32)
         features.loc[:, 'volume_imbalance'] = features['volume_imbalance'].replace([np.inf, -np.inf], np.nan)
     
+    # --- START OF NEW/MODIFIED CODE: Aggressive NaN/Inf cleanup ---
+    # Convert any remaining infinities to NaN first
+    features = features.replace([np.inf, -np.inf], np.nan)
+
+    # Fill leading NaNs using backward fill (bfill) from subsequent valid data
+    # This is often best for initial NaNs from lookback periods.
+    features = features.bfill() 
+
+    # Fill any remaining NaNs using forward fill (ffill) from previous valid data
+    features = features.ffill()
+
+    # As a last resort, fill any remaining NaNs with 0 (e.g., if an entire column was NaN)
+    features = features.fillna(0)
+
+    # Double-check: assert no NaNs/Infs remain
+    if features.isnull().any().any() or (features == np.inf).any().any() or (features == -np.inf).any().any():
+        # This assert should ideally not be hit if cleanup is robust
+        problematic_cols_after_cleanup = []
+        for col in features.columns:
+            if features[col].isnull().any() or (features[col] == np.inf).any() or (features[col] == -np.inf).any():
+                problematic_cols_after_cleanup.append(col)
+        raise ValueError(f"CRITICAL ERROR: NaNs/Infs still present in features after cleanup in generate_features_chunk for columns: {problematic_cols_after_cleanup}")
+    # --- END OF NEW/MODIFIED CODE ---
+
     return features
 
 class FeatureGenerator:
@@ -591,6 +615,20 @@ class FeatureGenerator:
             df['volume_std'] = df[volume_col].rolling(window=20).std()
             df['volume_ratio'] = df[volume_col] / df['volume_ma']
             
+            # --- NaN/Inf cleanup for technical features ---
+            # Convert any remaining infinities to NaN first
+            df = df.replace([np.inf, -np.inf], np.nan)
+            
+            # Fill leading NaNs using backward fill from subsequent valid data
+            df = df.bfill()
+            
+            # Fill any remaining NaNs using forward fill from previous valid data
+            df = df.ffill()
+            
+            # As a last resort, fill any remaining NaNs with 0
+            df = df.fillna(0)
+            # --- END OF CLEANUP ---
+            
             return df
             
         except Exception as e:
@@ -668,6 +706,21 @@ class FeatureGenerator:
         df['price_momentum'] = df[price_col].pct_change(5)
         df['volume_momentum'] = df[volume_col].pct_change(5)
         df['momentum_divergence'] = np.sign(df['price_momentum']) != np.sign(df['volume_momentum'])
+        
+        # --- NaN/Inf cleanup for momentum features ---
+        # Convert any remaining infinities to NaN first
+        df = df.replace([np.inf, -np.inf], np.nan)
+        
+        # Fill leading NaNs using backward fill from subsequent valid data
+        df = df.bfill()
+        
+        # Fill any remaining NaNs using forward fill from previous valid data
+        df = df.ffill()
+        
+        # As a last resort, fill any remaining NaNs with 0
+        df = df.fillna(0)
+        # --- END OF CLEANUP ---
+        
         return df
     
     def generate_order_book_features(
@@ -697,6 +750,20 @@ class FeatureGenerator:
             # Market depth features
             df['depth_imbalance'] = self._calculate_depth_imbalance(order_book_data)
             df['spread'] = order_book_data['ask_prices'].apply(lambda x: x[0]) - order_book_data['bid_prices'].apply(lambda x: x[0])
+        
+        # --- NaN/Inf cleanup for order book features ---
+        # Convert any remaining infinities to NaN first
+        df = df.replace([np.inf, -np.inf], np.nan)
+        
+        # Fill leading NaNs using backward fill from subsequent valid data
+        df = df.bfill()
+        
+        # Fill any remaining NaNs using forward fill from previous valid data
+        df = df.ffill()
+        
+        # As a last resort, fill any remaining NaNs with 0
+        df = df.fillna(0)
+        # --- END OF CLEANUP ---
         
         return df
     
