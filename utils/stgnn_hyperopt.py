@@ -261,6 +261,19 @@ def objective(trial: optuna.Trial) -> float:
             device=device  # Pass device to trainer
         )
         
+        # Validate trainer creation
+        if trainer is None:
+            logger.error("Trainer creation failed")
+            return float('inf')
+            
+        # Ensure model is on correct device
+        if hasattr(trainer, 'model') and trainer.model is not None:
+            trainer.model = trainer.model.to(device)
+            logger.info(f"Model moved to device: {device}")
+        else:
+            logger.error("Trainer model is None")
+            return float('inf')
+        
         # DISABLE SMOTE for hyperparameter optimization to prevent memory explosion
         # Override the train method to skip SMOTE processing
         original_train = trainer.train
@@ -273,12 +286,22 @@ def objective(trial: optuna.Trial) -> float:
             # Load data in chunks using the data processor's memory-efficient methods
             X, adj, y = data_processor.prepare_data(start_time, end_time)
             
+            # Validate data shapes
+            if X is None or adj is None or y is None:
+                logger.error("Data preparation returned None values")
+                return float('inf')
+                
+            logger.info(f"Data shapes - X: {X.shape}, adj: {adj.shape}, y: {y.shape}")
+            
             # Convert to classification targets using optimized price threshold
             y_flat = y.flatten().numpy()
             classes = np.ones(len(y_flat), dtype=int)  # Default to no direction
             classes[y_flat > config_dict['price_threshold']] = 2   # Up
             classes[y_flat < -config_dict['price_threshold']] = 0  # Down
             y_classes = torch.LongTensor(classes.reshape(y.shape))
+            
+            logger.info(f"Classification targets shape: {y_classes.shape}")
+            logger.info(f"Class distribution: {np.bincount(classes)}")
             
             # Split data using memory-efficient approach
             X_train, y_train, X_val, y_val = data_processor.split_data(X, y_classes)
@@ -381,7 +404,25 @@ def objective(trial: optuna.Trial) -> float:
         # Force memory cleanup before training
         manage_memory()
         
-        training_history = trainer.train()
+        # Add validation to ensure training completes successfully
+        try:
+            training_history = trainer.train()
+            
+            # Validate training history
+            if training_history is None:
+                logger.error("Training returned None - this indicates a critical error")
+                return float('inf')
+                
+            # Check if training actually happened
+            if 'train_losses' not in training_history or len(training_history['train_losses']) == 0:
+                logger.error("No training losses recorded - training may have failed")
+                return float('inf')
+                
+            logger.info(f"Training completed successfully with {len(training_history['train_losses'])} epochs")
+            
+        except Exception as e:
+            logger.error(f"Training failed with error: {e}")
+            return float('inf')
         
         # Force memory cleanup after training
         manage_memory()
@@ -400,8 +441,27 @@ def objective(trial: optuna.Trial) -> float:
         classes_val[y_val_flat < -config_dict['price_threshold']] = 0  # Down
         y_val_classes = torch.LongTensor(classes_val.reshape(y_val.shape))
         
-        # Evaluate model
-        evaluation_results = trainer.evaluate(X_val, y_val_classes)
+        # Evaluate model with validation
+        try:
+            evaluation_results = trainer.evaluate(X_val, y_val_classes)
+            
+            # Validate evaluation results
+            if evaluation_results is None:
+                logger.error("Evaluation returned None - this indicates a critical error")
+                return float('inf')
+                
+            # Check required keys exist
+            required_keys = ['f1', 'precision', 'recall', 'probabilities', 'true_labels']
+            for key in required_keys:
+                if key not in evaluation_results:
+                    logger.error(f"Evaluation results missing key: {key}")
+                    return float('inf')
+                    
+            logger.info("Evaluation completed successfully")
+            
+        except Exception as e:
+            logger.error(f"Evaluation failed with error: {e}")
+            return float('inf')
         
         # Force memory cleanup after evaluation
         manage_memory()
