@@ -125,6 +125,17 @@ class WeightedFocalLoss(nn.Module):
         Returns:
             Weighted focal loss value
         """
+        # CRITICAL FIX: Validate class weights
+        if torch.any(self.class_weights <= 0):
+            logger.error(f"Invalid class weights detected: {self.class_weights}")
+            # Use uniform weights as fallback
+            self.class_weights = torch.ones_like(self.class_weights)
+        
+        # CRITICAL FIX: Validate inputs and targets
+        if torch.isnan(inputs).any() or torch.isinf(inputs).any():
+            logger.error("Invalid inputs detected (NaN or Inf)")
+            return torch.tensor(float('inf'), device=inputs.device)
+        
         # Apply softmax to get probabilities
         probs = torch.softmax(inputs, dim=1)
         
@@ -135,9 +146,18 @@ class WeightedFocalLoss(nn.Module):
         # Get class weights for the targets
         target_weights = self.class_weights[targets]
         
+        # CRITICAL FIX: Add epsilon to prevent log(0)
+        epsilon = 1e-7
+        probs = torch.clamp(probs, epsilon, 1.0 - epsilon)
+        
         # Calculate weighted focal loss
         focal_weight = (1 - probs) ** self.gamma
-        weighted_focal_loss = -target_weights * self.alpha * focal_weight * torch.log(probs + 1e-7)
+        weighted_focal_loss = -target_weights * self.alpha * focal_weight * torch.log(probs)
+        
+        # CRITICAL FIX: Check for invalid loss values
+        if torch.isnan(weighted_focal_loss).any() or torch.isinf(weighted_focal_loss).any():
+            logger.error("Invalid focal loss detected (NaN or Inf)")
+            return torch.tensor(float('inf'), device=inputs.device)
         
         # Apply reduction
         if self.reduction == 'mean':
@@ -430,10 +450,16 @@ class ClassificationSTGNNTrainer:
             # Check for infinite or NaN loss
             if torch.isnan(loss) or torch.isinf(loss):
                 logger.error(f"Invalid loss detected: {loss.item()}")
+                logger.error(f"Logits stats: min={logits.min().item()}, max={logits.max().item()}, mean={logits.mean().item()}")
+                logger.error(f"Y batch stats: min={y_batch.min().item()}, max={y_batch.max().item()}")
                 continue
 
             # Backward pass
             loss.backward()
+            
+            # CRITICAL FIX: Gradient clipping for numerical stability
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            
             self.optimizer.step()
 
             total_loss += loss.item()
@@ -482,6 +508,8 @@ class ClassificationSTGNNTrainer:
                 # Check for infinite or NaN loss
                 if torch.isnan(loss) or torch.isinf(loss):
                     logger.error(f"Invalid loss detected: {loss.item()}")
+                    logger.error(f"Logits stats: min={logits.min().item()}, max={logits.max().item()}, mean={logits.mean().item()}")
+                    logger.error(f"Y batch stats: min={y_batch.min().item()}, max={y_batch.max().item()}")
                     continue
 
                 total_loss += loss.item()

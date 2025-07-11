@@ -215,6 +215,33 @@ class STGNNDataProcessor:
         input_features = [f for f in self.config.features if f in features.columns]
         total_sequences = len(features) - self.config.seq_len - self.config.prediction_horizon + 1
         
+        # CRITICAL FIX: Validate total_sequences before proceeding
+        if total_sequences <= 0:
+            print(f"ERROR: Cannot create sequences - insufficient data!")
+            print(f"Available data points: {len(features)}")
+            print(f"Required: seq_len={self.config.seq_len} + prediction_horizon={self.config.prediction_horizon} + 1")
+            print(f"Calculated total_sequences: {total_sequences}")
+            
+            # Try to adjust parameters to create at least some sequences
+            min_required = self.config.seq_len + self.config.prediction_horizon
+            if len(features) < min_required:
+                print(f"ERROR: Not enough data points ({len(features)}) for minimum requirements ({min_required})")
+                # Return empty arrays to trigger proper error handling upstream
+                return np.array([]), np.array([])
+            
+            # Try with shorter sequence length
+            original_seq_len = self.config.seq_len
+            self.config.seq_len = max(1, len(features) - self.config.prediction_horizon)
+            print(f"Adjusted sequence length to: {self.config.seq_len}")
+            total_sequences = len(features) - self.config.seq_len - self.config.prediction_horizon + 1
+            
+            if total_sequences <= 0:
+                print(f"ERROR: Still cannot create sequences after adjustment")
+                self.config.seq_len = original_seq_len  # Restore original
+                return np.array([]), np.array([])
+        
+        print(f"Creating {total_sequences} sequences from {len(features)} data points")
+        
         if total_sequences > max_sequences:
             # Sample sequences instead of creating all
             print(f"Sampling {max_sequences} sequences from {total_sequences} possible sequences")
@@ -316,9 +343,9 @@ class STGNNDataProcessor:
         # Create sequences
         X, y = self.create_sequences_lazy(features)
         
-        # Check if we have sequences
+        # CRITICAL FIX: Validate sequences after creation
         if len(X) == 0:
-            print("Warning: No sequences created from real data.")
+            print("ERROR: No sequences created from real data.")
             print(f"Features shape: {features.shape}")
             print(f"Sequence length: {self.config.seq_len}")
             print(f"Prediction horizon: {self.config.prediction_horizon}")
@@ -326,10 +353,15 @@ class STGNNDataProcessor:
             
             # Try with shorter sequence length
             original_seq_len = self.config.seq_len
-            self.config.seq_len = min(5, len(features) // 2)
+            self.config.seq_len = max(1, min(5, len(features) // 2))
             print(f"Trying with shorter sequence length: {self.config.seq_len}")
             X, y = self.create_sequences_lazy(features)
             self.config.seq_len = original_seq_len  # Restore original
+            
+            # If still no sequences, return empty arrays to trigger proper error handling
+            if len(X) == 0:
+                print("ERROR: Still no sequences after adjustment. Returning empty arrays.")
+                return np.array([]), np.array([])
         
         # Clean up immediately
         del data, asset_data, features

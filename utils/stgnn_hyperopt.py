@@ -287,10 +287,20 @@ def objective(trial: optuna.Trial) -> float:
             # Load data in chunks using the data processor's memory-efficient methods
             X, adj, y_orig_returns = data_processor.prepare_data(start_time, end_time)  # Let's rename y to y_orig_returns for clarity
 
-            # Validate data shapes
+            # CRITICAL FIX: Validate data shapes and content
             if X is None or adj is None or y_orig_returns is None:
                 logger.error("Data preparation returned None values")
                 return float('inf')
+            
+            # CRITICAL FIX: Validate that we have actual data
+            if len(X) == 0:
+                logger.error("Data preparation returned empty X tensor")
+                return float('inf')
+            if len(y_orig_returns) == 0:
+                logger.error("Data preparation returned empty y tensor")
+                return float('inf')
+            
+            logger.info(f"Data validation passed - X shape: {X.shape}, y shape: {y_orig_returns.shape}")
 
             # Convert to classification targets using optimized price threshold
             y_flat = y_orig_returns.flatten().cpu().numpy()
@@ -337,16 +347,40 @@ def objective(trial: optuna.Trial) -> float:
             # Skipping SMOTE for memory efficiency during hyperparameter optimization
             logger.info("Skipping SMOTE for memory efficiency during hyperparameter optimization")
 
+            # CRITICAL FIX: Validate data before creating DataLoaders
+            if len(X_train) == 0:
+                logger.error(f"Training set is empty! Cannot create DataLoader")
+                return float('inf')
+            if len(X_val) == 0:
+                logger.error(f"Validation set is empty! Cannot create DataLoader")
+                return float('inf')
+            
+            # Validate minimum data requirements
+            min_train_samples = config.batch_size * 2  # At least 2 batches
+            min_val_samples = config.batch_size  # At least 1 batch
+            
+            if len(X_train) < min_train_samples:
+                logger.error(f"Insufficient training samples: {len(X_train)} < {min_train_samples}")
+                return float('inf')
+            if len(X_val) < min_val_samples:
+                logger.error(f"Insufficient validation samples: {len(X_val)} < {min_val_samples}")
+                return float('inf')
+            
             # Create dataloaders with original (unbalanced) training data
             train_loader = data_processor.create_dataloader(X_train, y_train, drop_last=True)
             val_loader = data_processor.create_dataloader(X_val, y_val, drop_last=False)
 
+            # CRITICAL FIX: Validate DataLoaders after creation
             if len(train_loader) == 0:
                 logger.error(f"Train DataLoader is empty! Number of samples: {len(X_train)}, Batch size: {config.batch_size}")
+                logger.error(f"Train samples: {len(X_train)}, Batch size: {config.batch_size}, Drop last: True")
                 return float('inf')
             if len(val_loader) == 0:
                 logger.error(f"Validation DataLoader is empty! Number of samples: {len(X_val)}, Batch size: {config.batch_size}")
+                logger.error(f"Val samples: {len(X_val)}, Batch size: {config.batch_size}, Drop last: False")
                 return float('inf')
+            
+            logger.info(f"DataLoader validation passed - Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
             
             # Training loop
             patience_counter = 0
