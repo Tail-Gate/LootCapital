@@ -193,34 +193,31 @@ class TechnicalIndicators:
         
         # Calculate True Range
         tr1 = high - low
-        tr2 = abs(high - close.shift())
-        tr3 = abs(low - close.shift())
+        tr2 = abs(high - close.shift(1))
+        tr3 = abs(low - close.shift(1))
         tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-
+        
         # Calculate Directional Movement
-        up_move = high - high.shift()
-        down_move = low.shift() - low
-
-        plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0)
-        minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0)
-
-        # Calculate smoothed averages
-        tr_smoothed = tr.rolling(window=period).sum()
-        plus_di = 100 * pd.Series(plus_dm).rolling(window=period).sum() / tr_smoothed
-        minus_di = 100 * pd.Series(minus_dm).rolling(window=period).sum() / tr_smoothed
-
-        # Calculate ADX
+        dm_plus = high - high.shift(1)
+        dm_minus = low.shift(1) - low
+        dm_plus = dm_plus.where((dm_plus > dm_minus) & (dm_plus > 0), 0)
+        dm_minus = dm_minus.where((dm_minus > dm_plus) & (dm_minus > 0), 0)
+        
+        # Smooth the values
+        tr_smoothed = tr.rolling(window=period).mean()
+        dm_plus_smoothed = dm_plus.rolling(window=period).mean()
+        dm_minus_smoothed = dm_minus.rolling(window=period).mean()
+        
+        # Calculate Directional Indicators
+        plus_di = 100 * (dm_plus_smoothed / tr_smoothed)
+        minus_di = 100 * (dm_minus_smoothed / tr_smoothed)
+        
+        # Calculate Directional Index
         dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di)
+        
+        # Calculate ADX
         adx = dx.rolling(window=period).mean()
-
-        # Debug logging for NaNs
-        logger = logging.getLogger("ADXDebug")
-        logger.warning(f"ADX: tr_smoothed NaNs: {tr_smoothed.isna().sum()} (first: {tr_smoothed[tr_smoothed.isna()].index.tolist()[:5]})")
-        logger.warning(f"ADX: plus_di NaNs: {plus_di.isna().sum()} (first: {plus_di[plus_di.isna()].index.tolist()[:5]})")
-        logger.warning(f"ADX: minus_di NaNs: {minus_di.isna().sum()} (first: {minus_di[minus_di.isna()].index.tolist()[:5]})")
-        logger.warning(f"ADX: dx NaNs: {dx.isna().sum()} (first: {dx[dx.isna()].index.tolist()[:5]})")
-        logger.warning(f"ADX: adx NaNs: {adx.isna().sum()} (first: {adx[adx.isna()].index.tolist()[:5]})")
-
+        
         return pd.DataFrame({
             'adx': adx,
             'plus_di': plus_di,
