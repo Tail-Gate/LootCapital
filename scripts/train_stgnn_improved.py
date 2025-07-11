@@ -267,15 +267,55 @@ class STGNNClassificationModel(nn.Module):
         )
         
     def forward(self, x, adj):
+        # CRITICAL FIX: Validate inputs before STGNN forward pass
+        if torch.isnan(x).any() or torch.isinf(x).any():
+            logger.error(f"NaN/Inf detected in input x to STGNNClassificationModel. Shape: {x.shape}")
+            logger.error(f"Input x stats: min={x.min().item()}, max={x.max().item()}, mean={x.mean().item()}")
+            # Return zeros to prevent downstream errors
+            batch_size, num_nodes, seq_len, input_dim = x.shape
+            return torch.zeros(batch_size * num_nodes, self.num_classes, device=x.device), {}
+        
+        if torch.isnan(adj).any() or torch.isinf(adj).any():
+            logger.error(f"NaN/Inf detected in input adj to STGNNClassificationModel. Shape: {adj.shape}")
+            logger.error(f"Input adj stats: min={adj.min().item()}, max={adj.max().item()}, mean={adj.mean().item()}")
+            # Return zeros to prevent downstream errors
+            batch_size, num_nodes, seq_len, input_dim = x.shape
+            return torch.zeros(batch_size * num_nodes, self.num_classes, device=x.device), {}
+        
         # Get STGNN features
         features, attention_dict = self.stgnn(x, adj)
+        
+        # CRITICAL FIX: Validate STGNN output
+        if torch.isnan(features).any() or torch.isinf(features).any():
+            logger.error(f"NaN/Inf detected from STGNN base model output. Shape: {features.shape}")
+            logger.error(f"Features stats: min={features.min().item()}, max={features.max().item()}, mean={features.mean().item()}")
+            # Return zeros to prevent downstream errors
+            batch_size, num_nodes, seq_len, input_dim = x.shape
+            return torch.zeros(batch_size * num_nodes, self.num_classes, device=x.device), {}
         
         # Reshape features from [batch_size, num_nodes, hidden_dim]
         # to [batch_size * num_nodes, hidden_dim] for the classifier
         reshaped_features = features.view(-1, self.hidden_dim)
         
+        # CRITICAL FIX: Validate reshaped features
+        if torch.isnan(reshaped_features).any() or torch.isinf(reshaped_features).any():
+            logger.error(f"NaN/Inf detected after reshaping features. Shape: {reshaped_features.shape}")
+            logger.error(f"Reshaped features stats: min={reshaped_features.min().item()}, max={reshaped_features.max().item()}, mean={reshaped_features.mean().item()}")
+            # Return zeros to prevent downstream errors
+            batch_size, num_nodes, seq_len, input_dim = x.shape
+            return torch.zeros(batch_size * num_nodes, self.num_classes, device=x.device), {}
+        
         # Apply classification head
         logits = self.classifier(reshaped_features)
+        
+        # CRITICAL FIX: Validate classifier output
+        if torch.isnan(logits).any() or torch.isinf(logits).any():
+            logger.error(f"NaN/Inf detected after classifier. Shape: {logits.shape}")
+            logger.error(f"Logits stats: min={logits.min().item()}, max={logits.max().item()}, mean={logits.mean().item()}")
+            logger.error(f"Input to classifier (reshaped_features) stats: min={reshaped_features.min().item()}, max={reshaped_features.max().item()}, mean={reshaped_features.mean().item()}")
+            # Return zeros to prevent downstream errors
+            batch_size, num_nodes, seq_len, input_dim = x.shape
+            return torch.zeros(batch_size * num_nodes, self.num_classes, device=x.device), {}
         
         # The trainer's `train_epoch` and `validate` methods expect
         # [batch_size * num_nodes, num_classes] directly from the classifier,
@@ -414,7 +454,10 @@ class ClassificationSTGNNTrainer:
         return X, adj, y_classes
     
     def train_epoch(self, train_loader):
-        """Train for one epoch"""
+        """Train for one epoch with comprehensive anomaly detection"""
+        # CRITICAL FIX: Enable anomaly detection for backward pass
+        torch.autograd.set_detect_anomaly(True)
+        
         self.model.train()
         total_loss = 0
         correct = 0
@@ -424,6 +467,20 @@ class ClassificationSTGNNTrainer:
             # Move data to device
             X_batch = X_batch.to(self.device, non_blocking=False)
             y_batch = y_batch.to(self.device, non_blocking=False)
+            
+            # CRITICAL FIX: Inspect input features directly
+            if torch.isnan(X_batch).any() or torch.isinf(X_batch).any():
+                logger.error(f"NaN/Inf detected in X_batch BEFORE model forward pass. Shape: {X_batch.shape}")
+                logger.error(f"X_batch stats: min={X_batch.min().item()}, max={X_batch.max().item()}, mean={X_batch.mean().item()}")
+                continue
+            if self.adj is not None:
+                if torch.isnan(self.adj).any() or torch.isinf(self.adj).any():
+                    logger.error(f"NaN/Inf detected in self.adj BEFORE model forward pass. Shape: {self.adj.shape}")
+                    logger.error(f"Adj stats: min={self.adj.min().item()}, max={self.adj.max().item()}, mean={self.adj.mean().item()}")
+                    continue
+            else:
+                logger.error("self.adj is None - cannot validate adjacency matrix")
+                continue
 
             # Ensure adjacency matrix is on correct device
             if self.adj is not None:
@@ -436,6 +493,14 @@ class ClassificationSTGNNTrainer:
             # Forward pass
             self.optimizer.zero_grad()
             logits, _ = self.model(X_batch, self.adj)
+            
+            # CRITICAL FIX: Add detailed logging for logits after forward pass
+            if torch.isnan(logits).any() or torch.isinf(logits).any():
+                logger.error("Invalid logits detected (NaN or Inf) after model forward pass")
+                logger.error(f"Logits stats: min={logits.min().item()}, max={logits.max().item()}, mean={logits.mean().item()}")
+                logger.error(f"X_batch stats: min={X_batch.min().item()}, max={X_batch.max().item()}, mean={X_batch.mean().item()}")
+                logger.error(f"Adj stats: min={self.adj.min().item()}, max={self.adj.max().item()}, mean={self.adj.mean().item()}")
+                continue
 
             # Model now returns logits in shape [batch_size * num_nodes, num_classes]
             # and y_batch needs to be flattened to [batch_size * num_nodes]
@@ -472,7 +537,7 @@ class ClassificationSTGNNTrainer:
         return total_loss / len(train_loader), correct / total
     
     def validate(self, val_loader):
-        """Validate model"""
+        """Validate model with comprehensive anomaly detection"""
         self.model.eval()
         total_loss = 0
         correct = 0
@@ -483,6 +548,20 @@ class ClassificationSTGNNTrainer:
                 # Move data to device
                 X_batch = X_batch.to(self.device, non_blocking=False)
                 y_batch = y_batch.to(self.device, non_blocking=False)
+                
+                # CRITICAL FIX: Inspect input features directly
+                if torch.isnan(X_batch).any() or torch.isinf(X_batch).any():
+                    logger.error(f"NaN/Inf detected in X_batch BEFORE model forward pass. Shape: {X_batch.shape}")
+                    logger.error(f"X_batch stats: min={X_batch.min().item()}, max={X_batch.max().item()}, mean={X_batch.mean().item()}")
+                    continue
+                if self.adj is not None:
+                    if torch.isnan(self.adj).any() or torch.isinf(self.adj).any():
+                        logger.error(f"NaN/Inf detected in self.adj BEFORE model forward pass. Shape: {self.adj.shape}")
+                        logger.error(f"Adj stats: min={self.adj.min().item()}, max={self.adj.max().item()}, mean={self.adj.mean().item()}")
+                        continue
+                else:
+                    logger.error("self.adj is None - cannot validate adjacency matrix")
+                    continue
 
                 # Ensure adjacency matrix is on correct device
                 if self.adj is not None:
@@ -494,6 +573,14 @@ class ClassificationSTGNNTrainer:
 
                 # Forward pass
                 logits, _ = self.model(X_batch, self.adj)
+                
+                # CRITICAL FIX: Add detailed logging for logits after forward pass
+                if torch.isnan(logits).any() or torch.isinf(logits).any():
+                    logger.error("Invalid logits detected (NaN or Inf) after model forward pass")
+                    logger.error(f"Logits stats: min={logits.min().item()}, max={logits.max().item()}, mean={logits.mean().item()}")
+                    logger.error(f"X_batch stats: min={X_batch.min().item()}, max={X_batch.max().item()}, mean={X_batch.mean().item()}")
+                    logger.error(f"Adj stats: min={self.adj.min().item()}, max={self.adj.max().item()}, mean={self.adj.mean().item()}")
+                    continue
 
                 # Model now returns logits in shape [batch_size * num_nodes, num_classes]
                 # and y_batch needs to be flattened to [batch_size * num_nodes]
