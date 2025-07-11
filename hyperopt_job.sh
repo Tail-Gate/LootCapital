@@ -9,7 +9,7 @@
 #SBATCH --time=24:00:00                  # Maximum time for thorough optimization
 #SBATCH --output=hyperopt_log_%j.txt     # Standard output file, %j is replaced by job number
 #SBATCH --cpus-per-task=32               # Use ALL 32 CPUs on the node
-#SBATCH --gres=gpu:0                     # No GPU needed for CPU-only training
+#SBATCH --gres=gpu:2                     # 2 GPUs requested
 #SBATCH -n 1                             # Request 1 nodes for the job
 #SBATCH --exclusive                      # Request exclusive access to the node
 
@@ -82,8 +82,7 @@ export OMP_NUM_THREADS=32
 export MKL_NUM_THREADS=32
 export NUMEXPR_NUM_THREADS=32
 export OPENBLAS_NUM_THREADS=32
-# CPU-only training - no GPU needed
-export CUDA_VISIBLE_DEVICES=""
+
 
 # --- Step 7: Run your Python script with memory monitoring ---
 echo "Starting memory-optimized stgnn_hyperopt script..."
@@ -95,17 +94,12 @@ echo "  MKL_NUM_THREADS: $MKL_NUM_THREADS"
 echo "  NUMEXPR_NUM_THREADS: $NUMEXPR_NUM_THREADS"
 echo "  OPENBLAS_NUM_THREADS: $OPENBLAS_NUM_THREADS"
 echo ""
-echo "Ultra-minimal resource utilization strategy:"
-echo "  - Using CPU-only training for reliability"
+echo "Starting memory-optimized stgnn_hyperopt script..."
+echo "Resource utilization strategy:"
+echo "  - Using GPU training for maximum speed"
 echo "  - Using all 32 cores for parallel processing"
-echo "  - Using 16 workers for maximum data loading"
+echo "  - Using 2 GPUs"
 echo "  - Using 120GB memory (maximum available)"
-echo "  - Ultra-minimal parameter ranges to prevent OOM"
-echo "  - 1-day data window to minimize memory usage"
-echo "  - 10 trials for faster optimization"
-echo "  - Hidden dims: 4-6, Batch size: 1-2, Seq len: 5-10"
-echo "  - Single layer, 1 epoch training"
-echo "  - Only 2 features: returns, volume"
 
 python utils/stgnn_hyperopt.py
 
