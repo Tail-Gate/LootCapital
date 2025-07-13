@@ -1,0 +1,94 @@
+2025-07-13 17:28:16,364 - __main__ - INFO - Starting improved STGNN classification training with Focal Loss...
+2025-07-13 17:28:16,365 - __main__ - INFO - Configuration created successfully
+2025-07-13 17:28:16,365 - __main__ - INFO - Enhanced data processor scaler set to: minmax
+2025-07-13 17:28:16,365 - __main__ - INFO - Feature scaling enabled
+2025-07-13 17:28:16,365 - __main__ - INFO - Using CPU device for training
+2025-07-13 17:28:16,381 - __main__ - INFO - CPU training mode - using all available cores for parallel processing
+Scaler set to: minmax
+Starting full feature generator data preparation...
+Memory usage: 378.3 MB
+Using single asset processing with full feature generator...
+Processing single asset: ETH/USD
+Attempting to load from local: data/historical/ETH-USDT-SWAP_ohlcv_15m.csv
+Loading real data from: data/historical/ETH-USDT-SWAP_ohlcv_15m.csv
+Loaded 189605 rows of real data for ETH/USD
+Loaded 189605 data points for ETH/USD
+Generating features:   0%|          | 0/11 [00:00<?, ?it/s]Generating features:   9%|▉         | 1/11 [00:00<00:02,  4.61it/s]Generating features:  18%|█▊        | 2/11 [00:00<00:01,  5.00it/s]Generating features:  27%|██▋       | 3/11 [00:00<00:01,  4.38it/s]Generating features:  36%|███▋      | 4/11 [00:00<00:01,  5.06it/s]Generating features:  45%|████▌     | 5/11 [00:00<00:01,  5.60it/s]Generating features:  55%|█████▍    | 6/11 [00:01<00:00,  6.05it/s]Generating features:  64%|██████▎   | 7/11 [00:01<00:00,  6.31it/s]Generating features:  73%|███████▎  | 8/11 [00:01<00:00,  6.46it/s]Generating features:  82%|████████▏ | 9/11 [00:01<00:00,  6.23it/s]Generating features:  91%|█████████ | 10/11 [00:01<00:00,  4.55it/s]Generating features: 100%|██████████| 11/11 [00:02<00:00,  5.09it/s]Generating features: 100%|██████████| 11/11 [00:02<00:00,  5.33it/s]
+2025-07-13 17:28:30,687 - __main__ - INFO - Class distribution: {np.int64(1): 729, np.int64(2): 143, np.int64(0): 128}
+2025-07-13 17:28:30,697 - __main__ - INFO - Class weights: tensor([2.6042, 0.4572, 2.3310])
+2025-07-13 17:28:30,697 - __main__ - INFO - === TEMPORARY DEBUG: Inspecting data batches ===
+Creating sequences with lazy generation (max: 1000)...
+Creating 189391 sequences from 189605 data points
+Sampling 1000 sequences from 189391 possible sequences
+Created 1000 sequences with shapes X: (1000, 200, 25), y: (1000,)
+Memory usage: 417.5 MB
+Memory usage: 417.5 MB
+Single asset data prepared - X: torch.Size([1000, 1, 200, 25]), adj: torch.Size([1, 1]), y: torch.Size([1000, 1])
+Memory usage: 418.1 MB
+Starting full feature generator data preparation...
+Memory usage: 421.6 MB
+Using single asset processing with full feature generator...
+Processing single asset: ETH/USD
+Loaded 189605 data points for ETH/USD
+Generating features:   0%|          | 0/11 [00:00<?, ?it/s]Generating features:   9%|▉         | 1/11 [00:00<00:01,  7.31it/s]Generating features:  18%|█▊        | 2/11 [00:00<00:01,  7.77it/s]Generating features:  27%|██▋       | 3/11 [00:00<00:01,  7.95it/s]Generating features:  36%|███▋      | 4/11 [00:00<00:00,  8.08it/s]Generating features:  45%|████▌     | 5/11 [00:00<00:00,  8.19it/s]Generating features:  55%|█████▍    | 6/11 [00:00<00:00,  8.29it/s]Generating features:  64%|██████▎   | 7/11 [00:00<00:00,  8.30it/s]Generating features:  73%|███████▎  | 8/11 [00:00<00:00,  8.24it/s]Generating features:  82%|████████▏ | 9/11 [00:01<00:00,  8.01it/s]Generating features:  91%|█████████ | 10/11 [00:01<00:00,  7.73it/s]Generating features: 100%|██████████| 11/11 [00:01<00:00,  8.20it/s]
+2025-07-13 17:28:42,006 - __main__ - INFO - Prepared data shapes - X: torch.Size([1000, 1, 200, 25]), adj: torch.Size([1, 1]), y_classes: torch.Size([1000, 1])
+2025-07-13 17:28:42,008 - __main__ - INFO - Split data shapes - X_train: torch.Size([800, 1, 200, 25]), y_train: torch.Size([800, 1]), X_val: torch.Size([200, 1, 200, 25]), y_val: torch.Size([200, 1])
+2025-07-13 17:28:42,008 - __main__ - INFO - Training data class distribution before SMOTE: {np.int64(0): np.int64(105), np.int64(1): np.int64(578), np.int64(2): np.int64(117)}
+2025-07-13 17:28:42,008 - __main__ - INFO - Applying SMOTE to training data for class balance...
+2025-07-13 17:28:42,174 - __main__ - INFO - Training data class distribution after SMOTE: {np.int64(0): np.int64(578), np.int64(1): np.int64(578), np.int64(2): np.int64(578)}
+2025-07-13 17:28:42,174 - __main__ - INFO - Balanced training data shapes - X_train_balanced: torch.Size([1734, 1, 200, 25]), y_train_balanced: torch.Size([1734, 1])
+2025-07-13 17:28:42,174 - __main__ - INFO - Created dataloaders - train_loader batches: 108, val_loader batches: 13
+2025-07-13 17:28:42,174 - __main__ - INFO - === Inspecting first train batch ===
+Creating sequences with lazy generation (max: 1000)...
+Creating 189391 sequences from 189605 data points
+Sampling 1000 sequences from 189391 possible sequences
+Created 1000 sequences with shapes X: (1000, 200, 25), y: (1000,)
+Memory usage: 450.6 MB
+Memory usage: 450.6 MB
+Single asset data prepared - X: torch.Size([1000, 1, 200, 25]), adj: torch.Size([1, 1]), y: torch.Size([1000, 1])
+Memory usage: 450.6 MB
+2025-07-13 17:28:46,069 - __main__ - INFO - Train batch shapes - X_train_batch: torch.Size([16, 1, 200, 25]), y_train_batch: torch.Size([16, 1])
+2025-07-13 17:28:46,073 - __main__ - INFO - Train batch validation passed - no NaNs or Infs
+2025-07-13 17:28:46,073 - __main__ - INFO - === Inspecting first val batch ===
+2025-07-13 17:28:50,383 - __main__ - INFO - Val batch shapes - X_val_batch: torch.Size([16, 1, 200, 25]), y_val_batch: torch.Size([16, 1])
+2025-07-13 17:28:50,390 - __main__ - INFO - Val batch validation passed - no NaNs or Infs
+2025-07-13 17:28:50,392 - __main__ - INFO - Class weights used in trainer: tensor([2.6042, 0.4572, 2.3310])
+2025-07-13 17:28:50,393 - __main__ - INFO - === END TEMPORARY DEBUG ===
+Starting full feature generator data preparation...
+Memory usage: 319.0 MB
+Using single asset processing with full feature generator...
+Processing single asset: ETH/USD
+Loaded 189605 data points for ETH/USD
+Generating features:   0%|          | 0/11 [00:00<?, ?it/s]Generating features:   9%|▉         | 1/11 [00:00<00:01,  7.21it/s]Generating features:  18%|█▊        | 2/11 [00:00<00:01,  7.75it/s]Generating features:  27%|██▋       | 3/11 [00:00<00:01,  7.90it/s]Generating features:  36%|███▋      | 4/11 [00:00<00:00,  7.84it/s]Generating features:  45%|████▌     | 5/11 [00:00<00:00,  7.97it/s]Generating features:  55%|█████▍    | 6/11 [00:00<00:00,  8.09it/s]Generating features:  64%|██████▎   | 7/11 [00:00<00:00,  8.12it/s]Generating features:  73%|███████▎  | 8/11 [00:01<00:00,  8.08it/s]Generating features:  82%|████████▏ | 9/11 [00:01<00:00,  7.82it/s]Generating features:  91%|█████████ | 10/11 [00:01<00:00,  7.62it/s]Generating features: 100%|██████████| 11/11 [00:01<00:00,  8.05it/s]
+2025-07-13 17:29:01,517 - __main__ - INFO - Applying SMOTE to training data for class balance...
+2025-07-13 17:29:01,517 - __main__ - INFO - Training data class distribution before SMOTE: {np.int64(0): np.int64(102), np.int64(1): np.int64(590), np.int64(2): np.int64(108)}
+2025-07-13 17:29:01,621 - __main__ - INFO - Training data class distribution after SMOTE: {np.int64(0): np.int64(590), np.int64(1): np.int64(590), np.int64(2): np.int64(590)}
+2025-07-13 17:29:01,622 - __main__ - INFO - Training data shapes after SMOTE - X: torch.Size([1770, 1, 200, 25]), y: torch.Size([1770, 1])
+Creating sequences with lazy generation (max: 1000)...
+Creating 189391 sequences from 189605 data points
+Sampling 1000 sequences from 189391 possible sequences
+Created 1000 sequences with shapes X: (1000, 200, 25), y: (1000,)
+Memory usage: 463.1 MB
+Memory usage: 459.3 MB
+Single asset data prepared - X: torch.Size([1000, 1, 200, 25]), adj: torch.Size([1, 1]), y: torch.Size([1000, 1])
+Memory usage: 451.7 MB
+Traceback (most recent call last):
+  File "/Users/elvisobondo/Documents/LootCapital-1/scripts/train_stgnn_improved.py", line 1058, in <module>
+    main() 
+    ^^^^^^
+  File "/Users/elvisobondo/Documents/LootCapital-1/scripts/train_stgnn_improved.py", line 984, in main
+    training_history = trainer.train()
+                       ^^^^^^^^^^^^^^^
+  File "/Users/elvisobondo/Documents/LootCapital-1/scripts/train_stgnn_improved.py", line 716, in train
+    train_loss, train_acc = self.train_epoch(train_loader)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/elvisobondo/Documents/LootCapital-1/scripts/train_stgnn_improved.py", line 543, in train_epoch
+    loss.backward()
+  File "/Users/elvisobondo/Documents/LootCapital-1/venv_new/lib/python3.12/site-packages/torch/_tensor.py", line 648, in backward
+    torch.autograd.backward(
+  File "/Users/elvisobondo/Documents/LootCapital-1/venv_new/lib/python3.12/site-packages/torch/autograd/__init__.py", line 353, in backward
+    _engine_run_backward(
+  File "/Users/elvisobondo/Documents/LootCapital-1/venv_new/lib/python3.12/site-packages/torch/autograd/graph.py", line 824, in _engine_run_backward
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt

@@ -1,39 +1,0 @@
-Loading ETH-USDT 15m data...
-Loaded data from 2020-01-01 05:00:00 to 2025-05-29 06:00:00
-Total number of 15-minute periods: 189605
-
-Initializing feature generator...
-Generating features...
-Generating features:   0%|          | 0/11 [00:00<?, ?it/s]Generating features:   9%|▉         | 1/11 [00:00<00:01,  5.26it/s]Generating features:  18%|█▊        | 2/11 [00:00<00:01,  6.45it/s]Generating features:  27%|██▋       | 3/11 [00:00<00:01,  6.68it/s]Generating features:  36%|███▋      | 4/11 [00:00<00:01,  6.75it/s]Generating features:  45%|████▌     | 5/11 [00:00<00:00,  6.80it/s]Generating features:  55%|█████▍    | 6/11 [00:00<00:00,  6.81it/s]Generating features:  64%|██████▎   | 7/11 [00:01<00:00,  6.89it/s]Generating features:  73%|███████▎  | 8/11 [00:01<00:00,  6.93it/s]Generating features:  82%|████████▏ | 9/11 [00:01<00:00,  6.83it/s]Generating features:  91%|█████████ | 10/11 [00:01<00:00,  6.53it/s]Generating features: 100%|██████████| 11/11 [00:01<00:00,  6.55it/s]Generating features: 100%|██████████| 11/11 [00:01<00:00,  6.64it/s]
-/Users/elvisobondo/Documents/LootCapital-1/scripts/test_transformer_strategy.py:53: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
-  features = features.fillna(method='ffill')
-/Users/elvisobondo/Documents/LootCapital-1/scripts/test_transformer_strategy.py:56: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
-  features = features.fillna(method='bfill')
-
-Available features:
-['returns', 'log_returns', 'rsi', 'atr', 'bb_upper', 'bb_middle', 'bb_lower', 'bb_width', 'volume', 'volume_ma', 'volume_std', 'volume_surge', 'volume_ratio', 'macd', 'macd_signal', 'macd_hist', 'ma_crossover', 'swing_rsi', 'vwap_ratio', 'price_momentum', 'volatility_regime', 'support', 'resistance', 'breakout_intensity', 'adx', 'cumulative_delta']
-
-Feature Quality Check:
-Total features: 26
-Missing values: 3282
-Features with missing values: ['returns', 'log_returns', 'rsi', 'atr', 'bb_upper', 'bb_middle', 'bb_lower', 'bb_width', 'volume_ma', 'volume_std', 'volume_surge', 'volume_ratio', 'ma_crossover', 'swing_rsi', 'price_momentum', 'volatility_regime', 'support', 'resistance', 'adx']
-Features with infinite values: []
-
-Cleaning features...
-
-Scaling features...
-
-Creating target variable (predicting 15 periods ahead)...
-
-Target Distribution Analysis:
-
-Total samples: 189605
-
-Initializing Transformer Strategy...
-
-Starting walk-forward analysis with 3 outer folds and 3 inner folds
-Total hyperparameter combinations to test: 64
-Total training sessions: 576
-Training Progress:   0%|          | 0/576 [00:00<?, ?it/s]
-Epoch Progress:   0%|          | 0/50 [00:00<?, ?it/s][A/Users/elvisobondo/Documents/LootCapital-1/venv_new/lib/python3.12/site-packages/torch/utils/data/dataloader.py:683: UserWarning: 'pin_memory' argument is set as true but not supported on MPS now, then device pinned memory won't be used.
-  warnings.warn(warn_msg)
