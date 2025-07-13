@@ -22,4 +22,5 @@ optuna>=3.0.0     # for hyperparameter optimization
 mlflow>=2.0.0     # for experiment tracking
 tqdm>=4.64.0      # for progress bars
 imbalanced-learn>=0.10.0  # for SMOTE and other imbalanced learning methods
+imblearn>=0.10.0  # explicit import for SMOTE compatibility
 dataclasses       # for dataclass support (though built-in in Python 3.7+)

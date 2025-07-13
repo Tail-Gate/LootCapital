@@ -31,18 +31,18 @@ module load cuda
 
 # --- Step 3: Activate your personal Conda environment ---
 source ~/.bashrc
-conda activate stgnn_gpu_env
+conda activate stgnn_train
 
 # Check if conda activation was successful
 if [ $? -ne 0 ]; then
-    echo "ERROR: Conda environment 'stgnn_gpu_env' activation failed! Please check your Conda setup."
+    echo "ERROR: Conda environment 'stgnn_train' activation failed! Please check your Conda setup."
     exit 1
 fi
 
 echo "--- Environment Check within SLURM job (after Conda activation) ---"
 echo "Current directory: $(pwd)"
 echo "Which Python: $(which python)"
-echo "Conda environment list (should show 'stgnn_gpu_env' as active):"
+echo "Conda environment list (should show 'stgnn_train' as active):"
 conda env list
 echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
 echo "PATH: $PATH"
