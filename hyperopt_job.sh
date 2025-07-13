@@ -101,6 +101,6 @@ echo "  - Using all 32 cores for parallel processing"
 echo "  - Using 2 GPUs"
 echo "  - Using 120GB memory (maximum available)"
 
-python utils/train_stgnn_improved.py
+python scripts/train_stgnn_improved.py
 
 echo "JOB FINISHED AT: $(date)" 
