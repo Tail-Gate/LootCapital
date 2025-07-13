@@ -882,18 +882,31 @@ def main():
         logger.info("Feature scaling enabled")
         
         # Create trainer with Focal Loss parameters from config
+        # Use 3 months of data from the specified time period
+        start_time = datetime(2020, 1, 1)
+        end_time = datetime(2025, 5, 29)
+        
+        # Calculate 3 months from the start
+        three_months_later = start_time + timedelta(days=90)
+        training_end_time = min(three_months_later, end_time)
+        
+        logger.info(f"Using 3 months of data from {start_time.strftime('%Y-%m-%d')} to {training_end_time.strftime('%Y-%m-%d')}")
+        logger.info(f"Total training period: {(training_end_time - start_time).days} days")
+        
         trainer = ClassificationSTGNNTrainer(
             config, 
             data_processor, 
             price_threshold=0.018,
             focal_alpha=config.focal_alpha,
-            focal_gamma=config.focal_gamma
+            focal_gamma=config.focal_gamma,
+            start_time=start_time,
+            end_time=training_end_time
         )
         
         # TEMPORARY DEBUG: Prepare classification data and inspect batches
         logger.info("=== TEMPORARY DEBUG: Inspecting data batches ===")
         
-        # Prepare classification data
+        # Prepare classification data with time constraints
         X, adj, y_classes = trainer.prepare_classification_data()
         logger.info(f"Prepared data shapes - X: {X.shape}, adj: {adj.shape}, y_classes: {y_classes.shape}")
         
