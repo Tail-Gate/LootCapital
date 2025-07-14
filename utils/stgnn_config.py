@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Any, Optional
 import json
 import os
+import torch  # Add torch import for device check
 
 @dataclass
 class STGNNConfig:
@@ -65,6 +66,8 @@ class STGNNConfig:
     
     # Price threshold for classification (fixed for 0.5% movements)
     price_threshold: float = 0.005  # 0.5% threshold
+    # Device attribute with dynamic default
+    device: str = ("cuda" if torch.cuda.is_available() else "cpu")
     
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> 'STGNNConfig':

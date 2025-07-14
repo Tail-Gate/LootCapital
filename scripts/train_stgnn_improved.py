@@ -366,9 +366,8 @@ class ClassificationSTGNNTrainer:
         self.start_time = start_time
         self.end_time = end_time
         
-        # Always use CPU device
-        self.device = torch.device('cpu')
-        logger.info("Using CPU device for training")
+        # Use device from config or argument
+        self.device = torch.device(device if device is not None else getattr(config, 'device', 'cpu'))
         
         # Initialize model
         num_nodes = len(config.assets)
@@ -381,10 +380,9 @@ class ClassificationSTGNNTrainer:
             num_layers=config.num_layers,
             dropout=config.dropout,
             kernel_size=config.kernel_size
-        ).to(self.device)
-        
-        # Log device and model info
-        logger.info("CPU training mode - using all available cores for parallel processing")
+        )
+        self.model.to(self.device)
+        logger.info(f"Model device: {self.model.device}")
         
         # Initialize optimizer
         self.optimizer = torch.optim.Adam(
