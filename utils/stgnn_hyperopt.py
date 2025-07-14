@@ -732,7 +732,7 @@ def objective(trial: optuna.Trial) -> float:
         # Additional cleanup for HPC environment
         del trainer, data_processor, config
         if 'X_val' in locals():
-            del X_val, y_val, y_val_classes # Removed adj_val
+            del X_val, y_val # Removed y_val_classes
         if 'evaluation_results' in locals():
             del evaluation_results, probabilities, true_labels
         if 'f1_scores' in locals():
