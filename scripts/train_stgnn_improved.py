@@ -927,8 +927,8 @@ def create_improved_config():
         kernel_size=3,
         learning_rate=0.0005,  # Reduced for stability with more features
         batch_size=16,  # Reduced for memory management
-        num_epochs=100,
-        early_stopping_patience=10,
+        num_epochs=3,  # Reduced for quick testing
+        early_stopping_patience=2,  # Reduced for quick testing
         seq_len=200,
         prediction_horizon=15,  
         features=features,
