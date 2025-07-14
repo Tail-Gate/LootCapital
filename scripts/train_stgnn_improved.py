@@ -482,17 +482,8 @@ class ClassificationSTGNNTrainer:
         total_loss = 0
         correct = 0
         total = 0
-        
-        logger.info(f"Starting training epoch with {len(train_loader)} batches")
-        batch_count = 0
 
         for X_batch, y_batch in train_loader:
-            batch_count += 1
-            logger.info(f"Processing batch {batch_count}/{len(train_loader)} at {datetime.now().strftime('%H:%M:%S')}")
-            
-            # Log batch info
-            logger.info(f"  Batch {batch_count} shapes - X: {X_batch.shape}, y: {y_batch.shape}")
-            logger.info(f"  Batch {batch_count} memory usage: {X_batch.element_size() * X_batch.nelement() / 1024 / 1024:.2f} MB")
             # Move data to device
             X_batch = X_batch.to(self.device, non_blocking=False)
             y_batch = y_batch.to(self.device, non_blocking=False)
@@ -520,10 +511,8 @@ class ClassificationSTGNNTrainer:
                 return float('inf')  # Fail fast if adj is still None
 
             # Forward pass
-            logger.info(f"  Batch {batch_count}: Starting forward pass at {datetime.now().strftime('%H:%M:%S')}")
             self.optimizer.zero_grad()
             logits, _ = self.model(X_batch, self.adj)
-            logger.info(f"  Batch {batch_count}: Forward pass completed at {datetime.now().strftime('%H:%M:%S')}")
             
             # CRITICAL FIX: Add detailed logging for logits after forward pass
             if torch.isnan(logits).any() or torch.isinf(logits).any():
@@ -551,16 +540,12 @@ class ClassificationSTGNNTrainer:
                 continue
 
             # Backward pass
-            logger.info(f"  Batch {batch_count}: Starting backward pass at {datetime.now().strftime('%H:%M:%S')}")
             loss.backward()
-            logger.info(f"  Batch {batch_count}: Backward pass completed at {datetime.now().strftime('%H:%M:%S')}")
             
             # CRITICAL FIX: Gradient clipping for numerical stability
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
-            logger.info(f"  Batch {batch_count}: Gradient clipping completed at {datetime.now().strftime('%H:%M:%S')}")
             
             self.optimizer.step()
-            logger.info(f"  Batch {batch_count}: Optimizer step completed at {datetime.now().strftime('%H:%M:%S')}")
 
             total_loss += loss.item()
 
@@ -568,9 +553,6 @@ class ClassificationSTGNNTrainer:
             _, predicted = torch.max(logits, 1)
             total += y_batch.size(0)
             correct += (predicted == y_batch).sum().item()
-            
-            logger.info(f"  Batch {batch_count}: Loss = {loss.item():.6f}, Accuracy = {(predicted == y_batch).sum().item()}/{y_batch.size(0)} = {((predicted == y_batch).sum().item()/y_batch.size(0)*100):.2f}%")
-            logger.info(f"  Batch {batch_count}: Completed at {datetime.now().strftime('%H:%M:%S')}")
 
         # DEBUG: Check for division by zero issues in train_epoch
         if len(train_loader) == 0:
@@ -583,24 +565,17 @@ class ClassificationSTGNNTrainer:
             # For training, we can't proceed with zero samples
             raise ZeroDivisionError("No samples processed in training, preventing accuracy calculation.")
 
-        epoch_loss = total_loss / len(train_loader)
-        epoch_acc = correct / total
-        logger.info(f"Epoch completed at {datetime.now().strftime('%H:%M:%S')} - Total Loss: {epoch_loss:.6f}, Total Accuracy: {epoch_acc:.4f}")
-        return epoch_loss, epoch_acc
+        return total_loss / len(train_loader), correct / total
     
     def validate(self, val_loader):
         """Validate model with comprehensive anomaly detection"""
-        logger.info(f"Starting validation with {len(val_loader)} batches")
         self.model.eval()
         total_loss = 0
         correct = 0
         total = 0
-        val_batch_count = 0
 
         with torch.no_grad():
             for X_batch, y_batch in val_loader:
-                val_batch_count += 1
-                logger.info(f"  Validation batch {val_batch_count}/{len(val_loader)} at {datetime.now().strftime('%H:%M:%S')}")
                 # Move data to device
                 X_batch = X_batch.to(self.device, non_blocking=False)
                 y_batch = y_batch.to(self.device, non_blocking=False)
@@ -628,9 +603,7 @@ class ClassificationSTGNNTrainer:
                     return float('inf')
 
                 # Forward pass
-                logger.info(f"    Validation batch {val_batch_count}: Starting forward pass at {datetime.now().strftime('%H:%M:%S')}")
                 logits, _ = self.model(X_batch, self.adj)
-                logger.info(f"    Validation batch {val_batch_count}: Forward pass completed at {datetime.now().strftime('%H:%M:%S')}")
                 
                 # CRITICAL FIX: Add detailed logging for logits after forward pass
                 if torch.isnan(logits).any() or torch.isinf(logits).any():
@@ -663,9 +636,6 @@ class ClassificationSTGNNTrainer:
                 _, predicted = torch.max(logits, 1)
                 total += y_batch.size(0)
                 correct += (predicted == y_batch).sum().item()
-                
-                logger.info(f"    Validation batch {val_batch_count}: Loss = {loss.item():.6f}, Accuracy = {(predicted == y_batch).sum().item()}/{y_batch.size(0)} = {((predicted == y_batch).sum().item()/y_batch.size(0)*100):.2f}%")
-                logger.info(f"    Validation batch {val_batch_count}: Completed at {datetime.now().strftime('%H:%M:%S')}")
 
         # DEBUG: Check for division by zero issues in validate
         if len(val_loader) == 0:
@@ -678,22 +648,13 @@ class ClassificationSTGNNTrainer:
             # For validation, we can't proceed with zero samples
             raise ZeroDivisionError("No samples processed in validation, preventing accuracy calculation.")
 
-        val_loss = total_loss / len(val_loader)
-        val_acc = correct / total
-        logger.info(f"Validation completed at {datetime.now().strftime('%H:%M:%S')} - Total Loss: {val_loss:.6f}, Total Accuracy: {val_acc:.4f}")
-        return val_loss, val_acc
+        return total_loss / len(val_loader), correct / total
     
     def train(self):
         """Train model with early stopping and SMOTE for class balance"""
-        logger.info(f"Starting training process at {datetime.now().strftime('%H:%M:%S')}")
-        
         # Prepare data
-        logger.info("Preparing classification data...")
         X, adj, y_classes = self.prepare_classification_data()
-        logger.info(f"Data preparation completed at {datetime.now().strftime('%H:%M:%S')}")
-        
         X_train, y_train, X_val, y_val = self.data_processor.split_data(X, y_classes)
-        logger.info(f"Data splitting completed at {datetime.now().strftime('%H:%M:%S')}")
         
         # Apply SMOTE to training data only
         logger.info("Applying SMOTE to training data for class balance...")
@@ -750,39 +711,13 @@ class ClassificationSTGNNTrainer:
         # Training loop
         patience_counter = 0
         
-        logger.info(f"Starting training loop with {self.config.num_epochs} epochs at {datetime.now().strftime('%H:%M:%S')}")
-        logger.info(f"Model device: {self.device}")
-        logger.info(f"Model parameters: {sum(p.numel() for p in self.model.parameters())} total parameters")
-        logger.info(f"Optimizer: {type(self.optimizer).__name__}")
-        logger.info(f"Loss function: {type(self.criterion).__name__}")
-        
-        # Test model forward pass
-        logger.info("Testing model forward pass...")
-        try:
-            test_batch = next(iter(train_loader))
-            test_X, test_y = test_batch
-            logger.info(f"Test batch shapes - X: {test_X.shape}, y: {test_y.shape}")
-            
-            with torch.no_grad():
-                test_logits, _ = self.model(test_X, self.adj)
-                logger.info(f"Test forward pass successful - logits shape: {test_logits.shape}")
-                logger.info(f"Test forward pass completed at {datetime.now().strftime('%H:%M:%S')}")
-        except Exception as e:
-            logger.error(f"Test forward pass failed: {e}")
-            raise
-        
         for epoch in range(self.config.num_epochs):
-            epoch_start_time = datetime.now()
-            logger.info(f"=== EPOCH {epoch + 1}/{self.config.num_epochs} STARTING at {epoch_start_time.strftime('%H:%M:%S')} ===")
-            
             # Train epoch
-            logger.info(f"Starting training epoch {epoch + 1}...")
             train_loss, train_acc = self.train_epoch(train_loader)
             self.train_losses.append(train_loss)
             self.train_accuracies.append(train_acc)
             
             # Validate
-            logger.info(f"Starting validation for epoch {epoch + 1}...")
             val_loss, val_acc = self.validate(val_loader)
             self.val_losses.append(val_loss)
             self.val_accuracies.append(val_acc)
@@ -792,39 +727,21 @@ class ClassificationSTGNNTrainer:
                 self.best_val_loss = val_loss
                 self.best_model_state = self.model.state_dict().copy()
                 patience_counter = 0
-                logger.info(f"New best validation loss: {val_loss:.6f} at epoch {epoch + 1}")
             else:
                 patience_counter += 1
-                logger.info(f"Validation loss did not improve. Patience: {patience_counter}/{self.config.early_stopping_patience}")
                 
             if patience_counter >= self.config.early_stopping_patience:
                 logger.info(f'Early stopping at epoch {epoch + 1}')
                 break
                 
-            epoch_end_time = datetime.now()
-            epoch_duration = epoch_end_time - epoch_start_time
-            logger.info(f"=== EPOCH {epoch + 1} COMPLETED at {epoch_end_time.strftime('%H:%M:%S')} (Duration: {epoch_duration}) ===")
-            logger.info(f'Epoch {epoch + 1}/{self.config.num_epochs} Results:')
-            logger.info(f'  Train Loss: {train_loss:.6f}, Train Acc: {train_acc:.4f}')
-            logger.info(f'  Val Loss: {val_loss:.6f}, Val Acc: {val_acc:.4f}')
-            logger.info(f'  Best Val Loss: {self.best_val_loss:.6f}')
-            logger.info(f'  Patience Counter: {patience_counter}')
-            logger.info("")
+            if (epoch + 1) % 10 == 0:
+                logger.info(f'Epoch {epoch + 1}/{self.config.num_epochs}:')
+                logger.info(f'Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}')
+                logger.info(f'Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}')
                 
         # Load best model
         if self.best_model_state is not None:
             self.model.load_state_dict(self.best_model_state)
-            logger.info("Best model loaded successfully")
-            
-        logger.info(f"Training completed at {datetime.now().strftime('%H:%M:%S')}")
-        logger.info(f"Total epochs completed: {len(self.train_losses)}")
-        logger.info(f"Final best validation loss: {self.best_val_loss:.6f}")
-        
-        logger.info("=== TRAINING RESULTS SUMMARY ===")
-        logger.info(f"Final training loss: {self.train_losses[-1] if self.train_losses else 'N/A'}")
-        logger.info(f"Final training accuracy: {self.train_accuracies[-1] if self.train_accuracies else 'N/A'}")
-        logger.info(f"Final validation loss: {self.val_losses[-1] if self.val_losses else 'N/A'}")
-        logger.info(f"Final validation accuracy: {self.val_accuracies[-1] if self.val_accuracies else 'N/A'}")
             
         return {
             'train_losses': self.train_losses,
@@ -927,8 +844,8 @@ def create_improved_config():
         kernel_size=3,
         learning_rate=0.0005,  # Reduced for stability with more features
         batch_size=16,  # Reduced for memory management
-        num_epochs=3,  # Reduced for quick testing
-        early_stopping_patience=2,  # Reduced for quick testing
+        num_epochs=3,
+        early_stopping_patience=10,
         seq_len=200,
         prediction_horizon=15,  
         features=features,
@@ -964,120 +881,20 @@ def main():
         data_processor.set_scaler('minmax')  # or 'standard' for StandardScaler
         logger.info("Feature scaling enabled")
         
-        # Create trainer with Focal Loss parameters from config
-        # Use 1 month of data from the specified time period
-        start_time = datetime(2020, 1, 1)
-        end_time = datetime(2025, 5, 29)
+        # Use a fixed 1-month window: January 1, 2020 to January 31, 2020
+        start_time = pd.Timestamp('2020-01-01')
+        end_time = pd.Timestamp('2020-01-31')
         
-        # Calculate 1 month from the start
-        one_month_later = start_time + timedelta(days=30)
-        training_end_time = min(one_month_later, end_time)
-        
-        logger.info(f"Using 1 month of data from {start_time.strftime('%Y-%m-%d')} to {training_end_time.strftime('%Y-%m-%d')}")
-        logger.info(f"Total training period: {(training_end_time - start_time).days} days")
-        
+        # Create trainer with Focal Loss parameters from config and fixed time window
         trainer = ClassificationSTGNNTrainer(
             config, 
             data_processor, 
-            price_threshold=0.018,
+            price_threshold=config.price_threshold if hasattr(config, 'price_threshold') else 0.018,
             focal_alpha=config.focal_alpha,
             focal_gamma=config.focal_gamma,
             start_time=start_time,
-            end_time=training_end_time
+            end_time=end_time
         )
-        
-        # TEMPORARY DEBUG: Prepare classification data and inspect batches
-        logger.info("=== TEMPORARY DEBUG: Inspecting data batches ===")
-        
-        # Prepare classification data with time constraints
-        X, adj, y_classes = trainer.prepare_classification_data()
-        logger.info(f"Prepared data shapes - X: {X.shape}, adj: {adj.shape}, y_classes: {y_classes.shape}")
-        
-        # Split data
-        X_train, y_train, X_val, y_val = data_processor.split_data(X, y_classes)
-        logger.info(f"Split data shapes - X_train: {X_train.shape}, y_train: {y_train.shape}, X_val: {X_val.shape}, y_val: {y_val.shape}")
-        
-        # Log class distribution before SMOTE
-        y_train_flat = y_train.reshape(-1)
-        unique_before, counts_before = np.unique(y_train_flat.numpy(), return_counts=True)
-        class_dist_before = dict(zip(unique_before, counts_before))
-        logger.info(f"Training data class distribution before SMOTE: {class_dist_before}")
-        
-        # Apply SMOTE to training data only
-        logger.info("Applying SMOTE to training data for class balance...")
-        
-        # Get original shapes
-        batch_size_train, num_nodes, seq_len, input_dim = X_train.shape
-        
-        # Apply SMOTE at the node level (batch_size * num_nodes level)
-        X_train_node_level = X_train.reshape(batch_size_train * num_nodes, seq_len * input_dim)
-        y_train_node_level = y_train.reshape(-1)
-        
-        # Apply SMOTE
-        smote = SMOTE(random_state=42, k_neighbors=min(5, min(class_dist_before.values()) - 1))
-        X_train_balanced_node, y_train_balanced_node = smote.fit_resample(X_train_node_level.numpy(), y_train_node_level.numpy())
-        
-        # Log class distribution after SMOTE
-        unique_after, counts_after = np.unique(y_train_balanced_node, return_counts=True)
-        class_dist_after = dict(zip(unique_after, counts_after))
-        logger.info(f"Training data class distribution after SMOTE: {class_dist_after}")
-        
-        # Reshape back to original format
-        new_batch_size = len(y_train_balanced_node) // num_nodes
-        if len(y_train_balanced_node) % num_nodes != 0:
-            padding_needed = num_nodes - (len(y_train_balanced_node) % num_nodes)
-            X_train_balanced_node = np.vstack([X_train_balanced_node, X_train_balanced_node[:padding_needed]])
-            y_train_balanced_node = np.hstack([y_train_balanced_node, y_train_balanced_node[:padding_needed]])
-            new_batch_size = len(y_train_balanced_node) // num_nodes
-        
-        X_train_balanced = X_train_balanced_node.reshape(new_batch_size, num_nodes, seq_len, input_dim)
-        y_train_balanced = y_train_balanced_node.reshape(new_batch_size, num_nodes)
-        
-        # Convert back to tensors
-        X_train_balanced = torch.FloatTensor(X_train_balanced)
-        y_train_balanced = torch.LongTensor(y_train_balanced)
-        
-        logger.info(f"Balanced training data shapes - X_train_balanced: {X_train_balanced.shape}, y_train_balanced: {y_train_balanced.shape}")
-        
-        # Create dataloaders
-        logger.info(f"Creating dataloaders at {datetime.now().strftime('%H:%M:%S')}")
-        train_loader = data_processor.create_dataloader(X_train_balanced, y_train_balanced, drop_last=True)
-        logger.info(f"Train loader created with {len(train_loader)} batches at {datetime.now().strftime('%H:%M:%S')}")
-        val_loader = data_processor.create_dataloader(X_val, y_val, drop_last=False)
-        logger.info(f"Val loader created with {len(val_loader)} batches at {datetime.now().strftime('%H:%M:%S')}")
-        
-        logger.info(f"Created dataloaders - train_loader batches: {len(train_loader)}, val_loader batches: {len(val_loader)}")
-        
-        # Get first batch from train_loader
-        logger.info("=== Inspecting first train batch ===")
-        train_iter = iter(train_loader)
-        X_train_batch, y_train_batch = next(train_iter)
-        logger.info(f"Train batch shapes - X_train_batch: {X_train_batch.shape}, y_train_batch: {y_train_batch.shape}")
-        
-        # Check for NaNs and Infs in train batch
-        assert not torch.isnan(X_train_batch).any(), "NaN detected in X_train_batch"
-        assert not torch.isinf(X_train_batch).any(), "Inf detected in X_train_batch"
-        assert not torch.isnan(y_train_batch).any(), "NaN detected in y_train_batch"
-        assert not torch.isinf(y_train_batch).any(), "Inf detected in y_train_batch"
-        logger.info("Train batch validation passed - no NaNs or Infs")
-        
-        # Get first batch from val_loader
-        logger.info("=== Inspecting first val batch ===")
-        val_iter = iter(val_loader)
-        X_val_batch, y_val_batch = next(val_iter)
-        logger.info(f"Val batch shapes - X_val_batch: {X_val_batch.shape}, y_val_batch: {y_val_batch.shape}")
-        
-        # Check for NaNs and Infs in val batch
-        assert not torch.isnan(X_val_batch).any(), "NaN detected in X_val_batch"
-        assert not torch.isinf(X_val_batch).any(), "Inf detected in X_val_batch"
-        assert not torch.isnan(y_val_batch).any(), "NaN detected in y_val_batch"
-        assert not torch.isinf(y_val_batch).any(), "Inf detected in y_val_batch"
-        logger.info("Val batch validation passed - no NaNs or Infs")
-        
-        # Log class weights
-        logger.info(f"Class weights used in trainer: {trainer.criterion.class_weights}")
-        
-        logger.info("=== END TEMPORARY DEBUG ===")
         
         # Train model
         training_history = trainer.train()
@@ -1123,7 +940,7 @@ def main():
         print(evaluation_results['classification_report'])
         
         # Save results
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = 'fixedwindow'  # Use a fixed string since datetime.now is not allowed
         
         # Save model
         model_path = f'models/stgnn_classification_horizon15_{timestamp}.pt'

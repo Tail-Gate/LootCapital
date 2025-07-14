@@ -85,7 +85,7 @@ export OPENBLAS_NUM_THREADS=32
 
 
 # --- Step 7: Run your Python script with memory monitoring ---
-echo "Starting memory-optimized train_stgnn_improved script..."
+echo "Starting memory-optimized stgnn_hyperopt script..."
 echo "Memory optimization settings:"
 echo "  PYTORCH_CUDA_ALLOC_CONF: $PYTORCH_CUDA_ALLOC_CONF"
 echo "  CUDA_LAUNCH_BLOCKING: $CUDA_LAUNCH_BLOCKING"
@@ -94,13 +94,13 @@ echo "  MKL_NUM_THREADS: $MKL_NUM_THREADS"
 echo "  NUMEXPR_NUM_THREADS: $NUMEXPR_NUM_THREADS"
 echo "  OPENBLAS_NUM_THREADS: $OPENBLAS_NUM_THREADS"
 echo ""
-echo "Starting memory-optimized train_stgnn_improved script..."
+echo "Starting memory-optimized stgnn_hyperopt script..."
 echo "Resource utilization strategy:"
 echo "  - Using GPU training for maximum speed"
 echo "  - Using all 32 cores for parallel processing"
 echo "  - Using 2 GPUs"
 echo "  - Using 120GB memory (maximum available)"
 
-python scripts/train_stgnn_improved.py
+python utils/stgnn_hyperopt.py
 
 echo "JOB FINISHED AT: $(date)" 
