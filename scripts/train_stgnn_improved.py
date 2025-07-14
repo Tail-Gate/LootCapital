@@ -483,8 +483,8 @@ class ClassificationSTGNNTrainer:
 
         for X_batch, y_batch in train_loader:
             # Move data to device
-            X_batch = X_batch.to(self.device, non_blocking=False)
-            y_batch = y_batch.to(self.device, non_blocking=False)
+            X_batch = X_batch.to(self.device)
+            y_batch = y_batch.to(self.device)
             
             # CRITICAL FIX: Inspect input features directly
             if torch.isnan(X_batch).any() or torch.isinf(X_batch).any():
@@ -575,8 +575,8 @@ class ClassificationSTGNNTrainer:
         with torch.no_grad():
             for X_batch, y_batch in val_loader:
                 # Move data to device
-                X_batch = X_batch.to(self.device, non_blocking=False)
-                y_batch = y_batch.to(self.device, non_blocking=False)
+                X_batch = X_batch.to(self.device)
+                y_batch = y_batch.to(self.device)
                 
                 # CRITICAL FIX: Inspect input features directly
                 if torch.isnan(X_batch).any() or torch.isinf(X_batch).any():
