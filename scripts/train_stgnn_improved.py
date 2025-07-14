@@ -382,7 +382,7 @@ class ClassificationSTGNNTrainer:
             kernel_size=config.kernel_size
         )
         self.model.to(self.device)
-        logger.info(f"Model device: {self.model.device}")
+        logger.info(f"Model device: {next(self.model.parameters()).device}")
         
         # Initialize optimizer
         self.optimizer = torch.optim.Adam(
