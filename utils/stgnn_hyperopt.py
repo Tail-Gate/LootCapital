@@ -28,6 +28,17 @@ from utils.stgnn_data import STGNNDataProcessor
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)  # Set logger to debug for more verbosity
+
+# Add a stream handler for print-like output
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+if not logger.hasHandlers():
+    logger.addHandler(console_handler)
+else:
+    logger.handlers[0] = console_handler
 
 def get_device():
     """Get CPU device for training."""
@@ -112,19 +123,15 @@ def create_classification_data_processor(config: STGNNConfig, start_time=None, e
     return data_processor
 
 def objective(trial: optuna.Trial) -> float:
-    """
-    Ultra-minimal memory-optimized objective function for hyperparameter optimization
-    
-    Args:
-        trial: Optuna trial object
-        
-    Returns:
-        Validation loss (weighted focal loss or combined metric)
-    """
+    print("\n==================== NEW TRIAL ====================")
+    print(f"Trial number: {trial.number}")
+    logger.info(f"Starting new Optuna trial: {trial.number}")
     # Force memory cleanup at start of trial
     manage_memory()
     
     try:
+        print("[OBJECTIVE] Defining hyperparameter search space...")
+        logger.debug(f"Trial params: {trial.params}")
         # Define ULTRA-MINIMAL hyperparameter search space to prevent OOM
         config_dict = {
             'assets': ['ETH/USD'],  # Focus on single asset for optimization
@@ -174,6 +181,8 @@ def objective(trial: optuna.Trial) -> float:
             'price_momentum_lookback': 3,  # Fixed minimal value
         }
         
+        print(f"[OBJECTIVE] Config: {config_dict}")
+        logger.debug(f"Config: {config_dict}")
         # Create STGNNConfig with ULTRA-MINIMAL parameters
         config = STGNNConfig(
             num_nodes=len(config_dict['assets']),
@@ -206,6 +215,7 @@ def objective(trial: optuna.Trial) -> float:
             price_threshold=config_dict['price_threshold']
         )
         
+        print("[OBJECTIVE] Determining data range...")
         # Dynamically determine the full data range (5 years)
         data_file_path = 'data/historical/ETH-USDT-SWAP_ohlcv_15m.csv'
         try:
@@ -219,22 +229,23 @@ def objective(trial: optuna.Trial) -> float:
             end_time = latest_date
             start_time = earliest_date
             
-            logger.info(f"Data file date range: {earliest_date} to {latest_date}")
-            logger.info(f"Using full 5-year data range: {start_time} to {end_time}")
-            logger.info(f"Total data span: {(end_time - start_time).days} days")
+            print(f"[OBJECTIVE] Data file date range: {earliest_date} to {latest_date}")
+            print(f"[OBJECTIVE] Using full 5-year data range: {start_time} to {end_time}")
+            print(f"[OBJECTIVE] Total data span: {(end_time - start_time).days} days")
             
         except Exception as e:
             logger.warning(f"Could not read data file to determine date range: {e}")
             # Fallback to a known good date range
             end_time = datetime(2025, 3, 15, 12, 0, 0)
             start_time = end_time - timedelta(days=1)
-            logger.info(f"Using fallback date range: {start_time} to {end_time}")
+            print(f"[OBJECTIVE] Using fallback date range: {start_time} to {end_time}")
         
         # Create data processor with memory-efficient approach
         data_processor = create_classification_data_processor(config)
         
         # Get device for training
         device = get_device()
+        print(f"[OBJECTIVE] Using device: {device}")
         logger.info(f"Using device: {device}")
         
         # Create trainer with ultra-minimal parameters
@@ -250,6 +261,9 @@ def objective(trial: optuna.Trial) -> float:
             device=device  # Pass device to trainer
         )
         
+        print(f"[OBJECTIVE] Trainer created. Model device: {device}")
+        logger.debug(f"Trainer created. Model device: {device}")
+
         # Validate trainer creation
         if trainer is None:
             logger.error("Trainer creation failed")
@@ -278,14 +292,17 @@ def objective(trial: optuna.Trial) -> float:
         
         # DISABLE SMOTE for hyperparameter optimization to prevent memory explosion
         # Override the train method to skip SMOTE processing
+        print("[OBJECTIVE] Overriding train method to skip SMOTE...")
         original_train = trainer.train
         
         def train_without_smote():
-            """Train without SMOTE to save memory during hyperparameter optimization"""
-            logger.info("Using memory-efficient data loading for hyperparameter optimization")
-
+            print("[TRAIN] Starting training WITHOUT SMOTE...")
+            logger.info("[TRAIN] Starting training WITHOUT SMOTE...")
             # Load data in chunks using the data processor's memory-efficient methods
             X, adj, y_orig_returns = data_processor.prepare_data(start_time, end_time)  # Let's rename y to y_orig_returns for clarity
+
+            print(f"[TRAIN] Data loaded. X shape: {X.shape}, adj shape: {adj.shape}, y shape: {y_orig_returns.shape}")
+            logger.debug(f"[TRAIN] Data loaded. X: {X.shape}, adj: {adj.shape}, y: {y_orig_returns.shape}")
 
             # CRITICAL FIX: Validate data shapes and content
             if X is None or adj is None or y_orig_returns is None:
@@ -318,7 +335,8 @@ def objective(trial: optuna.Trial) -> float:
                 logger.error(f"Inf count: {torch.isinf(adj).sum().item()}")
                 return float('inf')
             
-            logger.info(f"Data validation passed - X shape: {X.shape}, y shape: {y_orig_returns.shape}")
+            print(f"[TRAIN] Data validation passed - X shape: {X.shape}, y shape: {y_orig_returns.shape}")
+            logger.debug(f"Data validation passed - X: {X.shape}, y: {y_orig_returns.shape}")
 
             # Convert to classification targets using optimized price threshold
             y_flat = y_orig_returns.flatten().cpu().numpy()
@@ -327,10 +345,14 @@ def objective(trial: optuna.Trial) -> float:
             classes[y_flat < -config_dict['price_threshold']] = 0  # Down
 
             y_classes = torch.LongTensor(classes.reshape(y_orig_returns.shape))
-            logger.info(f"Classification targets y_classes prepared on CPU: {y_classes.shape}")
+            print(f"[TRAIN] Classification targets y_classes prepared: {y_classes.shape}")
+            logger.debug(f"Classification targets y_classes prepared: {y_classes.shape}")
 
             # Split data. X_train, y_train, X_val, y_val should remain on CPU here.
             X_train, y_train, X_val, y_val = data_processor.split_data(X.cpu(), y_classes.cpu())
+
+            print(f"[TRAIN] Splitting data: X_train {X_train.shape}, X_val {X_val.shape}")
+            logger.debug(f"Splitting data: X_train: {X_train.shape}, X_val: {X_val.shape}")
 
             if len(X_val) == 0:
                 logger.error(f"Validation set is empty! X_val shape: {X_val.shape}, total X samples: {len(X)}")
@@ -341,16 +363,20 @@ def objective(trial: optuna.Trial) -> float:
             
             # Log data statistics for debugging
             logger.info(f"Data statistics - X: {X.shape}, X_train: {X_train.shape}, X_val: {X_val.shape}")
+            print(f"[TRAIN] Data statistics - X: {X.shape}, X_train: {X_train.shape}, X_val: {X_val.shape}")
+            logger.debug(f"Data statistics - X: {X.shape}, X_train: {X_train.shape}, X_val: {X_val.shape}")
             logger.info(f"Batch size: {config.batch_size}, Train samples: {len(X_train)}, Val samples: {len(X_val)}")
+            print(f"[TRAIN] Batch size: {config.batch_size}, Train samples: {len(X_train)}, Val samples: {len(X_val)}")
 
             # !!! Crucial Fix: Update trainer.adj attribute !!!
             # The 'adj' here is the local variable from data_processor.prepare_data()
             # It must be moved to the correct device and assigned to the trainer's attribute.
             trainer.adj = adj.to(device)
             logger.info(f"Adjacency matrix moved to device: {trainer.adj.device}")
+            print(f"[TRAIN] Adjacency matrix moved to device: {trainer.adj.device}")
 
             # Calculate class weights using the prepared data to ensure consistency
-            logger.info("Calculating class weights using prepared data...")
+            print(f"[TRAIN] Calculating class weights...")
             class_weights = calculate_weighted_class_weights(y_orig_returns)
             class_weights = class_weights.to(device)
             
@@ -361,8 +387,10 @@ def objective(trial: optuna.Trial) -> float:
                 gamma=config_dict['focal_gamma']
             )
             logger.info(f"Updated criterion with class weights: {class_weights}")
+            print(f"[TRAIN] Updated criterion with class weights: {class_weights}")
 
             # Skipping SMOTE for memory efficiency during hyperparameter optimization
+            print("[TRAIN] Skipping SMOTE for memory efficiency during hyperparameter optimization")
             logger.info("Skipping SMOTE for memory efficiency during hyperparameter optimization")
 
             # CRITICAL FIX: Validate data before creating DataLoaders
@@ -388,6 +416,9 @@ def objective(trial: optuna.Trial) -> float:
             train_loader = data_processor.create_dataloader(X_train, y_train, drop_last=True)
             val_loader = data_processor.create_dataloader(X_val, y_val, drop_last=False)
 
+            print(f"[TRAIN] Creating DataLoaders...")
+            logger.debug(f"Creating DataLoaders: X_train: {X_train.shape}, y_train: {y_train.shape}, X_val: {X_val.shape}, y_val: {y_val.shape}")
+
             # CRITICAL FIX: Validate DataLoaders after creation
             if len(train_loader) == 0:
                 logger.error(f"Train DataLoader is empty! Number of samples: {len(X_train)}, Batch size: {config.batch_size}")
@@ -412,20 +443,27 @@ def objective(trial: optuna.Trial) -> float:
                     return float('inf')
                 
                 logger.info(f"First train batch validation passed - X_batch shape: {X_batch.shape}")
+                print(f"[TRAIN] First train batch validation passed - X_batch shape: {X_batch.shape}")
                 
             except Exception as e:
                 logger.error(f"Error checking first train batch: {e}")
                 return float('inf')
             
             logger.info(f"DataLoader validation passed - Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
+            print(f"[TRAIN] DataLoader validation passed - Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
             
             # DEBUG: Double-check DataLoader state immediately after validation
             logger.info(f"DEBUG: Immediately after validation check - Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
+            print(f"[TRAIN] DEBUG: Immediately after validation check - Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
             
             # Training loop
             patience_counter = 0
             
+            print(f"[TRAIN] Starting training loop for {trainer.config.num_epochs} epochs...")
+            logger.debug(f"Starting training loop for {trainer.config.num_epochs} epochs...")
+
             for epoch in range(trainer.config.num_epochs):
+                print(f"[TRAIN] Epoch {epoch+1}/{trainer.config.num_epochs}")
                 # DEBUG: Check DataLoader state at start of each epoch
                 logger.info(f"DEBUG: Epoch {epoch + 1} - Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
                 
@@ -473,12 +511,17 @@ def objective(trial: optuna.Trial) -> float:
                 if (epoch + 1) % 5 == 0:  # Log every 5 epochs for ultra-minimal training
                     logger.info(f'Epoch {epoch + 1}/{trainer.config.num_epochs}:')
                     logger.info(f'Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}')
-                    logger.info(f'Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}')
+                    print(f"[TRAIN] Epoch {epoch + 1}/{trainer.config.num_epochs}:")
+                    print(f"[TRAIN] Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
+                    print(f"[TRAIN] Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}")
                     
             # Load best model
             if trainer.best_model_state is not None:
                 trainer.model.load_state_dict(trainer.best_model_state)
                 
+            print("[TRAIN] Training complete. Loading best model state.")
+            logger.debug("Training complete. Loading best model state.")
+
             return {
                 'train_losses': trainer.train_losses,
                 'val_losses': trainer.val_losses,
@@ -562,7 +605,10 @@ def objective(trial: optuna.Trial) -> float:
                 return float('inf')
                 
             logger.info(f"Training completed successfully with {len(training_history['train_losses'])} epochs")
+            print(f"[OBJECTIVE] Training completed successfully with {len(training_history['train_losses'])} epochs")
+            logger.debug(f"Training completed successfully with {len(training_history['train_losses'])} epochs")
             logger.info(f"Final training loss: {train_losses[-1] if train_losses else 'N/A'}")
+            print(f"[OBJECTIVE] Final training loss: {train_losses[-1] if train_losses else 'N/A'}")
             
         except Exception as e:
             logger.error(f"Training failed with error: {e}")
@@ -577,7 +623,8 @@ def objective(trial: optuna.Trial) -> float:
         trainer.config.num_epochs = original_epochs
         
         # Use the same validation data that was used during training
-        logger.info("Evaluating on validation data using consistent dataset...")
+        print("[OBJECTIVE] Evaluating on validation data using consistent dataset...")
+        logger.debug("Evaluating on validation data using consistent dataset...")
         try:
             # Use the validation data that was already prepared and split during training
             # This ensures we're evaluating on the exact same data used for validation during training
@@ -598,6 +645,7 @@ def objective(trial: optuna.Trial) -> float:
                     return float('inf')
                     
             logger.info("Evaluation completed successfully")
+            print("[OBJECTIVE] Evaluation completed successfully")
             
         except Exception as e:
             logger.error(f"Evaluation failed with error: {e}")
@@ -660,6 +708,14 @@ def objective(trial: optuna.Trial) -> float:
             return float('inf')
         
         # Log trial results for monitoring
+        print(f"[OBJECTIVE] Ultra-Minimal Trial Results:")
+        print(f"[OBJECTIVE]  Hidden dim: {config_dict['hidden_dim']}, Layers: {config_dict['num_layers']}")
+        print(f"[OBJECTIVE]  Batch size: {config_dict['batch_size']}, Seq len: {config_dict['seq_len']}")
+        print(f"[OBJECTIVE]  Data window: 3 days, Epochs: 1")
+        print(f"[OBJECTIVE]  F1 Scores: Down={f1_scores[0]:.4f}, NoDir={f1_scores[1]:.4f}, Up={f1_scores[2]:.4f}")
+        print(f"[OBJECTIVE]  Precision: Down={precision_scores[0]:.4f}, NoDir={precision_scores[1]:.4f}, Up={precision_scores[2]:.4f}")
+        print(f"[OBJECTIVE]  Log Loss: {log_loss_val:.4f}")
+        print(f"[OBJECTIVE]  Combined Objective: {combined_objective:.4f}")
         logger.info(f"Ultra-Minimal Trial Results:")
         logger.info(f"  Hidden dim: {config_dict['hidden_dim']}, Layers: {config_dict['num_layers']}")
         logger.info(f"  Batch size: {config_dict['batch_size']}, Seq len: {config_dict['seq_len']}")
@@ -675,7 +731,7 @@ def objective(trial: optuna.Trial) -> float:
         # Additional cleanup for HPC environment
         del trainer, data_processor, config
         if 'X_val' in locals():
-            del X_val, adj_val, y_val, y_val_classes
+            del X_val, y_val, y_val_classes # Removed adj_val
         if 'evaluation_results' in locals():
             del evaluation_results, probabilities, true_labels
         if 'f1_scores' in locals():
@@ -683,18 +739,19 @@ def objective(trial: optuna.Trial) -> float:
         if 'log_loss_val' in locals():
             del log_loss_val
         
+        print("[OBJECTIVE] Trial complete. Returning objective value.")
         return combined_objective
         
     except Exception as e:
-        logger.error(f"Error in ultra-minimal objective function: {e}")
+        print(f"[ERROR] Exception in trial: {e}")
+        logger.error(f"[ERROR] Exception in trial: {e}")
         # Force memory cleanup on error
         manage_memory()
         return float('inf')  # Return high penalty for failed trials
 
 def main():
-    """
-    Main function to run memory-optimized hyperparameter optimization for CPU execution
-    """
+    print("\n==================== HYPEROPT MAIN ====================")
+    logger.info("Starting hyperparameter optimization main()...")
     # Log initial device and memory information
     device = get_device()
     logger.info(f"Starting hyperparameter optimization with device: {device}")
@@ -733,6 +790,7 @@ def main():
         except ValueError:
             # This catch handles cases where trials exist but none are in a 'COMPLETE' state yet
             best_params_info = "no (no completed trials yet)"
+    print(f"[MAIN] Starting ultra-minimal Optuna optimization with {best_params_info} previous best parameters.")
     logger.info(f"Starting ultra-minimal Optuna optimization with {best_params_info} previous best parameters.")
     
     # ULTRA-MINIMAL number of trials to prevent OOM
