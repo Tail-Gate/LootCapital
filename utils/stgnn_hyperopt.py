@@ -262,9 +262,6 @@ def objective(trial: optuna.Trial) -> float:
             device=device  # Pass device to trainer
         )
         
-        print(f"[OBJECTIVE] Trainer created. Model device: {device}")
-        logger.debug(f"Trainer created. Model device: {device}")
-
         # Validate trainer creation
         if trainer is None:
             logger.error("Trainer creation failed")
@@ -287,6 +284,9 @@ def objective(trial: optuna.Trial) -> float:
                 logger.error(f"FATAL: Model is not on the correct device after move: {model_device_actual} vs {device}")
                 return float('inf')
             logger.info(f"Model successfully verified on device: {device}")
+            # Update the logging to use the actual model device
+            print(f"[OBJECTIVE] Trainer created. Model device: {next(trainer.model.parameters()).device}")
+            logger.debug(f"Trainer created. Model device: {next(trainer.model.parameters()).device}")
         else:
             logger.error("Trainer model is None")
             return float('inf')
