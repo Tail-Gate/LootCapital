@@ -25,20 +25,21 @@ from scripts.train_stgnn_improved import STGNNClassificationModel, Classificatio
 from utils.stgnn_config import STGNNConfig
 from utils.stgnn_data import STGNNDataProcessor
 
+# Add a stream handler for print-like output
 # Set up logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)  # Set logger to debug for more verbosity
 
-# Add a stream handler for print-like output
+# Clear existing handlers to prevent duplicate output when script is run multiple times
+if logger.hasHandlers():
+    logger.handlers.clear()
+
+# Add a stream handler for console output
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 console_handler.setFormatter(formatter)
-if not logger.hasHandlers():
-    logger.addHandler(console_handler)
-else:
-    logger.handlers[0] = console_handler
+logger.addHandler(console_handler) # <-- Simpler, always adds
 
 def get_device():
     """Get CPU device for training."""
