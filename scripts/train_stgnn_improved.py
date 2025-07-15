@@ -343,11 +343,11 @@ class STGNNClassificationModel(nn.Module):
         return logits, attention_dict
 
 class ClassificationSTGNNTrainer:
-    """Trainer for STGNN classification model"""
+    """Trainer for STGNN classification model with comprehensive logging and GPU support"""
     
     def __init__(self, config, data_processor, price_threshold=0.018, focal_alpha=1.0, focal_gamma=2.0, class_weights=None, start_time=None, end_time=None, device=None):
         """
-        Initialize trainer
+        Initialize trainer with comprehensive logging and GPU support
         
         Args:
             config: STGNN configuration
@@ -360,18 +360,71 @@ class ClassificationSTGNNTrainer:
             end_time: Optional end time for data range
             device: Device to use for training (cuda/cpu)
         """
+        print("[TRAINER] Initializing ClassificationSTGNNTrainer...")
+        logger.info("[TRAINER] Initializing ClassificationSTGNNTrainer...")
+        
         self.config = config
         self.data_processor = data_processor
         self.price_threshold = price_threshold
         self.start_time = start_time
         self.end_time = end_time
         
-        # Use device from config or argument
-        self.device = torch.device(device if device is not None else getattr(config, 'device', 'cpu'))
+        # Enhanced device detection and setup
+        print("[TRAINER] Setting up device...")
+        logger.info("[TRAINER] Setting up device...")
         
-        # Initialize model
+        if device is not None:
+            self.device = torch.device(device)
+            print(f"[TRAINER] Using specified device: {self.device}")
+            logger.info(f"[TRAINER] Using specified device: {self.device}")
+        else:
+            # Auto-detect best device
+            if torch.cuda.is_available():
+                cuda_count = torch.cuda.device_count()
+                current_device = torch.cuda.current_device()
+                device_name = torch.cuda.get_device_name(current_device)
+                
+                print(f"[TRAINER] CUDA available with {cuda_count} device(s)")
+                print(f"[TRAINER] Using CUDA device {current_device}: {device_name}")
+                logger.info(f"[TRAINER] CUDA available with {cuda_count} device(s)")
+                logger.info(f"[TRAINER] Using CUDA device {current_device}: {device_name}")
+                
+                # Check GPU memory
+                gpu_memory = torch.cuda.get_device_properties(current_device).total_memory / 1024**3
+                allocated_memory = torch.cuda.memory_allocated(current_device) / 1024**3
+                cached_memory = torch.cuda.memory_reserved(current_device) / 1024**3
+                
+                print(f"[TRAINER] GPU Memory - Total: {gpu_memory:.1f}GB, Allocated: {allocated_memory:.1f}GB, Cached: {cached_memory:.1f}GB")
+                logger.info(f"[TRAINER] GPU Memory - Total: {gpu_memory:.1f}GB, Allocated: {allocated_memory:.1f}GB, Cached: {cached_memory:.1f}GB")
+                
+                self.device = torch.device('cuda:0')
+                torch.cuda.empty_cache()
+                print("[TRAINER] GPU cache cleared")
+                logger.info("[TRAINER] GPU cache cleared")
+            else:
+                print("[TRAINER] CUDA not available, using CPU")
+                logger.info("[TRAINER] CUDA not available, using CPU")
+                
+                import multiprocessing
+                cpu_count = multiprocessing.cpu_count()
+                print(f"[TRAINER] CPU cores available: {cpu_count}")
+                logger.info(f"[TRAINER] CPU cores available: {cpu_count}")
+                
+                self.device = torch.device('cpu')
+        
+        print(f"[TRAINER] Final device: {self.device}")
+        logger.info(f"[TRAINER] Final device: {self.device}")
+        
+        # Initialize model with comprehensive logging
+        print("[TRAINER] Initializing STGNN classification model...")
+        logger.info("[TRAINER] Initializing STGNN classification model...")
+        
         num_nodes = len(config.assets)
         input_dim = len(config.features)
+        
+        print(f"[TRAINER] Model parameters - Nodes: {num_nodes}, Input dim: {input_dim}, Hidden dim: {config.hidden_dim}")
+        logger.info(f"[TRAINER] Model parameters - Nodes: {num_nodes}, Input dim: {input_dim}, Hidden dim: {config.hidden_dim}")
+        
         self.model = STGNNClassificationModel(
             num_nodes=num_nodes,
             input_dim=input_dim,
@@ -381,28 +434,52 @@ class ClassificationSTGNNTrainer:
             dropout=config.dropout,
             kernel_size=config.kernel_size
         )
-        self.model.to(self.device)
-        logger.info(f"Model device: {next(self.model.parameters()).device}")
         
-        # Initialize optimizer
+        print("[TRAINER] Moving model to device...")
+        logger.info("[TRAINER] Moving model to device...")
+        self.model.to(self.device)
+        
+        # Verify model device placement
+        model_device = next(self.model.parameters()).device
+        print(f"[TRAINER] Model device: {model_device}")
+        logger.info(f"Model device: {model_device}")
+        
+        if model_device != self.device:
+            print(f"[TRAINER] WARNING: Model device mismatch! Expected: {self.device}, Actual: {model_device}")
+            logger.warning(f"[TRAINER] WARNING: Model device mismatch! Expected: {self.device}, Actual: {model_device}")
+        
+        # Initialize optimizer with logging
+        print(f"[TRAINER] Initializing optimizer with learning rate: {config.learning_rate}")
+        logger.info(f"[TRAINER] Initializing optimizer with learning rate: {config.learning_rate}")
+        
         self.optimizer = torch.optim.Adam(
             self.model.parameters(),
             lr=config.learning_rate,
-            weight_decay=config.weight_decay
+            weight_decay=getattr(config, 'weight_decay', 0.0)
         )
         
-        # Set up loss function
+        # Set up loss function with comprehensive logging
+        print("[TRAINER] Setting up loss function...")
+        logger.info("[TRAINER] Setting up loss function...")
+        
         if class_weights is not None:
             # Use pre-calculated class weights
+            print(f"[TRAINER] Using pre-calculated class weights: {class_weights}")
+            logger.info(f"[TRAINER] Using pre-calculated class weights: {class_weights}")
+            
             class_weights = class_weights.to(self.device)
             self.criterion = WeightedFocalLoss(
                 class_weights=class_weights,
                 alpha=focal_alpha,
                 gamma=focal_gamma
             )
-            logger.info(f"Using pre-calculated class weights: {class_weights}")
+            print(f"[TRAINER] WeightedFocalLoss created with alpha={focal_alpha}, gamma={focal_gamma}")
+            logger.info(f"[TRAINER] WeightedFocalLoss created with alpha={focal_alpha}, gamma={focal_gamma}")
         else:
             # Calculate class weights from data
+            print("[TRAINER] Calculating class weights from data...")
+            logger.info("[TRAINER] Calculating class weights from data...")
+            
             calculated_weights = self._calculate_class_weights()
             calculated_weights = calculated_weights.to(self.device)
             self.criterion = WeightedFocalLoss(
@@ -410,6 +487,8 @@ class ClassificationSTGNNTrainer:
                 alpha=focal_alpha,
                 gamma=focal_gamma
             )
+            print(f"[TRAINER] WeightedFocalLoss created with calculated weights: {calculated_weights}")
+            logger.info(f"[TRAINER] WeightedFocalLoss created with calculated weights: {calculated_weights}")
         
         # Training history
         self.train_losses = []
@@ -422,15 +501,33 @@ class ClassificationSTGNNTrainer:
         # Store adjacency matrix
         self.adj = None
         
+        print("[TRAINER] ClassificationSTGNNTrainer initialization completed successfully")
+        logger.info("[TRAINER] ClassificationSTGNNTrainer initialization completed successfully")
+        
     def _calculate_class_weights(self):
-        """Calculate class weights to handle imbalance"""
+        """Calculate class weights to handle imbalance with comprehensive logging"""
+        print("[TRAINER] Calculating class weights...")
+        logger.info("[TRAINER] Calculating class weights...")
+        
         # Prepare data to get target distribution
+        print("[TRAINER] Preparing data for class weight calculation...")
+        logger.info("[TRAINER] Preparing data for class weight calculation...")
+        
         X, adj, y = self.data_processor.prepare_data()
         y_flat = y.flatten().numpy()
         
+        print(f"[TRAINER] Data shapes - X: {X.shape}, adj: {adj.shape}, y: {y.shape}")
+        logger.info(f"[TRAINER] Data shapes - X: {X.shape}, adj: {adj.shape}, y: {y.shape}")
+        
         # Convert to classes
+        print(f"[TRAINER] Converting returns to classes using threshold: {self.price_threshold}")
+        logger.info(f"[TRAINER] Converting returns to classes using threshold: {self.price_threshold}")
+        
         classes = self._returns_to_classes(y_flat)
         class_counts = Counter(classes)
+        
+        print(f"[TRAINER] Class distribution: {dict(class_counts)}")
+        logger.info(f"[TRAINER] Class distribution: {dict(class_counts)}")
         
         # Calculate weights (inverse frequency)
         total_samples = len(classes)
@@ -439,131 +536,329 @@ class ClassificationSTGNNTrainer:
             for i in range(3)
         ])
         
-        logger.info(f"Class distribution: {dict(class_counts)}")
-        logger.info(f"Class weights: {class_weights}")
+        print(f"[TRAINER] Calculated class weights: {class_weights}")
+        logger.info(f"[TRAINER] Calculated class weights: {class_weights}")
         
         return class_weights
     
     def _returns_to_classes(self, returns):
-        """Convert returns to classes (0=down, 1=no direction, 2=up)"""
+        """Convert returns to classes (0=down, 1=no direction, 2=up) with logging"""
+        print(f"[TRAINER] Converting {len(returns)} returns to classes with threshold: {self.price_threshold}")
+        logger.info(f"[TRAINER] Converting {len(returns)} returns to classes with threshold: {self.price_threshold}")
+        
         classes = np.ones(len(returns), dtype=int)  # Default to no direction
         classes[returns > self.price_threshold] = 2   # Up
         classes[returns < -self.price_threshold] = 0  # Down
+        
+        # Log class distribution
+        unique_classes, class_counts = np.unique(classes, return_counts=True)
+        class_dist = dict(zip(unique_classes, class_counts))
+        print(f"[TRAINER] Class distribution: {class_dist}")
+        logger.info(f"[TRAINER] Class distribution: {class_dist}")
+        
         return classes
     
     def prepare_classification_data(self):
-        """Prepare data for classification"""
+        """Prepare data for classification with comprehensive logging"""
+        print("[TRAINER] Preparing classification data...")
+        logger.info("[TRAINER] Preparing classification data...")
+        
+        if self.start_time and self.end_time:
+            print(f"[TRAINER] Data time range: {self.start_time} to {self.end_time}")
+            logger.info(f"[TRAINER] Data time range: {self.start_time} to {self.end_time}")
+        
         # Pass time window parameters to data processor
+        print("[TRAINER] Calling data processor prepare_data...")
+        logger.info("[TRAINER] Calling data processor prepare_data...")
+        
         X, adj, y = self.data_processor.prepare_data(self.start_time, self.end_time)
         
+        print(f"[TRAINER] Data processor returned - X: {X.shape}, adj: {adj.shape}, y: {y.shape}")
+        logger.info(f"[TRAINER] Data processor returned - X: {X.shape}, adj: {adj.shape}, y: {y.shape}")
+        
+        # Validate data
+        if X is None or adj is None or y is None:
+            print("[TRAINER] ERROR: Data processor returned None values")
+            logger.error("[TRAINER] ERROR: Data processor returned None values")
+            raise ValueError("Data processor returned None values")
+        
+        if len(X) == 0 or len(y) == 0:
+            print("[TRAINER] ERROR: Data processor returned empty tensors")
+            logger.error("[TRAINER] ERROR: Data processor returned empty tensors")
+            raise ValueError("Data processor returned empty tensors")
+        
+        # Check for NaN/Inf values
+        if torch.isnan(X).any() or torch.isinf(X).any():
+            print("[TRAINER] ERROR: NaN/Inf detected in X tensor")
+            logger.error("[TRAINER] ERROR: NaN/Inf detected in X tensor")
+            raise ValueError("NaN/Inf detected in X tensor")
+        
+        if torch.isnan(adj).any() or torch.isinf(adj).any():
+            print("[TRAINER] ERROR: NaN/Inf detected in adj tensor")
+            logger.error("[TRAINER] ERROR: NaN/Inf detected in adj tensor")
+            raise ValueError("NaN/Inf detected in adj tensor")
+        
+        if torch.isnan(y).any() or torch.isinf(y).any():
+            print("[TRAINER] ERROR: NaN/Inf detected in y tensor")
+            logger.error("[TRAINER] ERROR: NaN/Inf detected in y tensor")
+            raise ValueError("NaN/Inf detected in y tensor")
+        
+        print("[TRAINER] Data validation passed")
+        logger.info("[TRAINER] Data validation passed")
+        
         # Store adjacency matrix for later use
+        print(f"[TRAINER] Moving adjacency matrix to device: {self.device}")
+        logger.info(f"[TRAINER] Moving adjacency matrix to device: {self.device}")
+        
         self.adj = adj.to(self.device)
+        print(f"[TRAINER] Adjacency matrix device: {self.adj.device}")
+        logger.info(f"[TRAINER] Adjacency matrix device: {self.adj.device}")
         
         # Convert returns to classes
+        print("[TRAINER] Converting returns to classification targets...")
+        logger.info("[TRAINER] Converting returns to classification targets...")
+        
         y_flat = y.flatten().numpy()
         y_classes = self._returns_to_classes(y_flat)
         
         # Reshape back to [batch_size, num_nodes]
         y_classes = y_classes.reshape(y.shape)
         
+        print(f"[TRAINER] Classification targets shape: {y_classes.shape}")
+        logger.info(f"[TRAINER] Classification targets shape: {y_classes.shape}")
+        
         # Convert to tensors and move to device
+        print("[TRAINER] Converting to tensors and moving to device...")
+        logger.info("[TRAINER] Converting to tensors and moving to device...")
+        
         y_classes = torch.LongTensor(y_classes).to(self.device)
+        
+        print(f"[TRAINER] Final tensors - X: {X.shape}, adj: {self.adj.shape}, y_classes: {y_classes.shape}")
+        logger.info(f"[TRAINER] Final tensors - X: {X.shape}, adj: {self.adj.shape}, y_classes: {y_classes.shape}")
         
         return X, adj, y_classes
     
     def train_epoch(self, train_loader):
-        """Train for one epoch with comprehensive anomaly detection"""
+        """Train for one epoch with comprehensive anomaly detection and logging"""
+        print(f"[TRAIN_EPOCH] Starting training epoch...")
+        logger.info(f"[TRAIN_EPOCH] Starting training epoch...")
+        
         # CRITICAL FIX: Enable anomaly detection for backward pass
         torch.autograd.set_detect_anomaly(True)
+        print("[TRAIN_EPOCH] Anomaly detection enabled for backward pass")
+        logger.info("[TRAIN_EPOCH] Anomaly detection enabled for backward pass")
         
         self.model.train()
         total_loss = 0
         correct = 0
         total = 0
+        
+        print(f"[TRAIN_EPOCH] Training on device: {self.device}")
+        logger.info(f"[TRAIN_EPOCH] Training on device: {self.device}")
+        
+        # Log memory usage at start
+        if torch.cuda.is_available():
+            current_device = torch.cuda.current_device()
+            allocated_memory = torch.cuda.memory_allocated(current_device) / 1024**3
+            cached_memory = torch.cuda.memory_reserved(current_device) / 1024**3
+            print(f"[TRAIN_EPOCH] GPU Memory at start - Allocated: {allocated_memory:.3f}GB, Cached: {cached_memory:.3f}GB")
+            logger.info(f"[TRAIN_EPOCH] GPU Memory at start - Allocated: {allocated_memory:.3f}GB, Cached: {cached_memory:.3f}GB")
 
+        batch_count = 0
         for X_batch, y_batch in train_loader:
+            batch_count += 1
+            print(f"[TRAIN_EPOCH] Processing batch {batch_count}/{len(train_loader)}")
+            logger.debug(f"[TRAIN_EPOCH] Processing batch {batch_count}/{len(train_loader)}")
+            
             # Move data to device
+            print(f"[TRAIN_EPOCH] Moving batch to device: {self.device}")
+            logger.debug(f"[TRAIN_EPOCH] Moving batch to device: {self.device}")
+            
             X_batch = X_batch.to(self.device)
             y_batch = y_batch.to(self.device)
             
+            print(f"[TRAIN_EPOCH] Batch shapes - X_batch: {X_batch.shape}, y_batch: {y_batch.shape}")
+            logger.debug(f"[TRAIN_EPOCH] Batch shapes - X_batch: {X_batch.shape}, y_batch: {y_batch.shape}")
+            
             # CRITICAL FIX: Inspect input features directly
+            print(f"[TRAIN_EPOCH] Validating input tensors...")
+            logger.debug(f"[TRAIN_EPOCH] Validating input tensors...")
+            
             if torch.isnan(X_batch).any() or torch.isinf(X_batch).any():
+                print(f"[TRAIN_EPOCH] ERROR: NaN/Inf detected in X_batch BEFORE model forward pass. Shape: {X_batch.shape}")
                 logger.error(f"NaN/Inf detected in X_batch BEFORE model forward pass. Shape: {X_batch.shape}")
                 logger.error(f"X_batch stats: min={X_batch.min().item()}, max={X_batch.max().item()}, mean={X_batch.mean().item()}")
                 continue
+            else:
+                print(f"[TRAIN_EPOCH] X_batch validation passed")
+                logger.debug(f"[TRAIN_EPOCH] X_batch validation passed")
+            
             if self.adj is not None:
                 if torch.isnan(self.adj).any() or torch.isinf(self.adj).any():
+                    print(f"[TRAIN_EPOCH] ERROR: NaN/Inf detected in self.adj BEFORE model forward pass. Shape: {self.adj.shape}")
                     logger.error(f"NaN/Inf detected in self.adj BEFORE model forward pass. Shape: {self.adj.shape}")
                     logger.error(f"Adj stats: min={self.adj.min().item()}, max={self.adj.max().item()}, mean={self.adj.mean().item()}")
                     continue
+                else:
+                    print(f"[TRAIN_EPOCH] Adjacency matrix validation passed")
+                    logger.debug(f"[TRAIN_EPOCH] Adjacency matrix validation passed")
             else:
+                print(f"[TRAIN_EPOCH] ERROR: self.adj is None - cannot validate adjacency matrix")
                 logger.error("self.adj is None - cannot validate adjacency matrix")
                 continue
 
             # Ensure adjacency matrix is on correct device
             if self.adj is not None:
                 if self.adj.device != self.device:
+                    print(f"[TRAIN_EPOCH] Moving adjacency matrix from {self.adj.device} to {self.device}")
+                    logger.info(f"[TRAIN_EPOCH] Moving adjacency matrix from {self.adj.device} to {self.device}")
                     self.adj = self.adj.to(self.device, non_blocking=False)
+                else:
+                    print(f"[TRAIN_EPOCH] Adjacency matrix already on correct device: {self.adj.device}")
+                    logger.debug(f"[TRAIN_EPOCH] Adjacency matrix already on correct device: {self.adj.device}")
             else:
+                print(f"[TRAIN_EPOCH] ERROR: self.adj is None right before model forward pass!")
                 logger.error("self.adj is None right before model forward pass!")
                 return float('inf')  # Fail fast if adj is still None
 
             # Forward pass
+            print(f"[TRAIN_EPOCH] Starting forward pass...")
+            logger.debug(f"[TRAIN_EPOCH] Starting forward pass...")
+            
             self.optimizer.zero_grad()
             logits, _ = self.model(X_batch, self.adj)
             
+            print(f"[TRAIN_EPOCH] Forward pass completed - logits shape: {logits.shape}")
+            logger.debug(f"[TRAIN_EPOCH] Forward pass completed - logits shape: {logits.shape}")
+            
             # CRITICAL FIX: Add detailed logging for logits after forward pass
+            print(f"[TRAIN_EPOCH] Validating logits after forward pass...")
+            logger.debug(f"[TRAIN_EPOCH] Validating logits after forward pass...")
+            
             if torch.isnan(logits).any() or torch.isinf(logits).any():
+                print(f"[TRAIN_EPOCH] ERROR: Invalid logits detected (NaN or Inf) after model forward pass")
                 logger.error("Invalid logits detected (NaN or Inf) after model forward pass")
                 logger.error(f"Logits stats: min={logits.min().item()}, max={logits.max().item()}, mean={logits.mean().item()}")
                 logger.error(f"X_batch stats: min={X_batch.min().item()}, max={X_batch.max().item()}, mean={X_batch.mean().item()}")
                 logger.error(f"Adj stats: min={self.adj.min().item()}, max={self.adj.max().item()}, mean={self.adj.mean().item()}")
                 continue
+            else:
+                print(f"[TRAIN_EPOCH] Logits validation passed")
+                logger.debug(f"[TRAIN_EPOCH] Logits validation passed")
 
             # Model now returns logits in shape [batch_size * num_nodes, num_classes]
             # and y_batch needs to be flattened to [batch_size * num_nodes]
+            print(f"[TRAIN_EPOCH] Reshaping y_batch for loss calculation...")
+            logger.debug(f"[TRAIN_EPOCH] Reshaping y_batch for loss calculation...")
+            
             y_batch = y_batch.view(-1)  # [batch_size * num_nodes]
+            print(f"[TRAIN_EPOCH] Reshaped y_batch shape: {y_batch.shape}")
+            logger.debug(f"[TRAIN_EPOCH] Reshaped y_batch shape: {y_batch.shape}")
 
             # Validate shapes before loss calculation
+            print(f"[TRAIN_EPOCH] Validating shapes before loss calculation...")
+            logger.debug(f"[TRAIN_EPOCH] Validating shapes before loss calculation...")
+            
             if logits.shape[0] != y_batch.shape[0]:
+                print(f"[TRAIN_EPOCH] ERROR: Shape mismatch: logits {logits.shape} vs y_batch {y_batch.shape}")
+                logger.error(f"[TRAIN_EPOCH] ERROR: Shape mismatch: logits {logits.shape} vs y_batch {y_batch.shape}")
                 raise ValueError(f"Shape mismatch: logits {logits.shape} vs y_batch {y_batch.shape}")
+            else:
+                print(f"[TRAIN_EPOCH] Shape validation passed")
+                logger.debug(f"[TRAIN_EPOCH] Shape validation passed")
 
+            print(f"[TRAIN_EPOCH] Calculating loss...")
+            logger.debug(f"[TRAIN_EPOCH] Calculating loss...")
+            
             loss = self.criterion(logits, y_batch)
+            
+            print(f"[TRAIN_EPOCH] Loss calculated: {loss.item():.6f}")
+            logger.debug(f"[TRAIN_EPOCH] Loss calculated: {loss.item():.6f}")
 
             # Check for infinite or NaN loss
             if torch.isnan(loss) or torch.isinf(loss):
+                print(f"[TRAIN_EPOCH] ERROR: Invalid loss detected: {loss.item()}")
                 logger.error(f"Invalid loss detected: {loss.item()}")
                 logger.error(f"Logits stats: min={logits.min().item()}, max={logits.max().item()}, mean={logits.mean().item()}")
                 logger.error(f"Y batch stats: min={y_batch.min().item()}, max={y_batch.max().item()}")
                 continue
+            else:
+                print(f"[TRAIN_EPOCH] Loss validation passed")
+                logger.debug(f"[TRAIN_EPOCH] Loss validation passed")
 
             # Backward pass
+            print(f"[TRAIN_EPOCH] Starting backward pass...")
+            logger.debug(f"[TRAIN_EPOCH] Starting backward pass...")
+            
             loss.backward()
+            print(f"[TRAIN_EPOCH] Backward pass completed")
+            logger.debug(f"[TRAIN_EPOCH] Backward pass completed")
             
             # CRITICAL FIX: Gradient clipping for numerical stability
+            print(f"[TRAIN_EPOCH] Applying gradient clipping...")
+            logger.debug(f"[TRAIN_EPOCH] Applying gradient clipping...")
+            
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            print(f"[TRAIN_EPOCH] Gradient clipping applied")
+            logger.debug(f"[TRAIN_EPOCH] Gradient clipping applied")
             
             self.optimizer.step()
+            print(f"[TRAIN_EPOCH] Optimizer step completed")
+            logger.debug(f"[TRAIN_EPOCH] Optimizer step completed")
 
             total_loss += loss.item()
+            print(f"[TRAIN_EPOCH] Updated total loss: {total_loss:.6f}")
+            logger.debug(f"[TRAIN_EPOCH] Updated total loss: {total_loss:.6f}")
 
             # Calculate accuracy
+            print(f"[TRAIN_EPOCH] Calculating accuracy...")
+            logger.debug(f"[TRAIN_EPOCH] Calculating accuracy...")
+            
             _, predicted = torch.max(logits, 1)
-            total += y_batch.size(0)
-            correct += (predicted == y_batch).sum().item()
+            batch_correct = (predicted == y_batch).sum().item()
+            batch_total = y_batch.size(0)
+            
+            total += batch_total
+            correct += batch_correct
+            
+            batch_accuracy = batch_correct / batch_total if batch_total > 0 else 0.0
+            print(f"[TRAIN_EPOCH] Batch accuracy: {batch_accuracy:.4f} ({batch_correct}/{batch_total})")
+            logger.debug(f"[TRAIN_EPOCH] Batch accuracy: {batch_accuracy:.4f} ({batch_correct}/{batch_total})")
 
         # DEBUG: Check for division by zero issues in train_epoch
+        print(f"[TRAIN_EPOCH] Training epoch completed. Calculating final metrics...")
+        logger.info(f"[TRAIN_EPOCH] Training epoch completed. Calculating final metrics...")
+        
+        print(f"[TRAIN_EPOCH] Final counts - Total loss: {total_loss:.6f}, Correct: {correct}, Total: {total}")
+        logger.info(f"[TRAIN_EPOCH] Final counts - Total loss: {total_loss:.6f}, Correct: {correct}, Total: {total}")
+        
         if len(train_loader) == 0:
+            print(f"[TRAIN_EPOCH] ERROR: train_loader is unexpectedly empty immediately before division!")
             logger.error("DEBUG: train_loader is unexpectedly empty immediately before division!")
             logger.error(f"DEBUG: current correct: {correct}, total: {total}")
             raise ZeroDivisionError("train_loader is empty, preventing loss/accuracy calculation.")
         
         if total == 0:
+            print(f"[TRAIN_EPOCH] ERROR: 'total' samples processed is zero in training. This will cause ZeroDivisionError for accuracy.")
             logger.error("DEBUG: 'total' samples processed is zero in training. This will cause ZeroDivisionError for accuracy.")
             # For training, we can't proceed with zero samples
             raise ZeroDivisionError("No samples processed in training, preventing accuracy calculation.")
 
-        return total_loss / len(train_loader), correct / total
+        avg_loss = total_loss / len(train_loader)
+        accuracy = correct / total
+        
+        print(f"[TRAIN_EPOCH] Final metrics - Average loss: {avg_loss:.6f}, Accuracy: {accuracy:.6f}")
+        logger.info(f"[TRAIN_EPOCH] Final metrics - Average loss: {avg_loss:.6f}, Accuracy: {accuracy:.6f}")
+        
+        # Log memory usage at end
+        if torch.cuda.is_available():
+            current_device = torch.cuda.current_device()
+            allocated_memory = torch.cuda.memory_allocated(current_device) / 1024**3
+            cached_memory = torch.cuda.memory_reserved(current_device) / 1024**3
+            print(f"[TRAIN_EPOCH] GPU Memory at end - Allocated: {allocated_memory:.3f}GB, Cached: {cached_memory:.3f}GB")
+            logger.info(f"[TRAIN_EPOCH] GPU Memory at end - Allocated: {allocated_memory:.3f}GB, Cached: {cached_memory:.3f}GB")
+
+        return avg_loss, accuracy
     
     def validate(self, val_loader):
         """Validate model with comprehensive anomaly detection"""
