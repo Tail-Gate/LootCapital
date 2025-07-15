@@ -341,40 +341,40 @@ def objective(trial: optuna.Trial) -> float:
                 'vwap_ratio', 'cumulative_delta'
             ],  # Full feature set (23 features, removed problematic adx)
             
-            # ULTRA-MINIMAL parameter ranges to prevent OOM (slightly increased for stability)
-            'learning_rate': trial.suggest_float('learning_rate', 1e-4, 1e-3, log=True),  # Very small range
-            'hidden_dim': trial.suggest_int('hidden_dim', 8, 16, step=4),  # Slightly increased for stability
-            'num_layers': trial.suggest_int('num_layers', 1, 1),  # Single layer only
-            'kernel_size': trial.suggest_int('kernel_size', 2, 2),  # Fixed small value
-            'dropout': trial.suggest_float('dropout', 0.1, 0.1),  # Fixed small value
-            'batch_size': trial.suggest_int('batch_size', 2, 4, step=1),  # Slightly increased for stability
-            'seq_len': trial.suggest_int('seq_len', 10, 20, step=5),  # Slightly increased for stability
+            # EXPANDED parameter ranges for HPC
+            'learning_rate': trial.suggest_float('learning_rate', 1e-5, 1e-2, log=True),
+            'hidden_dim': trial.suggest_int('hidden_dim', 32, 512, step=32),
+            'num_layers': trial.suggest_int('num_layers', 1, 4),
+            'kernel_size': trial.suggest_int('kernel_size', 2, 7),
+            'dropout': trial.suggest_float('dropout', 0.0, 0.5),
+            'batch_size': trial.suggest_int('batch_size', 16, 256, step=16),
+            'seq_len': trial.suggest_int('seq_len', 10, 120, step=10),
             'prediction_horizon': 15,  # Fixed as per current requirement
             'early_stopping_patience': 2,  # Very short patience
             
             # Focal Loss parameters (minimal ranges)
-            'focal_alpha': trial.suggest_float('focal_alpha', 0.8, 1.0),
-            'focal_gamma': trial.suggest_float('focal_gamma', 1.5, 2.0),
+            'focal_alpha': trial.suggest_float('focal_alpha', 0.5, 2.0),
+            'focal_gamma': trial.suggest_float('focal_gamma', 1.0, 5.0),
             
             # Class multipliers (minimal ranges)
-            'class_multiplier_0': trial.suggest_float('class_multiplier_0', 1.0, 2.0),  # Down class
-            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 1.0, 1.5),
-            'class_multiplier_2': trial.suggest_float('class_multiplier_2', 1.0, 2.0),  # Up class
+            'class_multiplier_0': trial.suggest_float('class_multiplier_0', 0.5, 3.0),  # Down class
+            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 0.5, 3.0),
+            'class_multiplier_2': trial.suggest_float('class_multiplier_2', 0.5, 3.0),  # Up class
             
             # Price threshold (fixed)
             'price_threshold': 0.005,  # Fixed 0.5% threshold for classification
             
-            # ULTRA-MINIMAL feature engineering parameters (fixed values)
-            'rsi_period': 10,  # Fixed minimal value
-            'macd_fast_period': 10,  # Fixed minimal value
-            'macd_slow_period': 20,  # Fixed minimal value
-            'macd_signal_period': 7,  # Fixed minimal value
-            'bb_period': 15,  # Fixed minimal value
-            'bb_num_std_dev': 2.0,  # Fixed value
-            'atr_period': 10,  # Fixed minimal value
-            'adx_period': 10,  # Fixed minimal value
-            'volume_ma_period': 15,  # Fixed minimal value
-            'price_momentum_lookback': 3,  # Fixed minimal value
+            # Feature engineering parameters (searchable)
+            'rsi_period': trial.suggest_int('rsi_period', 5, 50),
+            'macd_fast_period': trial.suggest_int('macd_fast_period', 5, 30),
+            'macd_slow_period': trial.suggest_int('macd_slow_period', 20, 50),
+            'macd_signal_period': trial.suggest_int('macd_signal_period', 5, 20),
+            'bb_period': trial.suggest_int('bb_period', 10, 50),
+            'bb_num_std_dev': trial.suggest_float('bb_num_std_dev', 1.0, 3.0),
+            'atr_period': trial.suggest_int('atr_period', 5, 30),
+            'adx_period': trial.suggest_int('adx_period', 5, 30),
+            'volume_ma_period': trial.suggest_int('volume_ma_period', 10, 50),
+            'price_momentum_lookback': trial.suggest_int('price_momentum_lookback', 3, 20),
         }
         
         print(f"[OBJECTIVE] Config: {config_dict}")
@@ -991,14 +991,17 @@ def objective(trial: optuna.Trial) -> float:
             
             return torch.FloatTensor(class_weights)
         
-        # Train model with ULTRA-FEW epochs to prevent OOM
+        # Train model with production epochs for thorough optimization
         print("[OBJECTIVE] Setting up training configuration...")
         logger.info("[OBJECTIVE] Setting up training configuration...")
         
         original_epochs = trainer.config.num_epochs
-        trainer.config.num_epochs = 1  # Ultra-minimal: only 1 epoch
-        print(f"[OBJECTIVE] Training epochs: {original_epochs} -> {trainer.config.num_epochs} (ultra-minimal)")
-        logger.info(f"[OBJECTIVE] Training epochs: {original_epochs} -> {trainer.config.num_epochs} (ultra-minimal)")
+        trainer.config.num_epochs = 50  # Production: 50 epochs with early stopping
+        trainer.config.early_stopping_patience = 5  # Early stopping patience
+        print(f"[OBJECTIVE] Training epochs: {original_epochs} -> {trainer.config.num_epochs} (production)")
+        logger.info(f"[OBJECTIVE] Training epochs: {original_epochs} -> {trainer.config.num_epochs} (production)")
+        print(f"[OBJECTIVE] Early stopping patience: {trainer.config.early_stopping_patience}")
+        logger.info(f"[OBJECTIVE] Early stopping patience: {trainer.config.early_stopping_patience}")
         
         # Force memory cleanup before training
         print("[OBJECTIVE] Performing memory cleanup before training...")
@@ -1220,18 +1223,18 @@ def objective(trial: optuna.Trial) -> float:
             return float('inf')
         
         # Log trial results for monitoring
-        print(f"[OBJECTIVE] Ultra-Minimal Trial Results:")
+        print(f"[OBJECTIVE] Production Trial Results:")
         print(f"[OBJECTIVE]  Hidden dim: {config_dict['hidden_dim']}, Layers: {config_dict['num_layers']}")
         print(f"[OBJECTIVE]  Batch size: {config_dict['batch_size']}, Seq len: {config_dict['seq_len']}")
-        print(f"[OBJECTIVE]  Data window: 3 days, Epochs: 1")
+        print(f"[OBJECTIVE]  Data window: 5 years, Epochs: 50 (with early stopping)")
         print(f"[OBJECTIVE]  F1 Scores: Down={f1_scores[0]:.4f}, NoDir={f1_scores[1]:.4f}, Up={f1_scores[2]:.4f}")
         print(f"[OBJECTIVE]  Precision: Down={precision_scores[0]:.4f}, NoDir={precision_scores[1]:.4f}, Up={precision_scores[2]:.4f}")
         print(f"[OBJECTIVE]  Log Loss: {log_loss_val:.4f}")
         print(f"[OBJECTIVE]  Combined Objective: {combined_objective:.4f}")
-        logger.info(f"Ultra-Minimal Trial Results:")
+        logger.info(f"Production Trial Results:")
         logger.info(f"  Hidden dim: {config_dict['hidden_dim']}, Layers: {config_dict['num_layers']}")
         logger.info(f"  Batch size: {config_dict['batch_size']}, Seq len: {config_dict['seq_len']}")
-        logger.info(f"  Data window: 3 days, Epochs: 1")
+        logger.info(f"  Data window: 5 years, Epochs: 50 (with early stopping)")
         logger.info(f"  F1 Scores: Down={f1_scores[0]:.4f}, NoDir={f1_scores[1]:.4f}, Up={f1_scores[2]:.4f}")
         logger.info(f"  Precision: Down={precision_scores[0]:.4f}, NoDir={precision_scores[1]:.4f}, Up={precision_scores[2]:.4f}")
         logger.info(f"  Log Loss: {log_loss_val:.4f}")
@@ -1302,13 +1305,13 @@ def main():
         except ValueError:
             # This catch handles cases where trials exist but none are in a 'COMPLETE' state yet
             best_params_info = "no (no completed trials yet)"
-    print(f"[MAIN] Starting ultra-minimal Optuna optimization with {best_params_info} previous best parameters.")
-    logger.info(f"Starting ultra-minimal Optuna optimization with {best_params_info} previous best parameters.")
+    print(f"[MAIN] Starting production Optuna optimization with {best_params_info} previous best parameters.")
+    logger.info(f"Starting production Optuna optimization with {best_params_info} previous best parameters.")
     
-    # ULTRA-MINIMAL number of trials to prevent OOM
+    # PRODUCTION number of trials for comprehensive optimization
     study.optimize(
         objective,
-        n_trials=10,  # Ultra-minimal: only 10 trials to prevent memory issues
+        n_trials=2000,  # Production: 2000 trials for comprehensive search
         timeout=None,    # Remove timeout to allow the study to run to completion or n_trials.
                          # Alternatively, set to a very large value (e.g., 24*3600*7 for a week in seconds).
         gc_after_trial=True, # Enable aggressive garbage collection after each trial.
@@ -1333,7 +1336,7 @@ def main():
     
     # Print optimization summary
     device_suffix = "CPU"
-    print(f'\nUltra-Minimal Optimization Summary ({device_suffix}):')
+    print(f'\nProduction Optimization Summary ({device_suffix}):')
     print(f'  Device: {device}')
     print(f'  Total trials: {len(study.trials)}')
     print(f'  Best validation loss: {study.best_trial.value:.4f}')
