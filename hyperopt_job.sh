@@ -6,7 +6,7 @@
 #SBATCH --mail-type=END,FAIL             # Email notifications for END and FAIL
 #SBATCH --mail-user=eoobon24@stlawu.edu  # Your St. Lawrence email address
 #SBATCH --mem=120gb                      # Maximum memory (node has 128GB)
-#SBATCH --time=24:00:00                  # Maximum time for thorough optimization
+#SBATCH --time=48:00:00                  #  time for thorough optimization
 #SBATCH --output=hyperopt_log_%j.txt     # Standard output file, %j is replaced by job number
 #SBATCH --cpus-per-task=32               # Use ALL 32 CPUs on the node
 #SBATCH --gres=gpu:2                     # 2 GPUs requested
