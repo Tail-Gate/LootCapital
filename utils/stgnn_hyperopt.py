@@ -341,40 +341,38 @@ def objective(trial: optuna.Trial) -> float:
                 'vwap_ratio', 'cumulative_delta'
             ],  # Full feature set (23 features, removed problematic adx)
             
-            # EXPANDED parameter ranges for HPC
-            'learning_rate': trial.suggest_float('learning_rate', 1e-5, 1e-2, log=True),
-            'hidden_dim': trial.suggest_int('hidden_dim', 128, 512, step=32),
-            'num_layers': trial.suggest_int('num_layers', 2, 4),
-            'kernel_size': trial.suggest_int('kernel_size', 2, 7),
-            'dropout': trial.suggest_float('dropout', 0.0, 0.5),
-            'batch_size': trial.suggest_int('batch_size', 32, 128, step=16),
-            'seq_len': trial.suggest_int('seq_len', 80, 120, step=10),
-            'prediction_horizon': 15,  # Fixed as per current requirement
-            'early_stopping_patience': 2,  # Very short patience
+            'learning_rate': trial.suggest_float('learning_rate', 0.0005, 0.0025, log=True), # Centered around 0.001578
+            'hidden_dim': trial.suggest_int('hidden_dim', 224, 288, step=32), # Centered around 256
+            'num_layers': trial.suggest_int('num_layers', 4, 7), # Around 4
+            'kernel_size': trial.suggest_int('kernel_size', 2, 3), # Around 2
+            'dropout': trial.suggest_float('dropout', 0.4, 0.5), # Around 0.4985
+            'batch_size': trial.suggest_int('batch_size', 32, 64, step=16), # Around 48
+            'seq_len': trial.suggest_int('seq_len', 120, 300, step=10), # Around 110
+            'prediction_horizon': 15,
+            'early_stopping_patience': 5,
             
             # Focal Loss parameters (minimal ranges)
-            'focal_alpha': trial.suggest_float('focal_alpha', 0.5, 2.0),
-            'focal_gamma': trial.suggest_float('focal_gamma', 1.0, 5.0),
+            'focal_alpha': trial.suggest_float('focal_alpha', 1.0, 1.8), # Around 1.4054
+            'focal_gamma': trial.suggest_float('focal_gamma', 3.0, 4.5), # Around 3.7522
             
-            # Class multipliers (minimal ranges)
-            'class_multiplier_0': trial.suggest_float('class_multiplier_0', 2, 5.0),  # Down class
-            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 0.5, 1.0),
-            'class_multiplier_2': trial.suggest_float('class_multiplier_2', 2, 5.0),  # Up class
+            'class_multiplier_0': trial.suggest_float('class_multiplier_0', 3.5, 4.5),  # Around 3.9929
+            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 0.7, 1.0), # Around 0.8613
+            'class_multiplier_2': trial.suggest_float('class_multiplier_2', 4.0, 5.0),  # Around 4.8036  # Up class
             
             # Price threshold (fixed)
             'price_threshold': 0.005,  # Fixed 0.5% threshold for classification
             
             # Feature engineering parameters (searchable)
-            'rsi_period': trial.suggest_int('rsi_period', 5, 50),
-            'macd_fast_period': trial.suggest_int('macd_fast_period', 5, 30),
-            'macd_slow_period': trial.suggest_int('macd_slow_period', 20, 50),
-            'macd_signal_period': trial.suggest_int('macd_signal_period', 5, 20),
-            'bb_period': trial.suggest_int('bb_period', 10, 50),
-            'bb_num_std_dev': trial.suggest_float('bb_num_std_dev', 1.0, 3.0),
-            'atr_period': trial.suggest_int('atr_period', 5, 30),
-            'adx_period': trial.suggest_int('adx_period', 5, 30),
-            'volume_ma_period': trial.suggest_int('volume_ma_period', 10, 50),
-            'price_momentum_lookback': trial.suggest_int('price_momentum_lookback', 3, 20),
+            'rsi_period': trial.suggest_int('rsi_period', 50, 100),
+            'macd_fast_period': trial.suggest_int('macd_fast_period', 20, 50),
+            'macd_slow_period': trial.suggest_int('macd_slow_period', 50, 90),
+            'macd_signal_period': trial.suggest_int('macd_signal_period', 9, 30),
+            'bb_period': trial.suggest_int('bb_period', 10, 20),
+            'bb_num_std_dev': trial.suggest_float('bb_num_std_dev', 1.0, 1.5),
+            'atr_period': trial.suggest_int('atr_period', 15, 25),
+            'adx_period': trial.suggest_int('adx_period', 30, 45),
+            'volume_ma_period': trial.suggest_int('volume_ma_period', 30, 45),
+            'price_momentum_lookback': trial.suggest_int('price_momentum_lookback', 20, 50),
         }
         
         print(f"[OBJECTIVE] Config: {config_dict}")

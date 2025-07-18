@@ -957,7 +957,7 @@ class ClassificationSTGNNTrainer:
         
         # Log class distribution before SMOTE
         y_train_flat = y_train.reshape(-1)
-        unique_before, counts_before = np.unique(y_train_flat.numpy(), return_counts=True)
+        unique_before, counts_before = np.unique(y_train_flat.cpu().numpy(), return_counts=True)
         class_dist_before = dict(zip(unique_before, counts_before))
         logger.info(f"Training data class distribution before SMOTE: {class_dist_before}")
         
@@ -968,7 +968,7 @@ class ClassificationSTGNNTrainer:
         
         # Apply SMOTE
         smote = SMOTE(random_state=42, k_neighbors=min(5, min(class_dist_before.values()) - 1))
-        X_train_balanced_node, y_train_balanced_node = smote.fit_resample(X_train_node_level.numpy(), y_train_node_level.numpy())
+        X_train_balanced_node, y_train_balanced_node = smote.fit_resample(X_train_node_level.cpu().numpy(), y_train_node_level.cpu().numpy())
         
         # Log class distribution after SMOTE
         unique_after, counts_after = np.unique(y_train_balanced_node, return_counts=True)
