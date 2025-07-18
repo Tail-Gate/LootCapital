@@ -1,6 +1,3 @@
-'''
-
-To extract values from the database, run the following code:
 
 import optuna
 
@@ -24,7 +21,7 @@ with open(output_file, "w") as f:
 
 print(f"All trial information written to {output_file}")
 
-'''
+
 
 '''
 
@@ -58,6 +55,11 @@ print(f"Top 20 trials written to {output_file}")
 
 '''
 
+
+'''
+
+To extract the trial states, run the following code:
+
 import optuna
 from collections import Counter
 
@@ -79,3 +81,5 @@ print("Trial state counts:")
 for state, count in state_counts.items():
     print(f"{state}: {count}")
 print(f"\nResults also written to {output_file}")
+
+'''
