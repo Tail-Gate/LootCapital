@@ -343,12 +343,12 @@ def objective(trial: optuna.Trial) -> float:
             
             # EXPANDED parameter ranges for HPC
             'learning_rate': trial.suggest_float('learning_rate', 1e-5, 1e-2, log=True),
-            'hidden_dim': trial.suggest_int('hidden_dim', 32, 512, step=32),
-            'num_layers': trial.suggest_int('num_layers', 1, 4),
+            'hidden_dim': trial.suggest_int('hidden_dim', 128, 512, step=32),
+            'num_layers': trial.suggest_int('num_layers', 2, 4),
             'kernel_size': trial.suggest_int('kernel_size', 2, 7),
             'dropout': trial.suggest_float('dropout', 0.0, 0.5),
-            'batch_size': trial.suggest_int('batch_size', 16, 256, step=16),
-            'seq_len': trial.suggest_int('seq_len', 10, 120, step=10),
+            'batch_size': trial.suggest_int('batch_size', 32, 128, step=16),
+            'seq_len': trial.suggest_int('seq_len', 80, 120, step=10),
             'prediction_horizon': 15,  # Fixed as per current requirement
             'early_stopping_patience': 2,  # Very short patience
             
@@ -444,7 +444,7 @@ def objective(trial: optuna.Trial) -> float:
             
             # Use the full data range (5 years)
             end_time = latest_date
-            start_time = earliest_date
+            start_time = end_time - timedelta(days=90)
             
             print(f"[OBJECTIVE] Data file date range: {earliest_date} to {latest_date}")
             print(f"[OBJECTIVE] Using full 5-year data range: {start_time} to {end_time}")
@@ -996,8 +996,8 @@ def objective(trial: optuna.Trial) -> float:
         logger.info("[OBJECTIVE] Setting up training configuration...")
         
         original_epochs = trainer.config.num_epochs
-        trainer.config.num_epochs = 50  # Production: 50 epochs with early stopping
-        trainer.config.early_stopping_patience = 5  # Early stopping patience
+        trainer.config.num_epochs = 10  # Production: 10 epochs with early stopping
+        trainer.config.early_stopping_patience = 2  # Early stopping patience
         print(f"[OBJECTIVE] Training epochs: {original_epochs} -> {trainer.config.num_epochs} (production)")
         logger.info(f"[OBJECTIVE] Training epochs: {original_epochs} -> {trainer.config.num_epochs} (production)")
         print(f"[OBJECTIVE] Early stopping patience: {trainer.config.early_stopping_patience}")
@@ -1311,7 +1311,7 @@ def main():
     # PRODUCTION number of trials for comprehensive optimization
     study.optimize(
         objective,
-        n_trials=2000,  # Production: 2000 trials for comprehensive search
+        n_trials=1,  # Production: 50 trials for comprehensive search
         timeout=None,    # Remove timeout to allow the study to run to completion or n_trials.
                          # Alternatively, set to a very large value (e.g., 24*3600*7 for a week in seconds).
         gc_after_trial=True, # Enable aggressive garbage collection after each trial.
