@@ -163,7 +163,7 @@ class WalkForwardOptimizer:
                  train_window_days: int = 180,  # 6 months training
                  test_window_days: int = 30,    # 1 month testing
                  step_size_days: int = 15,      # 2 weeks step
-                 price_threshold: float = 0.018,
+                 price_threshold: float = 0.005,
                  output_dir: str = "models",
                  reports_dir: str = "reports",
                  plots_dir: str = "plots",
@@ -1001,7 +1001,7 @@ Examples:
     --train-window-days 180 \\
     --test-window-days 30 \\
     --step-size-days 15 \\
-    --price-threshold 0.02
+    --price-threshold 0.005
         """
     )
     
@@ -1067,7 +1067,7 @@ Examples:
     parser.add_argument(
         '--price-threshold',
         type=float,
-        default=0.02,  # 2% threshold for meaningful price movements
+        default=0.005,  # 0.5% threshold for meaningful price movements
         help='Price threshold for classification (default: 0.02 for 2% movements)'
     )
     
