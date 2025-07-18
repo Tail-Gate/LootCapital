@@ -357,9 +357,9 @@ def objective(trial: optuna.Trial) -> float:
             'focal_gamma': trial.suggest_float('focal_gamma', 1.0, 5.0),
             
             # Class multipliers (minimal ranges)
-            'class_multiplier_0': trial.suggest_float('class_multiplier_0', 0.5, 3.0),  # Down class
-            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 0.5, 3.0),
-            'class_multiplier_2': trial.suggest_float('class_multiplier_2', 0.5, 3.0),  # Up class
+            'class_multiplier_0': trial.suggest_float('class_multiplier_0', 2, 5.0),  # Down class
+            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 0.5, 1.0),
+            'class_multiplier_2': trial.suggest_float('class_multiplier_2', 2, 5.0),  # Up class
             
             # Price threshold (fixed)
             'price_threshold': 0.005,  # Fixed 0.5% threshold for classification
@@ -1226,7 +1226,6 @@ def objective(trial: optuna.Trial) -> float:
         print(f"[OBJECTIVE] Production Trial Results:")
         print(f"[OBJECTIVE]  Hidden dim: {config_dict['hidden_dim']}, Layers: {config_dict['num_layers']}")
         print(f"[OBJECTIVE]  Batch size: {config_dict['batch_size']}, Seq len: {config_dict['seq_len']}")
-        print(f"[OBJECTIVE]  Data window: 5 years, Epochs: 50 (with early stopping)")
         print(f"[OBJECTIVE]  F1 Scores: Down={f1_scores[0]:.4f}, NoDir={f1_scores[1]:.4f}, Up={f1_scores[2]:.4f}")
         print(f"[OBJECTIVE]  Precision: Down={precision_scores[0]:.4f}, NoDir={precision_scores[1]:.4f}, Up={precision_scores[2]:.4f}")
         print(f"[OBJECTIVE]  Log Loss: {log_loss_val:.4f}")
@@ -1311,7 +1310,7 @@ def main():
     # PRODUCTION number of trials for comprehensive optimization
     study.optimize(
         objective,
-        n_trials=1,  # Production: 50 trials for comprehensive search
+        n_trials=50,  # Production: 50 trials for comprehensive search
         timeout=None,    # Remove timeout to allow the study to run to completion or n_trials.
                          # Alternatively, set to a very large value (e.g., 24*3600*7 for a week in seconds).
         gc_after_trial=True, # Enable aggressive garbage collection after each trial.
