@@ -718,7 +718,7 @@ class STGNNDataProcessor:
             batch_size = self.config.batch_size
         
         # Dynamically get number of CPU cores with fallback
-        num_workers = os.cpu_count() if os.cpu_count() is not None else 8
+        num_workers = 0  # Force single-process data loading to avoid CUDA context issues
         
         dataset = torch.utils.data.TensorDataset(X, y)
         return torch.utils.data.DataLoader(
