@@ -85,22 +85,7 @@ export OPENBLAS_NUM_THREADS=32
 
 
 # --- Step 7.5: Determine resume point for walk-forward optimization ---
-RESUME_ARGS=""
-latest_model_file=$(ls -1 models/wfo_stgnn_* 2>/dev/null | sort | tail -n 1)
-if [[ -n "$latest_model_file" ]]; then
-    # Extract the end period (to_YYYY-MM) from the filename
-    # Example filename: models/wfo_stgnn_2022-11_to_2024-01_20250720_195826.pt
-    period_part=$(basename "$latest_model_file" | grep -oE 'to_[0-9]{4}-[0-9]{2}')
-    if [[ -n "$period_part" ]]; then
-        end_ym=$(echo "$period_part" | cut -d'_' -f2)
-        # Compute the next month (YYYY-MM-01)
-        next_start=$(date -j -f "%Y-%m" "$end_ym" +"%Y-%m-01" 2>/dev/null || date -d "$end_ym-01 +1 month" +"%Y-%m-01" 2>/dev/null)
-        if [[ -n "$next_start" ]]; then
-            echo "Resuming walk-forward optimization from $next_start (after last completed period)"
-            RESUME_ARGS="--start-date $next_start"
-        fi
-    fi
-fi
+RESUME_ARGS="--start-date 2024-05-01"
 
 # --- Step 8: Run your Python script with memory monitoring ---
 echo "Starting memory-optimized walk_forward_optimization script..."
