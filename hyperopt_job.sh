@@ -84,7 +84,25 @@ export NUMEXPR_NUM_THREADS=32
 export OPENBLAS_NUM_THREADS=32
 
 
-# --- Step 7: Run your Python script with memory monitoring ---
+# --- Step 7.5: Determine resume point for walk-forward optimization ---
+RESUME_ARGS=""
+latest_model_file=$(ls -1 models/wfo_stgnn_* 2>/dev/null | sort | tail -n 1)
+if [[ -n "$latest_model_file" ]]; then
+    # Extract the end period (to_YYYY-MM) from the filename
+    # Example filename: models/wfo_stgnn_2022-11_to_2024-01_20250720_195826.pt
+    period_part=$(basename "$latest_model_file" | grep -oE 'to_[0-9]{4}-[0-9]{2}')
+    if [[ -n "$period_part" ]]; then
+        end_ym=$(echo "$period_part" | cut -d'_' -f2)
+        # Compute the next month (YYYY-MM-01)
+        next_start=$(date -j -f "%Y-%m" "$end_ym" +"%Y-%m-01" 2>/dev/null || date -d "$end_ym-01 +1 month" +"%Y-%m-01" 2>/dev/null)
+        if [[ -n "$next_start" ]]; then
+            echo "Resuming walk-forward optimization from $next_start (after last completed period)"
+            RESUME_ARGS="--start-date $next_start"
+        fi
+    fi
+fi
+
+# --- Step 8: Run your Python script with memory monitoring ---
 echo "Starting memory-optimized walk_forward_optimization script..."
 echo "Memory optimization settings:"
 echo "  PYTORCH_CUDA_ALLOC_CONF: $PYTORCH_CUDA_ALLOC_CONF"
@@ -101,6 +119,6 @@ echo "  - Using all 32 cores for parallel processing"
 echo "  - Using 2 GPUs"
 echo "  - Using 120GB memory (maximum available)"
 
-python scripts/walk_forward_optimization.py
+python scripts/walk_forward_optimization.py $RESUME_ARGS
 
 echo "JOB FINISHED AT: $(date)" 

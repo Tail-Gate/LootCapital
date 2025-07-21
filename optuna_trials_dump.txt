@@ -1,1350 +1,1350 @@
 Trial 0:
-  Value: 4.753715230682932
+  Value: 4.730773740643665
   Params:
-    learning_rate: 0.0001537695290001055
-    hidden_dim: 352
-    num_layers: 3
-    kernel_size: 7
-    dropout: 0.45241634270959313
-    batch_size: 64
-    seq_len: 90
-    focal_alpha: 0.5666786525391314
-    focal_gamma: 1.9718415079056197
-    class_multiplier_0: 3.388420815549331
-    class_multiplier_1: 0.9646220788526867
-    class_multiplier_2: 2.0842747648328475
-    rsi_period: 22
-    macd_fast_period: 18
-    macd_slow_period: 44
-    macd_signal_period: 13
-    bb_period: 20
-    bb_num_std_dev: 1.8818798717502048
-    atr_period: 6
-    adx_period: 8
-    volume_ma_period: 18
-    price_momentum_lookback: 4
+    learning_rate: 0.0010790055237125996
+    hidden_dim: 224
+    num_layers: 5
+    kernel_size: 3
+    dropout: 0.41238840774043656
+    batch_size: 48
+    seq_len: 200
+    focal_alpha: 1.7423050209630602
+    focal_gamma: 3.6077243207696217
+    class_multiplier_0: 3.5649023366156887
+    class_multiplier_1: 0.8428241804600161
+    class_multiplier_2: 4.399423153157746
+    rsi_period: 66
+    macd_fast_period: 37
+    macd_slow_period: 78
+    macd_signal_period: 28
+    bb_period: 17
+    bb_num_std_dev: 1.2367469510987108
+    atr_period: 18
+    adx_period: 33
+    volume_ma_period: 44
+    price_momentum_lookback: 28
   State: 1
 ----------------------------------------
 Trial 1:
-  Value: 4.095694598118451
+  Value: 4.0706546875737395
   Params:
-    learning_rate: 0.0002639567137430436
-    hidden_dim: 384
-    num_layers: 3
-    kernel_size: 2
-    dropout: 0.41105194855732835
-    batch_size: 48
-    seq_len: 110
-    focal_alpha: 1.2781265198918863
-    focal_gamma: 1.9366403104148873
-    class_multiplier_0: 3.3504682688929983
-    class_multiplier_1: 0.8784793299301001
-    class_multiplier_2: 2.876386859825793
-    rsi_period: 30
-    macd_fast_period: 14
-    macd_slow_period: 25
-    macd_signal_period: 11
-    bb_period: 34
-    bb_num_std_dev: 2.3875891674705234
-    atr_period: 11
-    adx_period: 25
-    volume_ma_period: 46
-    price_momentum_lookback: 20
+    learning_rate: 0.0019454983428282009
+    hidden_dim: 224
+    num_layers: 7
+    kernel_size: 3
+    dropout: 0.4057784217378438
+    batch_size: 32
+    seq_len: 240
+    focal_alpha: 1.625212225442747
+    focal_gamma: 3.3188035032935232
+    class_multiplier_0: 3.7135685227565802
+    class_multiplier_1: 0.9211602263341231
+    class_multiplier_2: 4.196169603754691
+    rsi_period: 74
+    macd_fast_period: 39
+    macd_slow_period: 80
+    macd_signal_period: 27
+    bb_period: 13
+    bb_num_std_dev: 1.0633903840362064
+    atr_period: 25
+    adx_period: 33
+    volume_ma_period: 45
+    price_momentum_lookback: 30
   State: 1
 ----------------------------------------
 Trial 2:
-  Value: 4.287080947678831
+  Value: 4.85838906697469
   Params:
-    learning_rate: 0.00980006765495706
-    hidden_dim: 320
-    num_layers: 3
-    kernel_size: 4
-    dropout: 0.15652144721863614
-    batch_size: 80
-    seq_len: 100
-    focal_alpha: 1.0191235151139586
-    focal_gamma: 2.848013697622459
-    class_multiplier_0: 2.6275680440696365
-    class_multiplier_1: 0.7825107771597906
-    class_multiplier_2: 3.7354750801569994
-    rsi_period: 11
-    macd_fast_period: 29
-    macd_slow_period: 34
-    macd_signal_period: 7
-    bb_period: 33
-    bb_num_std_dev: 1.9377886061839718
-    atr_period: 11
-    adx_period: 18
-    volume_ma_period: 46
-    price_momentum_lookback: 3
+    learning_rate: 0.0008757827845355615
+    hidden_dim: 256
+    num_layers: 5
+    kernel_size: 3
+    dropout: 0.4129212228221121
+    batch_size: 32
+    seq_len: 270
+    focal_alpha: 1.7349409137528156
+    focal_gamma: 4.410240395448383
+    class_multiplier_0: 4.301485947744906
+    class_multiplier_1: 0.8426062474917544
+    class_multiplier_2: 4.989327326078765
+    rsi_period: 50
+    macd_fast_period: 37
+    macd_slow_period: 85
+    macd_signal_period: 29
+    bb_period: 13
+    bb_num_std_dev: 1.2632935658826914
+    atr_period: 21
+    adx_period: 44
+    volume_ma_period: 39
+    price_momentum_lookback: 31
   State: 1
 ----------------------------------------
 Trial 3:
-  Value: 4.24878431863193
+  Value: 4.354740881749668
   Params:
-    learning_rate: 0.000151489217525494
-    hidden_dim: 192
-    num_layers: 3
-    kernel_size: 4
-    dropout: 0.08788855256465955
-    batch_size: 96
-    seq_len: 120
-    focal_alpha: 1.1673010190565454
-    focal_gamma: 2.438662553188287
-    class_multiplier_0: 2.4272794591551756
-    class_multiplier_1: 0.7778974428456313
-    class_multiplier_2: 2.1133053896368996
-    rsi_period: 39
-    macd_fast_period: 7
-    macd_slow_period: 41
-    macd_signal_period: 19
-    bb_period: 26
-    bb_num_std_dev: 2.9771216053781457
-    atr_period: 12
-    adx_period: 13
-    volume_ma_period: 45
-    price_momentum_lookback: 13
-  State: 1
-----------------------------------------
-Trial 4:
-  Value: 4.970580854333902
-  Params:
-    learning_rate: 0.0008736439546592641
-    hidden_dim: 480
-    num_layers: 3
-    kernel_size: 6
-    dropout: 0.38391564544430073
-    batch_size: 80
-    seq_len: 90
-    focal_alpha: 1.5095042491093396
-    focal_gamma: 1.0585878513046096
-    class_multiplier_0: 4.882524391919991
-    class_multiplier_1: 0.5310649769677176
-    class_multiplier_2: 3.447443156159437
-    rsi_period: 27
-    macd_fast_period: 8
-    macd_slow_period: 29
-    macd_signal_period: 20
-    bb_period: 20
-    bb_num_std_dev: 2.1773850964023693
-    atr_period: 12
-    adx_period: 19
-    volume_ma_period: 45
-    price_momentum_lookback: 16
-  State: 1
-----------------------------------------
-Trial 5:
-  Value: 4.653087922629411
-  Params:
-    learning_rate: 3.8043569706651844e-05
-    hidden_dim: 160
-    num_layers: 2
-    kernel_size: 7
-    dropout: 0.14958936446897458
-    batch_size: 32
-    seq_len: 80
-    focal_alpha: 1.936156546647986
-    focal_gamma: 2.812388384627638
-    class_multiplier_0: 3.634599277530043
-    class_multiplier_1: 0.9999958495684138
-    class_multiplier_2: 3.1538654130652612
-    rsi_period: 27
-    macd_fast_period: 9
-    macd_slow_period: 25
-    macd_signal_period: 6
-    bb_period: 24
-    bb_num_std_dev: 2.7222255303489122
-    atr_period: 13
-    adx_period: 12
-    volume_ma_period: 17
-    price_momentum_lookback: 15
-  State: 1
-----------------------------------------
-Trial 6:
-  Value: 4.719216439010405
-  Params:
-    learning_rate: 0.0002935985342572608
-    hidden_dim: 384
-    num_layers: 2
-    kernel_size: 6
-    dropout: 0.25722950663376976
-    batch_size: 80
-    seq_len: 100
-    focal_alpha: 1.0525882887025562
-    focal_gamma: 4.892280951034248
-    class_multiplier_0: 2.9458478087739843
-    class_multiplier_1: 0.7257526266916421
-    class_multiplier_2: 3.833963842845875
-    rsi_period: 16
-    macd_fast_period: 25
-    macd_slow_period: 24
-    macd_signal_period: 12
-    bb_period: 49
-    bb_num_std_dev: 1.9066910977208762
-    atr_period: 20
-    adx_period: 13
-    volume_ma_period: 36
-    price_momentum_lookback: 14
-  State: 1
-----------------------------------------
-Trial 7:
-  Value: 4.577080437903566
-  Params:
-    learning_rate: 2.0127250817892696e-05
-    hidden_dim: 288
-    num_layers: 4
-    kernel_size: 2
-    dropout: 0.3736359438123727
-    batch_size: 64
-    seq_len: 100
-    focal_alpha: 0.6361685923641649
-    focal_gamma: 1.9272358074413436
-    class_multiplier_0: 4.792966172511795
-    class_multiplier_1: 0.969990304260025
-    class_multiplier_2: 3.411338809965864
-    rsi_period: 23
-    macd_fast_period: 9
-    macd_slow_period: 26
-    macd_signal_period: 16
-    bb_period: 50
-    bb_num_std_dev: 2.7986057927764
-    atr_period: 9
-    adx_period: 5
-    volume_ma_period: 25
-    price_momentum_lookback: 11
-  State: 1
-----------------------------------------
-Trial 8:
-  Value: 4.467640746248742
-  Params:
-    learning_rate: 6.979644721633515e-05
-    hidden_dim: 352
-    num_layers: 3
-    kernel_size: 7
-    dropout: 0.27690453469035764
-    batch_size: 128
-    seq_len: 120
-    focal_alpha: 1.997044495034322
-    focal_gamma: 3.1107156929457918
-    class_multiplier_0: 3.234484922828819
-    class_multiplier_1: 0.6802234949254302
-    class_multiplier_2: 3.9400349084501842
-    rsi_period: 34
-    macd_fast_period: 15
-    macd_slow_period: 33
-    macd_signal_period: 15
-    bb_period: 38
-    bb_num_std_dev: 2.8407380378050737
-    atr_period: 27
-    adx_period: 5
-    volume_ma_period: 18
-    price_momentum_lookback: 18
-  State: 1
-----------------------------------------
-Trial 9:
-  Value: 4.1658640073913755
-  Params:
-    learning_rate: 5.176346526908e-05
-    hidden_dim: 448
-    num_layers: 3
-    kernel_size: 7
-    dropout: 0.31248185996329103
-    batch_size: 32
-    seq_len: 100
-    focal_alpha: 1.721264394513526
-    focal_gamma: 4.770143924894559
-    class_multiplier_0: 2.289566046816923
-    class_multiplier_1: 0.6700199712330485
-    class_multiplier_2: 3.119853443577636
-    rsi_period: 12
-    macd_fast_period: 16
-    macd_slow_period: 25
-    macd_signal_period: 13
-    bb_period: 44
-    bb_num_std_dev: 2.0314310544196563
-    atr_period: 12
-    adx_period: 28
-    volume_ma_period: 29
-    price_momentum_lookback: 6
-  State: 1
-----------------------------------------
-Trial 10:
-  Value: 3.8112689040042147
-  Params:
-    learning_rate: 0.0015781339288998295
+    learning_rate: 0.0006381307515242716
     hidden_dim: 256
     num_layers: 4
     kernel_size: 2
-    dropout: 0.4985897513765768
+    dropout: 0.41969204537880345
+    batch_size: 64
+    seq_len: 120
+    focal_alpha: 1.5424039505248652
+    focal_gamma: 3.200532704851588
+    class_multiplier_0: 4.10740632841291
+    class_multiplier_1: 0.7873862422278121
+    class_multiplier_2: 4.475723178447211
+    rsi_period: 58
+    macd_fast_period: 28
+    macd_slow_period: 62
+    macd_signal_period: 27
+    bb_period: 16
+    bb_num_std_dev: 1.4832543377719505
+    atr_period: 17
+    adx_period: 33
+    volume_ma_period: 32
+    price_momentum_lookback: 41
+  State: 1
+----------------------------------------
+Trial 4:
+  Value: 4.559514239787266
+  Params:
+    learning_rate: 0.0008256706650226787
+    hidden_dim: 256
+    num_layers: 5
+    kernel_size: 2
+    dropout: 0.48904467071682345
+    batch_size: 32
+    seq_len: 260
+    focal_alpha: 1.5303472504872329
+    focal_gamma: 3.3758408676861538
+    class_multiplier_0: 4.484233956787529
+    class_multiplier_1: 0.7773118395394581
+    class_multiplier_2: 4.041105455153385
+    rsi_period: 65
+    macd_fast_period: 38
+    macd_slow_period: 82
+    macd_signal_period: 24
+    bb_period: 19
+    bb_num_std_dev: 1.4816151828583606
+    atr_period: 19
+    adx_period: 37
+    volume_ma_period: 44
+    price_momentum_lookback: 50
+  State: 1
+----------------------------------------
+Trial 5:
+  Value: 5.41636233551631
+  Params:
+    learning_rate: 0.0007707509054509612
+    hidden_dim: 224
+    num_layers: 6
+    kernel_size: 2
+    dropout: 0.4245879560551386
+    batch_size: 32
+    seq_len: 170
+    focal_alpha: 1.5077507603976614
+    focal_gamma: 4.289106916747789
+    class_multiplier_0: 4.358808973758312
+    class_multiplier_1: 0.8374773141401399
+    class_multiplier_2: 4.259583055176883
+    rsi_period: 75
+    macd_fast_period: 47
+    macd_slow_period: 77
+    macd_signal_period: 22
+    bb_period: 20
+    bb_num_std_dev: 1.0161589449763548
+    atr_period: 17
+    adx_period: 45
+    volume_ma_period: 45
+    price_momentum_lookback: 28
+  State: 1
+----------------------------------------
+Trial 6:
+  Value: 4.365988244758325
+  Params:
+    learning_rate: 0.0013037362911420174
+    hidden_dim: 256
+    num_layers: 6
+    kernel_size: 2
+    dropout: 0.462260155068004
+    batch_size: 32
+    seq_len: 280
+    focal_alpha: 1.6534696006720422
+    focal_gamma: 3.9590117418514525
+    class_multiplier_0: 3.714375682604032
+    class_multiplier_1: 0.8370578717988206
+    class_multiplier_2: 4.973205182135581
+    rsi_period: 87
+    macd_fast_period: 48
+    macd_slow_period: 51
+    macd_signal_period: 28
+    bb_period: 16
+    bb_num_std_dev: 1.0604512071749932
+    atr_period: 19
+    adx_period: 35
+    volume_ma_period: 42
+    price_momentum_lookback: 49
+  State: 1
+----------------------------------------
+Trial 7:
+  Value: 4.351383175672419
+  Params:
+    learning_rate: 0.0012566026917336267
+    hidden_dim: 256
+    num_layers: 7
+    kernel_size: 2
+    dropout: 0.41924257634770346
+    batch_size: 64
+    seq_len: 270
+    focal_alpha: 1.3298750875031302
+    focal_gamma: 3.5864258774431947
+    class_multiplier_0: 4.083987164190451
+    class_multiplier_1: 0.894938176053011
+    class_multiplier_2: 4.192503089302702
+    rsi_period: 98
+    macd_fast_period: 48
+    macd_slow_period: 73
+    macd_signal_period: 25
+    bb_period: 19
+    bb_num_std_dev: 1.0443922895629565
+    atr_period: 23
+    adx_period: 38
+    volume_ma_period: 42
+    price_momentum_lookback: 46
+  State: 1
+----------------------------------------
+Trial 8:
+  Value: 4.228614169924045
+  Params:
+    learning_rate: 0.0010400937391570866
+    hidden_dim: 256
+    num_layers: 6
+    kernel_size: 2
+    dropout: 0.4791630954501513
     batch_size: 48
-    seq_len: 110
-    focal_alpha: 1.405475054987472
-    focal_gamma: 3.8695870811858777
-    class_multiplier_0: 3.9929685943426456
-    class_multiplier_1: 0.8613712444700666
-    class_multiplier_2: 4.803615176811097
-    rsi_period: 49
-    macd_fast_period: 22
-    macd_slow_period: 50
-    macd_signal_period: 10
-    bb_period: 11
-    bb_num_std_dev: 1.2795806229607456
-    atr_period: 20
-    adx_period: 29
-    volume_ma_period: 37
+    seq_len: 270
+    focal_alpha: 1.083584845970347
+    focal_gamma: 4.296987755384018
+    class_multiplier_0: 4.0672827505024705
+    class_multiplier_1: 0.9412520075416635
+    class_multiplier_2: 4.549335139475335
+    rsi_period: 55
+    macd_fast_period: 37
+    macd_slow_period: 86
+    macd_signal_period: 22
+    bb_period: 17
+    bb_num_std_dev: 1.269502784553571
+    atr_period: 22
+    adx_period: 37
+    volume_ma_period: 36
+    price_momentum_lookback: 41
+  State: 1
+----------------------------------------
+Trial 9:
+  Value: 4.271970487520256
+  Params:
+    learning_rate: 0.0018989607579780958
+    hidden_dim: 224
+    num_layers: 7
+    kernel_size: 3
+    dropout: 0.4062225322076871
+    batch_size: 32
+    seq_len: 220
+    focal_alpha: 1.1497522333238592
+    focal_gamma: 3.3520447702332703
+    class_multiplier_0: 3.8010777363859596
+    class_multiplier_1: 0.8748978800747719
+    class_multiplier_2: 4.971080489453668
+    rsi_period: 59
+    macd_fast_period: 23
+    macd_slow_period: 72
+    macd_signal_period: 28
+    bb_period: 16
+    bb_num_std_dev: 1.3126442925436417
+    atr_period: 24
+    adx_period: 45
+    volume_ma_period: 42
+    price_momentum_lookback: 45
+  State: 1
+----------------------------------------
+Trial 10:
+  Value: 5.0171512426004545
+  Params:
+    learning_rate: 0.0024186065023841944
+    hidden_dim: 288
+    num_layers: 7
+    kernel_size: 3
+    dropout: 0.443160504633146
+    batch_size: 48
+    seq_len: 220
+    focal_alpha: 1.2684819899528232
+    focal_gamma: 3.0041363021686442
+    class_multiplier_0: 3.853303792451645
+    class_multiplier_1: 0.9772967345688646
+    class_multiplier_2: 4.731852303520914
+    rsi_period: 80
+    macd_fast_period: 29
+    macd_slow_period: 62
+    macd_signal_period: 14
+    bb_period: 10
+    bb_num_std_dev: 1.1500574667020553
+    atr_period: 25
+    adx_period: 30
+    volume_ma_period: 36
     price_momentum_lookback: 20
   State: 1
 ----------------------------------------
 Trial 11:
-  Value: 4.565578843105712
+  Value: 4.79597112674023
   Params:
-    learning_rate: 0.0017062689510474933
-    hidden_dim: 256
-    num_layers: 4
-    kernel_size: 2
-    dropout: 0.42839368637487324
+    learning_rate: 0.0016918228007939415
+    hidden_dim: 288
+    num_layers: 6
+    kernel_size: 3
+    dropout: 0.49775561976604216
     batch_size: 48
-    seq_len: 110
-    focal_alpha: 1.4382274147660425
-    focal_gamma: 3.8547722714978105
-    class_multiplier_0: 4.062157246162775
-    class_multiplier_1: 0.8716260784234557
-    class_multiplier_2: 4.720446316584846
-    rsi_period: 50
-    macd_fast_period: 21
-    macd_slow_period: 50
-    macd_signal_period: 9
-    bb_period: 14
-    bb_num_std_dev: 1.0298744475747306
-    atr_period: 20
-    adx_period: 30
-    volume_ma_period: 37
-    price_momentum_lookback: 20
+    seq_len: 240
+    focal_alpha: 1.005427788430458
+    focal_gamma: 4.003654322764152
+    class_multiplier_0: 3.966727909371123
+    class_multiplier_1: 0.9564344555738378
+    class_multiplier_2: 4.667191991667111
+    rsi_period: 75
+    macd_fast_period: 42
+    macd_slow_period: 89
+    macd_signal_period: 18
+    bb_period: 13
+    bb_num_std_dev: 1.366908798238686
+    atr_period: 22
+    adx_period: 40
+    volume_ma_period: 35
+    price_momentum_lookback: 38
   State: 1
 ----------------------------------------
 Trial 12:
-  Value: 5.144861213587325
+  Value: 4.243946391212666
   Params:
-    learning_rate: 0.0013648619443609386
+    learning_rate: 0.0005403213985795009
     hidden_dim: 224
-    num_layers: 4
-    kernel_size: 3
-    dropout: 0.4502371578049415
+    num_layers: 7
+    kernel_size: 2
+    dropout: 0.4736931470391615
     batch_size: 48
-    seq_len: 110
-    focal_alpha: 1.3370040518659434
-    focal_gamma: 3.8002573685379146
-    class_multiplier_0: 4.036128442153805
-    class_multiplier_1: 0.8548384758767595
-    class_multiplier_2: 4.649354023117079
-    rsi_period: 49
-    macd_fast_period: 23
-    macd_slow_period: 20
-    macd_signal_period: 10
-    bb_period: 10
-    bb_num_std_dev: 1.1960237715469602
-    atr_period: 24
-    adx_period: 24
-    volume_ma_period: 38
-    price_momentum_lookback: 20
+    seq_len: 300
+    focal_alpha: 1.0470076666888675
+    focal_gamma: 4.106357660851107
+    class_multiplier_0: 3.5862316369202842
+    class_multiplier_1: 0.9311781646297638
+    class_multiplier_2: 4.634990962475813
+    rsi_period: 93
+    macd_fast_period: 31
+    macd_slow_period: 87
+    macd_signal_period: 19
+    bb_period: 13
+    bb_num_std_dev: 1.1561443556962305
+    atr_period: 15
+    adx_period: 30
+    volume_ma_period: 30
+    price_momentum_lookback: 34
   State: 1
 ----------------------------------------
 Trial 13:
-  Value: 4.7606410481926345
+  Value: 4.216704501420892
   Params:
-    learning_rate: 0.00544410301988602
-    hidden_dim: 416
-    num_layers: 4
+    learning_rate: 0.001636486625721411
+    hidden_dim: 288
+    num_layers: 6
     kernel_size: 3
-    dropout: 0.4850265363608577
-    batch_size: 48
-    seq_len: 110
-    focal_alpha: 0.8679129924791029
-    focal_gamma: 3.8635638201583173
-    class_multiplier_0: 4.049148721668474
-    class_multiplier_1: 0.8767069761538779
-    class_multiplier_2: 2.5543425979181187
-    rsi_period: 39
-    macd_fast_period: 13
-    macd_slow_period: 39
-    macd_signal_period: 9
-    bb_period: 36
-    bb_num_std_dev: 1.487329604814672
-    atr_period: 17
-    adx_period: 25
-    volume_ma_period: 50
-    price_momentum_lookback: 11
+    dropout: 0.4414247627875044
+    batch_size: 64
+    seq_len: 170
+    focal_alpha: 1.2101909382955611
+    focal_gamma: 3.697935688202643
+    class_multiplier_0: 3.991400941859943
+    class_multiplier_1: 0.7164631579533407
+    class_multiplier_2: 4.276659746346196
+    rsi_period: 50
+    macd_fast_period: 41
+    macd_slow_period: 81
+    macd_signal_period: 22
+    bb_period: 11
+    bb_num_std_dev: 1.1387088120999294
+    atr_period: 25
+    adx_period: 39
+    volume_ma_period: 38
+    price_momentum_lookback: 21
   State: 1
 ----------------------------------------
 Trial 14:
-  Value: 4.758755285417007
+  Value: 4.110279970250645
   Params:
-    learning_rate: 0.0005480176181808319
-    hidden_dim: 512
-    num_layers: 2
+    learning_rate: 0.0016408483210364878
+    hidden_dim: 288
+    num_layers: 7
     kernel_size: 3
-    dropout: 0.4980669754715087
-    batch_size: 112
-    seq_len: 120
-    focal_alpha: 1.6264813662594515
-    focal_gamma: 1.1151279269394707
-    class_multiplier_0: 4.41021580893432
-    class_multiplier_1: 0.9018185880768065
-    class_multiplier_2: 4.243260031063509
-    rsi_period: 41
-    macd_fast_period: 28
-    macd_slow_period: 50
+    dropout: 0.4438125380958489
+    batch_size: 64
+    seq_len: 160
+    focal_alpha: 1.2259545843394712
+    focal_gamma: 3.7643001497750292
+    class_multiplier_0: 3.910510617233312
+    class_multiplier_1: 0.7482289755123459
+    class_multiplier_2: 4.0049581963452585
+    rsi_period: 68
+    macd_fast_period: 43
+    macd_slow_period: 66
     macd_signal_period: 11
-    bb_period: 29
-    bb_num_std_dev: 2.345650603031214
-    atr_period: 16
-    adx_period: 23
+    bb_period: 10
+    bb_num_std_dev: 1.155751587282854
+    atr_period: 25
+    adx_period: 41
     volume_ma_period: 39
-    price_momentum_lookback: 17
+    price_momentum_lookback: 21
   State: 1
 ----------------------------------------
 Trial 15:
-  Value: 4.907827395623131
+  Value: 4.948822127332132
   Params:
-    learning_rate: 0.0030896873396688406
+    learning_rate: 0.002406922564514723
     hidden_dim: 288
-    num_layers: 4
-    kernel_size: 2
-    dropout: 0.3572776184329255
+    num_layers: 7
+    kernel_size: 3
+    dropout: 0.4323859008953605
     batch_size: 64
-    seq_len: 110
-    focal_alpha: 1.2770960448405981
-    focal_gamma: 4.316409166496846
-    class_multiplier_0: 3.6988794864609655
-    class_multiplier_1: 0.826363135202946
-    class_multiplier_2: 2.800971361793004
-    rsi_period: 34
-    macd_fast_period: 19
-    macd_slow_period: 45
-    macd_signal_period: 8
-    bb_period: 42
-    bb_num_std_dev: 1.5931499939172953
-    atr_period: 5
-    adx_period: 27
-    volume_ma_period: 33
-    price_momentum_lookback: 8
+    seq_len: 140
+    focal_alpha: 1.3998765895647476
+    focal_gamma: 3.4738943282528725
+    class_multiplier_0: 3.7033045955324146
+    class_multiplier_1: 0.7036839898315393
+    class_multiplier_2: 4.005693787955339
+    rsi_period: 69
+    macd_fast_period: 43
+    macd_slow_period: 64
+    macd_signal_period: 12
+    bb_period: 11
+    bb_num_std_dev: 1.0963297941903123
+    atr_period: 24
+    adx_period: 42
+    volume_ma_period: 39
+    price_momentum_lookback: 24
   State: 1
 ----------------------------------------
 Trial 16:
-  Value: 4.43178787319496
+  Value: 5.165060040863934
   Params:
-    learning_rate: 0.00033720025354100846
-    hidden_dim: 128
-    num_layers: 3
-    kernel_size: 5
-    dropout: 0.4072720814640068
-    batch_size: 32
-    seq_len: 110
-    focal_alpha: 1.7400761473636024
-    focal_gamma: 3.2637611980946866
-    class_multiplier_0: 2.984041571760231
-    class_multiplier_1: 0.9222165452592734
-    class_multiplier_2: 4.918677042844929
-    rsi_period: 5
-    macd_fast_period: 12
-    macd_slow_period: 38
-    macd_signal_period: 5
-    bb_period: 16
-    bb_num_std_dev: 2.502155964103519
-    atr_period: 22
-    adx_period: 20
-    volume_ma_period: 27
-    price_momentum_lookback: 18
+    learning_rate: 0.0019929774510227217
+    hidden_dim: 288
+    num_layers: 4
+    kernel_size: 3
+    dropout: 0.4589275432922193
+    batch_size: 64
+    seq_len: 180
+    focal_alpha: 1.4188151233769322
+    focal_gamma: 3.8165275497631006
+    class_multiplier_0: 3.8683281014866338
+    class_multiplier_1: 0.7612909092395607
+    class_multiplier_2: 4.108635639418273
+    rsi_period: 83
+    macd_fast_period: 33
+    macd_slow_period: 67
+    macd_signal_period: 9
+    bb_period: 14
+    bb_num_std_dev: 1.175312031555875
+    atr_period: 23
+    adx_period: 41
+    volume_ma_period: 40
+    price_momentum_lookback: 25
   State: 1
 ----------------------------------------
 Trial 17:
-  Value: 4.297464273815443
+  Value: 4.471423051121855
   Params:
-    learning_rate: 0.0027337877384251094
-    hidden_dim: 416
-    num_layers: 4
+    learning_rate: 0.0014922314108273482
+    hidden_dim: 224
+    num_layers: 7
     kernel_size: 3
-    dropout: 0.3290473625787303
+    dropout: 0.40070774824984406
     batch_size: 48
-    seq_len: 120
-    focal_alpha: 0.8658884326218923
-    focal_gamma: 1.7657346875245779
-    class_multiplier_0: 4.437379484440761
-    class_multiplier_1: 0.5916605148566672
-    class_multiplier_2: 2.57467784388366
-    rsi_period: 47
-    macd_fast_period: 24
-    macd_slow_period: 31
+    seq_len: 140
+    focal_alpha: 1.6119380997493913
+    focal_gamma: 3.1362384588608045
+    class_multiplier_0: 3.5000202469844752
+    class_multiplier_1: 0.9042409002167137
+    class_multiplier_2: 4.175260606640971
+    rsi_period: 70
+    macd_fast_period: 44
+    macd_slow_period: 56
     macd_signal_period: 15
-    bb_period: 31
-    bb_num_std_dev: 1.5711424794381665
-    atr_period: 29
-    adx_period: 30
-    volume_ma_period: 42
-    price_momentum_lookback: 20
+    bb_period: 10
+    bb_num_std_dev: 1.0986742503947524
+    atr_period: 25
+    adx_period: 35
+    volume_ma_period: 33
+    price_momentum_lookback: 33
   State: 1
 ----------------------------------------
 Trial 18:
-  Value: 4.460331274908381
+  Value: 4.269320649035148
   Params:
-    learning_rate: 0.0006265056068873493
+    learning_rate: 0.001987780467794263
     hidden_dim: 224
-    num_layers: 2
-    kernel_size: 2
-    dropout: 0.19558683508228372
-    batch_size: 96
-    seq_len: 90
-    focal_alpha: 1.489622165540177
-    focal_gamma: 3.5402052048015062
-    class_multiplier_0: 3.7433711119729765
-    class_multiplier_1: 0.7960221562355968
-    class_multiplier_2: 4.211633170524381
-    rsi_period: 44
-    macd_fast_period: 5
-    macd_slow_period: 46
-    macd_signal_period: 11
-    bb_period: 25
-    bb_num_std_dev: 2.5032153468518294
-    atr_period: 16
-    adx_period: 22
-    volume_ma_period: 49
-    price_momentum_lookback: 8
+    num_layers: 7
+    kernel_size: 3
+    dropout: 0.4543665569406461
+    batch_size: 64
+    seq_len: 200
+    focal_alpha: 1.3865621392237175
+    focal_gamma: 3.81063862660615
+    class_multiplier_0: 3.6946099663028225
+    class_multiplier_1: 0.9968562584994203
+    class_multiplier_2: 4.334354173063663
+    rsi_period: 63
+    macd_fast_period: 50
+    macd_slow_period: 68
+    macd_signal_period: 10
+    bb_period: 12
+    bb_num_std_dev: 1.2066734608683114
+    atr_period: 21
+    adx_period: 43
+    volume_ma_period: 41
+    price_momentum_lookback: 24
   State: 1
 ----------------------------------------
 Trial 19:
-  Value: 4.299270553049613
+  Value: 4.556268583699367
   Params:
-    learning_rate: 0.00014468156284967937
-    hidden_dim: 320
-    num_layers: 3
-    kernel_size: 4
-    dropout: 0.04477792374792389
-    batch_size: 64
-    seq_len: 110
-    focal_alpha: 1.1846612410021204
-    focal_gamma: 2.3793825034026463
-    class_multiplier_0: 3.0876764286115455
-    class_multiplier_1: 0.729578452938952
-    class_multiplier_2: 4.328461775483451
-    rsi_period: 33
-    macd_fast_period: 21
-    macd_slow_period: 21
-    macd_signal_period: 17
-    bb_period: 39
-    bb_num_std_dev: 1.3425747250872095
-    atr_period: 24
-    adx_period: 27
-    volume_ma_period: 10
-    price_momentum_lookback: 18
+    learning_rate: 0.0015267618381465753
+    hidden_dim: 288
+    num_layers: 6
+    kernel_size: 3
+    dropout: 0.43183530207382786
+    batch_size: 32
+    seq_len: 240
+    focal_alpha: 1.2714201447987448
+    focal_gamma: 3.254052931483017
+    class_multiplier_0: 3.9128754515303137
+    class_multiplier_1: 0.8027385367616225
+    class_multiplier_2: 4.116676043618318
+    rsi_period: 80
+    macd_fast_period: 45
+    macd_slow_period: 75
+    macd_signal_period: 18
+    bb_period: 14
+    bb_num_std_dev: 1.004432756082448
+    atr_period: 23
+    adx_period: 33
+    volume_ma_period: 45
+    price_momentum_lookback: 29
   State: 1
 ----------------------------------------
 Trial 20:
-  Value: 5.527263226159622
+  Value: 4.6831369661552795
   Params:
-    learning_rate: 1.4348007594982608e-05
-    hidden_dim: 384
-    num_layers: 4
-    kernel_size: 5
-    dropout: 0.49882588286951185
-    batch_size: 32
-    seq_len: 80
-    focal_alpha: 1.3682054377269945
-    focal_gamma: 2.3762015107525394
-    class_multiplier_0: 4.409195710165363
-    class_multiplier_1: 0.9241860661456331
-    class_multiplier_2: 2.9119774515080716
-    rsi_period: 18
-    macd_fast_period: 12
-    macd_slow_period: 29
-    macd_signal_period: 8
-    bb_period: 20
-    bb_num_std_dev: 1.763019492322915
-    atr_period: 8
-    adx_period: 15
-    volume_ma_period: 41
-    price_momentum_lookback: 13
+    learning_rate: 0.002102023396355591
+    hidden_dim: 256
+    num_layers: 7
+    kernel_size: 3
+    dropout: 0.4680293269806264
+    batch_size: 48
+    seq_len: 240
+    focal_alpha: 1.1591021411183589
+    focal_gamma: 3.4822465941241667
+    class_multiplier_0: 4.195543471189391
+    class_multiplier_1: 0.7454424962122963
+    class_multiplier_2: 4.016361181434755
+    rsi_period: 71
+    macd_fast_period: 22
+    macd_slow_period: 57
+    macd_signal_period: 15
+    bb_period: 11
+    bb_num_std_dev: 1.0994954713342442
+    atr_period: 24
+    adx_period: 35
+    volume_ma_period: 37
+    price_momentum_lookback: 37
   State: 1
 ----------------------------------------
 Trial 21:
-  Value: 5.016811362878261
+  Value: 4.317947944124429
   Params:
-    learning_rate: 5.6746283523793746e-05
-    hidden_dim: 448
-    num_layers: 3
-    kernel_size: 6
-    dropout: 0.3213751684924853
-    batch_size: 32
-    seq_len: 100
-    focal_alpha: 1.7750524747143335
-    focal_gamma: 4.920253289942001
-    class_multiplier_0: 2.0368760358408293
-    class_multiplier_1: 0.6509949601519863
-    class_multiplier_2: 3.1405465083716155
-    rsi_period: 8
-    macd_fast_period: 15
-    macd_slow_period: 23
-    macd_signal_period: 13
-    bb_period: 43
-    bb_num_std_dev: 2.14975309463568
-    atr_period: 14
-    adx_period: 27
-    volume_ma_period: 30
-    price_momentum_lookback: 7
+    learning_rate: 0.0016368334102803363
+    hidden_dim: 288
+    num_layers: 6
+    kernel_size: 3
+    dropout: 0.4453784565983803
+    batch_size: 64
+    seq_len: 170
+    focal_alpha: 1.2058805800697536
+    focal_gamma: 3.676777072052538
+    class_multiplier_0: 3.7815062235445867
+    class_multiplier_1: 0.7094080159485825
+    class_multiplier_2: 4.271858669311301
+    rsi_period: 53
+    macd_fast_period: 40
+    macd_slow_period: 81
+    macd_signal_period: 22
+    bb_period: 11
+    bb_num_std_dev: 1.1310911861939072
+    atr_period: 25
+    adx_period: 39
+    volume_ma_period: 38
+    price_momentum_lookback: 20
   State: 1
 ----------------------------------------
 Trial 22:
-  Value: 3.9921285083959006
+  Value: 4.343659159136512
   Params:
-    learning_rate: 3.332783399420445e-05
-    hidden_dim: 480
-    num_layers: 3
-    kernel_size: 2
-    dropout: 0.2934115635247606
-    batch_size: 48
-    seq_len: 100
-    focal_alpha: 1.6192742286737394
-    focal_gamma: 4.513790137905322
-    class_multiplier_0: 2.027607647905567
-    class_multiplier_1: 0.6115174904207209
-    class_multiplier_2: 2.490199818979996
-    rsi_period: 13
-    macd_fast_period: 17
-    macd_slow_period: 28
-    macd_signal_period: 14
-    bb_period: 45
-    bb_num_std_dev: 2.168615917607914
-    atr_period: 9
-    adx_period: 29
-    volume_ma_period: 31
-    price_momentum_lookback: 9
+    learning_rate: 0.0013398391874724614
+    hidden_dim: 288
+    num_layers: 6
+    kernel_size: 3
+    dropout: 0.4384921379722276
+    batch_size: 64
+    seq_len: 150
+    focal_alpha: 1.244365807053386
+    focal_gamma: 3.7570765665418917
+    class_multiplier_0: 3.9950683624588494
+    class_multiplier_1: 0.7312494619239744
+    class_multiplier_2: 4.329714352713042
+    rsi_period: 61
+    macd_fast_period: 41
+    macd_slow_period: 81
+    macd_signal_period: 25
+    bb_period: 12
+    bb_num_std_dev: 1.2010987229455763
+    atr_period: 25
+    adx_period: 40
+    volume_ma_period: 33
+    price_momentum_lookback: 22
   State: 1
 ----------------------------------------
 Trial 23:
-  Value: 4.8389779036686305
+  Value: 4.216965055979589
   Params:
-    learning_rate: 3.113908178439616e-05
-    hidden_dim: 512
-    num_layers: 3
-    kernel_size: 2
-    dropout: 0.4164748337885228
-    batch_size: 48
-    seq_len: 100
-    focal_alpha: 1.5915101401687939
-    focal_gamma: 4.285004121292727
-    class_multiplier_0: 2.7230548594293476
-    class_multiplier_1: 0.5103745419483539
-    class_multiplier_2: 2.437557209246414
-    rsi_period: 19
-    macd_fast_period: 20
-    macd_slow_period: 27
-    macd_signal_period: 14
-    bb_period: 46
-    bb_num_std_dev: 2.347855808927453
-    atr_period: 9
-    adx_period: 30
-    volume_ma_period: 33
-    price_momentum_lookback: 9
+    learning_rate: 0.0016982643230888047
+    hidden_dim: 288
+    num_layers: 7
+    kernel_size: 3
+    dropout: 0.43418569097288306
+    batch_size: 64
+    seq_len: 190
+    focal_alpha: 1.1119951427672778
+    focal_gamma: 3.9255685300827294
+    class_multiplier_0: 3.9480839010313864
+    class_multiplier_1: 0.806028554538192
+    class_multiplier_2: 4.141249622758055
+    rsi_period: 87
+    macd_fast_period: 40
+    macd_slow_period: 70
+    macd_signal_period: 30
+    bb_period: 10
+    bb_num_std_dev: 1.0818537543558735
+    atr_period: 24
+    adx_period: 41
+    volume_ma_period: 38
+    price_momentum_lookback: 26
   State: 1
 ----------------------------------------
 Trial 24:
-  Value: 4.208637412648923
+  Value: 4.387198904948398
   Params:
-    learning_rate: 9.242728525166616e-05
-    hidden_dim: 480
-    num_layers: 3
+    learning_rate: 0.0018090440159380502
+    hidden_dim: 288
+    num_layers: 5
     kernel_size: 3
-    dropout: 0.4591108128667375
+    dropout: 0.44836420853521447
     batch_size: 64
-    seq_len: 110
-    focal_alpha: 1.5961073907178849
-    focal_gamma: 4.406566826516354
-    class_multiplier_0: 2.025774893313988
-    class_multiplier_1: 0.8173439912507531
-    class_multiplier_2: 2.3969354186775242
-    rsi_period: 31
-    macd_fast_period: 26
-    macd_slow_period: 31
-    macd_signal_period: 11
-    bb_period: 36
-    bb_num_std_dev: 2.55615784122108
-    atr_period: 19
-    adx_period: 25
-    volume_ma_period: 23
-    price_momentum_lookback: 5
+    seq_len: 160
+    focal_alpha: 1.3325767769245767
+    focal_gamma: 4.120769649983851
+    class_multiplier_0: 3.7980714867682988
+    class_multiplier_1: 0.7406077205399396
+    class_multiplier_2: 4.241387500988447
+    rsi_period: 74
+    macd_fast_period: 34
+    macd_slow_period: 78
+    macd_signal_period: 20
+    bb_period: 12
+    bb_num_std_dev: 1.1342090103662585
+    atr_period: 22
+    adx_period: 38
+    volume_ma_period: 40
+    price_momentum_lookback: 23
   State: 1
 ----------------------------------------
 Trial 25:
-  Value: 4.2163424413287895
+  Value: 5.204331130218586
   Params:
-    learning_rate: 1.1484057366896465e-05
+    learning_rate: 0.0014121664416584107
     hidden_dim: 256
-    num_layers: 2
-    kernel_size: 2
-    dropout: 0.2146191096109612
-    batch_size: 48
-    seq_len: 90
-    focal_alpha: 1.8766681005866706
-    focal_gamma: 4.122171991922719
-    class_multiplier_0: 3.475545872965634
-    class_multiplier_1: 0.5983033269997919
-    class_multiplier_2: 2.723849427242291
-    rsi_period: 14
-    macd_fast_period: 17
-    macd_slow_period: 36
-    macd_signal_period: 17
-    bb_period: 29
-    bb_num_std_dev: 2.26600124517948
-    atr_period: 15
-    adx_period: 21
-    volume_ma_period: 34
-    price_momentum_lookback: 10
+    num_layers: 6
+    kernel_size: 3
+    dropout: 0.4550482179942219
+    batch_size: 64
+    seq_len: 120
+    focal_alpha: 1.4544328854369204
+    focal_gamma: 3.4927669296839907
+    class_multiplier_0: 4.163546611145619
+    class_multiplier_1: 0.7205826649380228
+    class_multiplier_2: 4.4199989849277355
+    rsi_period: 80
+    macd_fast_period: 46
+    macd_slow_period: 90
+    macd_signal_period: 26
+    bb_period: 11
+    bb_num_std_dev: 1.044442971584499
+    atr_period: 25
+    adx_period: 36
+    volume_ma_period: 35
+    price_momentum_lookback: 31
   State: 1
 ----------------------------------------
 Trial 26:
-  Value: 5.453561308062205
+  Value: 4.646399056851012
   Params:
-    learning_rate: 0.0004808602571824365
-    hidden_dim: 384
-    num_layers: 4
+    learning_rate: 0.00220648314903636
+    hidden_dim: 288
+    num_layers: 7
     kernel_size: 3
-    dropout: 0.3891229827340664
+    dropout: 0.4273486881162621
     batch_size: 48
-    seq_len: 110
-    focal_alpha: 1.4036995201000682
-    focal_gamma: 4.58931302167467
-    class_multiplier_0: 3.8613657205924805
-    class_multiplier_1: 0.5926210897117882
-    class_multiplier_2: 2.275484436157193
-    rsi_period: 22
-    macd_fast_period: 22
-    macd_slow_period: 29
-    macd_signal_period: 10
-    bb_period: 47
-    bb_num_std_dev: 1.7348680898226854
-    atr_period: 7
-    adx_period: 25
-    volume_ma_period: 42
-    price_momentum_lookback: 16
+    seq_len: 220
+    focal_alpha: 1.189430341746837
+    focal_gamma: 3.0151952015628543
+    class_multiplier_0: 4.024426731144761
+    class_multiplier_1: 0.8717733078543245
+    class_multiplier_2: 4.098607672821989
+    rsi_period: 50
+    macd_fast_period: 39
+    macd_slow_period: 82
+    macd_signal_period: 23
+    bb_period: 14
+    bb_num_std_dev: 1.1893937780978487
+    atr_period: 23
+    adx_period: 32
+    volume_ma_period: 43
+    price_momentum_lookback: 21
   State: 1
 ----------------------------------------
 Trial 27:
-  Value: 5.342738474448522
+  Value: 4.274180409155933
   Params:
-    learning_rate: 0.0010781193195584695
-    hidden_dim: 448
-    num_layers: 3
-    kernel_size: 2
-    dropout: 0.2887830332973944
-    batch_size: 64
-    seq_len: 100
-    focal_alpha: 1.2132041449981574
-    focal_gamma: 3.458774753843452
-    class_multiplier_0: 4.596137959030882
-    class_multiplier_1: 0.8453192406555223
-    class_multiplier_2: 2.943768402377933
-    rsi_period: 43
-    macd_fast_period: 19
-    macd_slow_period: 22
-    macd_signal_period: 14
-    bb_period: 40
-    bb_num_std_dev: 2.610139164957951
-    atr_period: 9
-    adx_period: 28
-    volume_ma_period: 31
-    price_momentum_lookback: 19
+    learning_rate: 0.0011972336840703388
+    hidden_dim: 256
+    num_layers: 7
+    kernel_size: 3
+    dropout: 0.4435731286823286
+    batch_size: 48
+    seq_len: 190
+    focal_alpha: 1.3321042405540193
+    focal_gamma: 3.6722883315857917
+    class_multiplier_0: 3.665936297380534
+    class_multiplier_1: 0.7548646417151368
+    class_multiplier_2: 4.339753203980097
+    rsi_period: 56
+    macd_fast_period: 44
+    macd_slow_period: 66
+    macd_signal_period: 17
+    bb_period: 12
+    bb_num_std_dev: 1.1179380120118732
+    atr_period: 24
+    adx_period: 39
+    volume_ma_period: 40
+    price_momentum_lookback: 26
   State: 1
 ----------------------------------------
 Trial 28:
-  Value: 4.764965522960049
+  Value: 4.3016543050488405
   Params:
-    learning_rate: 0.00027934653596286765
-    hidden_dim: 320
-    num_layers: 3
+    learning_rate: 0.0015409390545510122
+    hidden_dim: 288
+    num_layers: 6
     kernel_size: 3
-    dropout: 0.22613393872585216
-    batch_size: 96
-    seq_len: 120
-    focal_alpha: 1.0176244102898129
-    focal_gamma: 1.6228439619589792
-    class_multiplier_0: 4.2001252712072885
-    class_multiplier_1: 0.7496759638025399
-    class_multiplier_2: 3.3100693211848045
-    rsi_period: 29
-    macd_fast_period: 14
-    macd_slow_period: 42
-    macd_signal_period: 12
-    bb_period: 35
-    bb_num_std_dev: 2.1405011356914385
-    atr_period: 10
-    adx_period: 16
-    volume_ma_period: 23
-    price_momentum_lookback: 13
+    dropout: 0.46389807068753286
+    batch_size: 64
+    seq_len: 140
+    focal_alpha: 1.5909921422101676
+    focal_gamma: 3.8556088680825584
+    class_multiplier_0: 3.890167718261763
+    class_multiplier_1: 0.9105693372306098
+    class_multiplier_2: 4.2135652267170105
+    rsi_period: 67
+    macd_fast_period: 42
+    macd_slow_period: 74
+    macd_signal_period: 20
+    bb_period: 10
+    bb_num_std_dev: 1.305817828161301
+    atr_period: 21
+    adx_period: 42
+    volume_ma_period: 37
+    price_momentum_lookback: 31
   State: 1
 ----------------------------------------
 Trial 29:
-  Value: 5.2474036650920315
+  Value: 4.0908086986593855
   Params:
-    learning_rate: 0.002083399715427754
-    hidden_dim: 352
-    num_layers: 3
-    kernel_size: 2
-    dropout: 0.45556734904599605
-    batch_size: 64
-    seq_len: 90
-    focal_alpha: 1.5496822397014116
-    focal_gamma: 1.4061449490070639
-    class_multiplier_0: 3.4623756527200737
-    class_multiplier_1: 0.7029437993846577
-    class_multiplier_2: 2.001707152805821
-    rsi_period: 25
-    macd_fast_period: 18
-    macd_slow_period: 47
-    macd_signal_period: 10
-    bb_period: 10
-    bb_num_std_dev: 1.761902094974411
-    atr_period: 6
-    adx_period: 28
-    volume_ma_period: 47
-    price_momentum_lookback: 16
+    learning_rate: 0.001040721996563561
+    hidden_dim: 224
+    num_layers: 5
+    kernel_size: 3
+    dropout: 0.4117012960373389
+    batch_size: 32
+    seq_len: 210
+    focal_alpha: 1.7983925037124697
+    focal_gamma: 3.6667508106922146
+    class_multiplier_0: 3.610465034313808
+    class_multiplier_1: 0.8106754733398388
+    class_multiplier_2: 4.422757562974957
+    rsi_period: 65
+    macd_fast_period: 36
+    macd_slow_period: 70
+    macd_signal_period: 12
+    bb_period: 15
+    bb_num_std_dev: 1.230145849508748
+    atr_period: 20
+    adx_period: 31
+    volume_ma_period: 44
+    price_momentum_lookback: 29
   State: 1
 ----------------------------------------
 Trial 30:
-  Value: 4.472741973483059
+  Value: 5.180744504907952
   Params:
-    learning_rate: 0.0001048337201655676
-    hidden_dim: 416
-    num_layers: 4
-    kernel_size: 4
-    dropout: 0.4406237400358458
+    learning_rate: 0.001010918661045834
+    hidden_dim: 224
+    num_layers: 5
+    kernel_size: 3
+    dropout: 0.4081524368145403
     batch_size: 32
-    seq_len: 110
-    focal_alpha: 0.525340233882253
-    focal_gamma: 4.049053211874169
-    class_multiplier_0: 3.229007618928085
-    class_multiplier_1: 0.9541692008270377
-    class_multiplier_2: 2.2369148184860816
-    rsi_period: 36
-    macd_fast_period: 11
-    macd_slow_period: 36
-    macd_signal_period: 14
-    bb_period: 21
-    bb_num_std_dev: 2.026676993250295
-    atr_period: 22
-    adx_period: 23
-    volume_ma_period: 41
-    price_momentum_lookback: 10
+    seq_len: 250
+    focal_alpha: 1.7679537437016901
+    focal_gamma: 3.587485578698203
+    class_multiplier_0: 3.555570755626518
+    class_multiplier_1: 0.824005433763952
+    class_multiplier_2: 4.808192203704437
+    rsi_period: 66
+    macd_fast_period: 36
+    macd_slow_period: 70
+    macd_signal_period: 13
+    bb_period: 15
+    bb_num_std_dev: 1.2277744677317355
+    atr_period: 16
+    adx_period: 32
+    volume_ma_period: 44
+    price_momentum_lookback: 28
   State: 1
 ----------------------------------------
 Trial 31:
-  Value: 4.235731925691618
+  Value: 4.022137292316173
   Params:
-    learning_rate: 3.2279161992093595e-05
-    hidden_dim: 480
-    num_layers: 3
-    kernel_size: 5
-    dropout: 0.31209835784236656
+    learning_rate: 0.0011219068818059713
+    hidden_dim: 224
+    num_layers: 5
+    kernel_size: 3
+    dropout: 0.41538602843076217
     batch_size: 32
-    seq_len: 100
-    focal_alpha: 1.730549395057021
-    focal_gamma: 4.678075650424079
-    class_multiplier_0: 2.3461494321265057
-    class_multiplier_1: 0.6374155888891051
-    class_multiplier_2: 3.12927040454891
-    rsi_period: 12
-    macd_fast_period: 15
-    macd_slow_period: 27
-    macd_signal_period: 12
-    bb_period: 45
-    bb_num_std_dev: 2.0519499964763375
-    atr_period: 14
-    adx_period: 29
-    volume_ma_period: 28
-    price_momentum_lookback: 7
+    seq_len: 210
+    focal_alpha: 1.7028251429500847
+    focal_gamma: 3.617704768432634
+    class_multiplier_0: 3.62473447775011
+    class_multiplier_1: 0.7793146506632928
+    class_multiplier_2: 4.391170519317481
+    rsi_period: 73
+    macd_fast_period: 35
+    macd_slow_period: 78
+    macd_signal_period: 11
+    bb_period: 15
+    bb_num_std_dev: 1.1731646015663393
+    atr_period: 20
+    adx_period: 31
+    volume_ma_period: 43
+    price_momentum_lookback: 26
   State: 1
 ----------------------------------------
 Trial 32:
-  Value: 4.654691588730802
+  Value: 4.411967327220827
   Params:
-    learning_rate: 2.0503211696556762e-05
-    hidden_dim: 448
-    num_layers: 3
-    kernel_size: 7
-    dropout: 0.3442282670595535
+    learning_rate: 0.0008890582900762789
+    hidden_dim: 224
+    num_layers: 5
+    kernel_size: 3
+    dropout: 0.4144813264194492
     batch_size: 32
-    seq_len: 100
-    focal_alpha: 1.680207023603213
-    focal_gamma: 4.61238855722512
-    class_multiplier_0: 2.3140905402025855
-    class_multiplier_1: 0.6280614569824111
-    class_multiplier_2: 3.5556506290422947
-    rsi_period: 8
-    macd_fast_period: 16
-    macd_slow_period: 24
-    macd_signal_period: 13
-    bb_period: 43
-    bb_num_std_dev: 2.318757198894126
-    atr_period: 11
-    adx_period: 26
-    volume_ma_period: 30
-    price_momentum_lookback: 5
+    seq_len: 210
+    focal_alpha: 1.7147752461480439
+    focal_gamma: 3.3474304525606557
+    class_multiplier_0: 3.6091296010461287
+    class_multiplier_1: 0.78062036090538
+    class_multiplier_2: 4.452105431696499
+    rsi_period: 73
+    macd_fast_period: 32
+    macd_slow_period: 76
+    macd_signal_period: 11
+    bb_period: 15
+    bb_num_std_dev: 1.2487306544439862
+    atr_period: 20
+    adx_period: 31
+    volume_ma_period: 43
+    price_momentum_lookback: 29
   State: 1
 ----------------------------------------
 Trial 33:
-  Value: 5.01673022400643
+  Value: 5.2333615731162
   Params:
-    learning_rate: 4.772805511566976e-05
-    hidden_dim: 448
-    num_layers: 3
-    kernel_size: 2
-    dropout: 0.2903060636549274
-    batch_size: 48
-    seq_len: 100
-    focal_alpha: 1.8457578959142504
-    focal_gamma: 4.959640781799598
-    class_multiplier_0: 2.5348564591393865
-    class_multiplier_1: 0.5699292429016715
-    class_multiplier_2: 3.639125419530942
-    rsi_period: 10
-    macd_fast_period: 18
-    macd_slow_period: 32
-    macd_signal_period: 13
-    bb_period: 33
-    bb_num_std_dev: 1.9406900414148238
-    atr_period: 18
-    adx_period: 28
-    volume_ma_period: 21
-    price_momentum_lookback: 3
+    learning_rate: 0.0011086942547585952
+    hidden_dim: 224
+    num_layers: 4
+    kernel_size: 3
+    dropout: 0.40151144976006453
+    batch_size: 32
+    seq_len: 230
+    focal_alpha: 1.7958130164380923
+    focal_gamma: 3.607189799654056
+    class_multiplier_0: 3.6298579452465654
+    class_multiplier_1: 0.8092734698965669
+    class_multiplier_2: 4.525983647383749
+    rsi_period: 77
+    macd_fast_period: 35
+    macd_slow_period: 78
+    macd_signal_period: 9
+    bb_period: 17
+    bb_num_std_dev: 1.2910070339328696
+    atr_period: 19
+    adx_period: 33
+    volume_ma_period: 44
+    price_momentum_lookback: 32
   State: 1
 ----------------------------------------
 Trial 34:
-  Value: 4.236687048728941
+  Value: 4.195006364466577
   Params:
-    learning_rate: 0.007464463267974249
-    hidden_dim: 480
-    num_layers: 3
-    kernel_size: 4
-    dropout: 0.15768980030050994
-    batch_size: 48
-    seq_len: 90
-    focal_alpha: 1.3085518147596615
-    focal_gamma: 2.711134244628103
-    class_multiplier_0: 2.174456914882921
-    class_multiplier_1: 0.6723560323725905
-    class_multiplier_2: 2.744341924439356
-    rsi_period: 21
-    macd_fast_period: 17
-    macd_slow_period: 28
-    macd_signal_period: 15
-    bb_period: 48
-    bb_num_std_dev: 2.4246244112023443
-    atr_period: 12
-    adx_period: 29
-    volume_ma_period: 27
-    price_momentum_lookback: 6
+    learning_rate: 0.000940978178464607
+    hidden_dim: 224
+    num_layers: 5
+    kernel_size: 3
+    dropout: 0.4145163003916473
+    batch_size: 32
+    seq_len: 200
+    focal_alpha: 1.6998205427374493
+    focal_gamma: 3.431999683862688
+    class_multiplier_0: 3.502691093185718
+    class_multiplier_1: 0.8610409964994953
+    class_multiplier_2: 4.373424117312166
+    rsi_period: 64
+    macd_fast_period: 38
+    macd_slow_period: 61
+    macd_signal_period: 11
+    bb_period: 16
+    bb_num_std_dev: 1.3770536011099657
+    atr_period: 20
+    adx_period: 31
+    volume_ma_period: 45
+    price_momentum_lookback: 27
   State: 1
 ----------------------------------------
 Trial 35:
-  Value: 4.520684737456939
+  Value: 4.040044211587625
   Params:
-    learning_rate: 0.00017141538538111828
-    hidden_dim: 352
-    num_layers: 3
-    kernel_size: 6
-    dropout: 0.36933595297068644
+    learning_rate: 0.0007322322873023349
+    hidden_dim: 224
+    num_layers: 5
+    kernel_size: 3
+    dropout: 0.4221078815985911
     batch_size: 32
-    seq_len: 100
-    focal_alpha: 1.5015055249439233
-    focal_gamma: 2.174569105662025
-    class_multiplier_0: 2.6374160663118866
-    class_multiplier_1: 0.7615231499354915
-    class_multiplier_2: 2.976949495624445
-    rsi_period: 14
-    macd_fast_period: 10
-    macd_slow_period: 25
-    macd_signal_period: 18
-    bb_period: 41
-    bb_num_std_dev: 2.2473295646099025
-    atr_period: 11
-    adx_period: 26
-    volume_ma_period: 35
-    price_momentum_lookback: 5
+    seq_len: 210
+    focal_alpha: 1.6741823812282906
+    focal_gamma: 3.199609898653052
+    class_multiplier_0: 3.743506915998191
+    class_multiplier_1: 0.7890764682626701
+    class_multiplier_2: 4.585249750210181
+    rsi_period: 68
+    macd_fast_period: 30
+    macd_slow_period: 84
+    macd_signal_period: 13
+    bb_period: 18
+    bb_num_std_dev: 1.2153810105614968
+    atr_period: 18
+    adx_period: 34
+    volume_ma_period: 43
+    price_momentum_lookback: 36
   State: 1
 ----------------------------------------
 Trial 36:
-  Value: 4.6615644169221415
+  Value: 4.257794400407396
   Params:
-    learning_rate: 0.00020315745124239778
-    hidden_dim: 512
-    num_layers: 2
-    kernel_size: 5
-    dropout: 0.24083145315018895
-    batch_size: 80
-    seq_len: 110
-    focal_alpha: 1.0892105206728764
-    focal_gamma: 4.724262306208482
-    class_multiplier_0: 2.843407429269604
-    class_multiplier_1: 0.7970432516672107
-    class_multiplier_2: 3.9855591696769297
-    rsi_period: 6
-    macd_fast_period: 27
-    macd_slow_period: 34
-    macd_signal_period: 7
-    bb_period: 45
-    bb_num_std_dev: 2.0734364509463887
-    atr_period: 13
-    adx_period: 9
-    volume_ma_period: 44
-    price_momentum_lookback: 12
+    learning_rate: 0.0007208868530197007
+    hidden_dim: 224
+    num_layers: 4
+    kernel_size: 3
+    dropout: 0.41935769926893285
+    batch_size: 32
+    seq_len: 210
+    focal_alpha: 1.65245118566308
+    focal_gamma: 3.2463308812489013
+    class_multiplier_0: 3.747319039453184
+    class_multiplier_1: 0.792208615465951
+    class_multiplier_2: 4.51147021820496
+    rsi_period: 72
+    macd_fast_period: 26
+    macd_slow_period: 85
+    macd_signal_period: 16
+    bb_period: 18
+    bb_num_std_dev: 1.2312363903657102
+    atr_period: 18
+    adx_period: 34
+    volume_ma_period: 43
+    price_momentum_lookback: 36
   State: 1
 ----------------------------------------
 Trial 37:
-  Value: 4.6099989687417136
+  Value: 4.48774458443936
   Params:
-    learning_rate: 2.198657084706896e-05
-    hidden_dim: 416
-    num_layers: 3
-    kernel_size: 3
-    dropout: 0.39635154905673964
-    batch_size: 64
-    seq_len: 100
-    focal_alpha: 1.660444750004356
-    focal_gamma: 4.452513354018135
-    class_multiplier_0: 2.214989140808221
-    class_multiplier_1: 0.5475593810372799
-    class_multiplier_2: 3.2837959303783
-    rsi_period: 16
-    macd_fast_period: 14
-    macd_slow_period: 22
-    macd_signal_period: 11
-    bb_period: 27
-    bb_num_std_dev: 1.879684361255314
-    atr_period: 7
-    adx_period: 29
-    volume_ma_period: 31
-    price_momentum_lookback: 9
+    learning_rate: 0.0006519276084591399
+    hidden_dim: 224
+    num_layers: 5
+    kernel_size: 2
+    dropout: 0.4077698530228299
+    batch_size: 32
+    seq_len: 230
+    focal_alpha: 1.6645165598702558
+    focal_gamma: 3.1215823685712927
+    class_multiplier_0: 3.6447839230935926
+    class_multiplier_1: 0.7709751496806769
+    class_multiplier_2: 4.57928788526582
+    rsi_period: 62
+    macd_fast_period: 30
+    macd_slow_period: 84
+    macd_signal_period: 13
+    bb_period: 15
+    bb_num_std_dev: 1.348288343146405
+    atr_period: 18
+    adx_period: 32
+    volume_ma_period: 44
+    price_momentum_lookback: 40
   State: 1
 ----------------------------------------
 Trial 38:
-  Value: 4.370950623057022
+  Value: 4.226158931471075
   Params:
-    learning_rate: 0.00010412106725636241
-    hidden_dim: 288
-    num_layers: 2
-    kernel_size: 7
-    dropout: 0.26736517249326663
-    batch_size: 80
-    seq_len: 100
-    focal_alpha: 1.8161086267385373
-    focal_gamma: 3.632281341987395
-    class_multiplier_0: 2.4261195987907724
-    class_multiplier_1: 0.6137589835001822
-    class_multiplier_2: 3.0498777213428854
-    rsi_period: 25
-    macd_fast_period: 16
-    macd_slow_period: 30
-    macd_signal_period: 16
-    bb_period: 23
-    bb_num_std_dev: 2.991444914405356
-    atr_period: 10
-    adx_period: 18
-    volume_ma_period: 36
-    price_momentum_lookback: 15
+    learning_rate: 0.0007396764620364994
+    hidden_dim: 224
+    num_layers: 5
+    kernel_size: 3
+    dropout: 0.4214303925149226
+    batch_size: 32
+    seq_len: 210
+    focal_alpha: 1.7524380297317848
+    focal_gamma: 3.308761817139094
+    class_multiplier_0: 3.5459242549084466
+    class_multiplier_1: 0.8511924599532701
+    class_multiplier_2: 4.466853360109307
+    rsi_period: 78
+    macd_fast_period: 27
+    macd_slow_period: 79
+    macd_signal_period: 14
+    bb_period: 20
+    bb_num_std_dev: 1.2785731473151662
+    atr_period: 17
+    adx_period: 34
+    volume_ma_period: 41
+    price_momentum_lookback: 35
   State: 1
 ----------------------------------------
 Trial 39:
-  Value: 5.0741889341145505
+  Value: 4.328304034160523
   Params:
-    learning_rate: 6.793239320153208e-05
-    hidden_dim: 192
-    num_layers: 3
+    learning_rate: 0.0005841510614502408
+    hidden_dim: 224
+    num_layers: 5
     kernel_size: 2
-    dropout: 0.46776636692792745
+    dropout: 0.41232356318889235
     batch_size: 32
-    seq_len: 90
-    focal_alpha: 1.444843302665089
-    focal_gamma: 4.128770137003824
-    class_multiplier_0: 3.3183640514873196
-    class_multiplier_1: 0.703718175141637
-    class_multiplier_2: 2.6321467909910377
-    rsi_period: 11
-    macd_fast_period: 20
-    macd_slow_period: 27
-    macd_signal_period: 9
-    bb_period: 38
-    bb_num_std_dev: 2.643205222284621
-    atr_period: 13
-    adx_period: 23
-    volume_ma_period: 15
-    price_momentum_lookback: 19
+    seq_len: 190
+    focal_alpha: 1.5833467861528936
+    focal_gamma: 3.1786023166791804
+    class_multiplier_0: 3.7535809180835513
+    class_multiplier_1: 0.823887098216127
+    class_multiplier_2: 4.610885615932619
+    rsi_period: 84
+    macd_fast_period: 35
+    macd_slow_period: 83
+    macd_signal_period: 10
+    bb_period: 18
+    bb_num_std_dev: 1.4350952806476631
+    atr_period: 20
+    adx_period: 34
+    volume_ma_period: 45
+    price_momentum_lookback: 30
   State: 1
 ----------------------------------------
 Trial 40:
-  Value: 3.9308616774735916
+  Value: 4.749774748604847
   Params:
-    learning_rate: 4.396695174658849e-05
-    hidden_dim: 384
+    learning_rate: 0.0006650019624855602
+    hidden_dim: 224
     num_layers: 4
-    kernel_size: 4
-    dropout: 0.1251504915557401
-    batch_size: 48
-    seq_len: 120
-    focal_alpha: 1.1052976272216153
-    focal_gamma: 2.91893816174544
-    class_multiplier_0: 2.564841287930887
-    class_multiplier_1: 0.9986986619202687
-    class_multiplier_2: 3.761762122732934
-    rsi_period: 19
-    macd_fast_period: 23
-    macd_slow_period: 25
-    macd_signal_period: 12
-    bb_period: 50
-    bb_num_std_dev: 1.0208072121642722
-    atr_period: 5
-    adx_period: 26
-    volume_ma_period: 47
-    price_momentum_lookback: 4
+    kernel_size: 3
+    dropout: 0.42699348553933864
+    batch_size: 32
+    seq_len: 260
+    focal_alpha: 1.5165563744460173
+    focal_gamma: 3.5468701378576877
+    class_multiplier_0: 3.833675166842959
+    class_multiplier_1: 0.8198952118775368
+    class_multiplier_2: 4.716704196072
+    rsi_period: 66
+    macd_fast_period: 25
+    macd_slow_period: 88
+    macd_signal_period: 13
+    bb_period: 15
+    bb_num_std_dev: 1.2206149157633452
+    atr_period: 19
+    adx_period: 31
+    volume_ma_period: 42
+    price_momentum_lookback: 39
   State: 1
 ----------------------------------------
 Trial 41:
-  Value: 4.61444391978379
+  Value: 4.5630588872287285
   Params:
-    learning_rate: 3.7272799427718344e-05
-    hidden_dim: 384
-    num_layers: 4
-    kernel_size: 4
-    dropout: 0.10795831877923337
-    batch_size: 48
-    seq_len: 120
-    focal_alpha: 0.9363634589836478
-    focal_gamma: 2.9688773754173616
-    class_multiplier_0: 2.5512003246604213
-    class_multiplier_1: 0.9950785160273837
-    class_multiplier_2: 4.530090662000667
-    rsi_period: 17
-    macd_fast_period: 23
-    macd_slow_period: 25
-    macd_signal_period: 12
-    bb_period: 49
-    bb_num_std_dev: 1.1575093846762856
-    atr_period: 5
-    adx_period: 26
-    volume_ma_period: 46
-    price_momentum_lookback: 3
+    learning_rate: 0.0008429204773229296
+    hidden_dim: 224
+    num_layers: 5
+    kernel_size: 3
+    dropout: 0.4127035410008469
+    batch_size: 32
+    seq_len: 230
+    focal_alpha: 1.7977021350297324
+    focal_gamma: 3.415970422534961
+    class_multiplier_0: 3.722520289227823
+    class_multiplier_1: 0.7648546841212517
+    class_multiplier_2: 4.064892889720071
+    rsi_period: 68
+    macd_fast_period: 37
+    macd_slow_period: 72
+    macd_signal_period: 11
+    bb_period: 17
+    bb_num_std_dev: 1.181803523874844
+    atr_period: 17
+    adx_period: 30
+    volume_ma_period: 43
+    price_momentum_lookback: 33
   State: 1
 ----------------------------------------
 Trial 42:
-  Value: 4.085398581116361
+  Value: 4.576201234457374
   Params:
-    learning_rate: 2.6793875752472736e-05
-    hidden_dim: 352
-    num_layers: 4
-    kernel_size: 2
-    dropout: 0.03388320267614425
-    batch_size: 48
-    seq_len: 120
-    focal_alpha: 1.1252884175103783
-    focal_gamma: 2.622068609089919
-    class_multiplier_0: 2.194106910478685
-    class_multiplier_1: 0.9587819027331139
-    class_multiplier_2: 3.2950076639649186
-    rsi_period: 13
-    macd_fast_period: 30
-    macd_slow_period: 24
-    macd_signal_period: 13
-    bb_period: 50
-    bb_num_std_dev: 1.0473042210512928
-    atr_period: 8
-    adx_period: 28
+    learning_rate: 0.0012040349952064967
+    hidden_dim: 256
+    num_layers: 5
+    kernel_size: 3
+    dropout: 0.4047613786915186
+    batch_size: 32
+    seq_len: 290
+    focal_alpha: 1.7150675241015894
+    focal_gamma: 3.7239928797137614
+    class_multiplier_0: 3.662680645649898
+    class_multiplier_1: 0.7890476644592672
+    class_multiplier_2: 4.384311480302752
+    rsi_period: 70
+    macd_fast_period: 32
+    macd_slow_period: 64
+    macd_signal_period: 12
+    bb_period: 14
+    bb_num_std_dev: 1.1627435805554607
+    atr_period: 18
+    adx_period: 33
     volume_ma_period: 44
-    price_momentum_lookback: 4
+    price_momentum_lookback: 26
   State: 1
 ----------------------------------------
 Trial 43:
-  Value: 4.491263243168467
+  Value: 4.259249436552613
   Params:
-    learning_rate: 1.5309865439138527e-05
-    hidden_dim: 320
-    num_layers: 4
-    kernel_size: 2
-    dropout: 0.02764318088220397
-    batch_size: 64
-    seq_len: 120
-    focal_alpha: 1.1149954723833806
-    focal_gamma: 2.5505381295328027
-    class_multiplier_0: 2.1506891139036046
-    class_multiplier_1: 0.9648200283267142
-    class_multiplier_2: 3.7115776969133485
-    rsi_period: 20
-    macd_fast_period: 30
-    macd_slow_period: 23
-    macd_signal_period: 14
-    bb_period: 49
-    bb_num_std_dev: 1.00774525285084
-    atr_period: 7
-    adx_period: 30
-    volume_ma_period: 48
-    price_momentum_lookback: 4
+    learning_rate: 0.000959148906404896
+    hidden_dim: 224
+    num_layers: 5
+    kernel_size: 3
+    dropout: 0.42323800159685
+    batch_size: 32
+    seq_len: 260
+    focal_alpha: 1.6632070243341273
+    focal_gamma: 4.459117032807434
+    class_multiplier_0: 3.5736462460639316
+    class_multiplier_1: 0.8395032593944064
+    class_multiplier_2: 4.434617140149523
+    rsi_period: 60
+    macd_fast_period: 38
+    macd_slow_period: 70
+    macd_signal_period: 10
+    bb_period: 16
+    bb_num_std_dev: 1.2567622879426354
+    atr_period: 16
+    adx_period: 31
+    volume_ma_period: 42
+    price_momentum_lookback: 23
   State: 1
 ----------------------------------------
 Trial 44:
-  Value: 4.677470974309979
+  Value: 5.190077303028226
   Params:
-    learning_rate: 2.8847156596310938e-05
-    hidden_dim: 352
-    num_layers: 4
-    kernel_size: 2
-    dropout: 0.07603296395536714
-    batch_size: 48
-    seq_len: 120
-    focal_alpha: 1.2502603683024474
-    focal_gamma: 3.199128535879466
-    class_multiplier_0: 2.8051496585881806
-    class_multiplier_1: 0.9399044075676899
-    class_multiplier_2: 3.299154959611418
-    rsi_period: 14
-    macd_fast_period: 25
-    macd_slow_period: 20
-    macd_signal_period: 10
-    bb_period: 50
-    bb_num_std_dev: 1.1406536476395686
-    atr_period: 6
-    adx_period: 24
-    volume_ma_period: 44
-    price_momentum_lookback: 4
+    learning_rate: 0.0007858151396569896
+    hidden_dim: 224
+    num_layers: 5
+    kernel_size: 3
+    dropout: 0.4160504349176051
+    batch_size: 32
+    seq_len: 220
+    focal_alpha: 1.5466730747355941
+    focal_gamma: 3.0721950991387605
+    class_multiplier_0: 3.817992458974404
+    class_multiplier_1: 0.7789830057795922
+    class_multiplier_2: 4.871455533846079
+    rsi_period: 77
+    macd_fast_period: 29
+    macd_slow_period: 79
+    macd_signal_period: 12
+    bb_period: 19
+    bb_num_std_dev: 1.078583078869696
+    atr_period: 21
+    adx_period: 36
+    volume_ma_period: 41
+    price_momentum_lookback: 28
   State: 1
 ----------------------------------------
 Trial 45:
-  Value: 4.157747263054126
+  Value: 4.45577842796492
   Params:
-    learning_rate: 0.0008268426945101885
+    learning_rate: 0.0018080076794743784
     hidden_dim: 256
     num_layers: 4
     kernel_size: 3
-    dropout: 0.1322479812566269
-    batch_size: 48
-    seq_len: 120
-    focal_alpha: 0.748751134669857
-    focal_gamma: 2.110983418354631
-    class_multiplier_0: 2.4430628427985805
-    class_multiplier_1: 0.8955322122145825
-    class_multiplier_2: 3.462549984244573
-    rsi_period: 24
-    macd_fast_period: 29
-    macd_slow_period: 26
-    macd_signal_period: 12
-    bb_period: 15
-    bb_num_std_dev: 1.2760307625324965
-    atr_period: 8
-    adx_period: 27
-    volume_ma_period: 40
-    price_momentum_lookback: 6
+    dropout: 0.4081662517443664
+    batch_size: 32
+    seq_len: 180
+    focal_alpha: 1.6153453990475808
+    focal_gamma: 4.042184234370562
+    class_multiplier_0: 4.401078501254656
+    class_multiplier_1: 0.7937358230141354
+    class_multiplier_2: 4.555239236951791
+    rsi_period: 65
+    macd_fast_period: 34
+    macd_slow_period: 76
+    macd_signal_period: 14
+    bb_period: 13
+    bb_num_std_dev: 1.02780430490744
+    atr_period: 16
+    adx_period: 30
+    volume_ma_period: 45
+    price_momentum_lookback: 35
   State: 1
 ----------------------------------------
 Trial 46:
-  Value: 4.162373959492577
+  Value: 4.820513785557837
   Params:
-    learning_rate: 4.364375007865832e-05
-    hidden_dim: 288
-    num_layers: 4
-    kernel_size: 2
-    dropout: 0.060186201662039474
-    batch_size: 64
-    seq_len: 120
-    focal_alpha: 0.9857870877363584
-    focal_gamma: 2.7844764324585034
-    class_multiplier_0: 2.010417587554953
-    class_multiplier_1: 0.9902767264417104
-    class_multiplier_2: 3.9397972774998293
-    rsi_period: 27
-    macd_fast_period: 27
-    macd_slow_period: 42
-    macd_signal_period: 11
-    bb_period: 47
-    bb_num_std_dev: 1.3555563446130423
-    atr_period: 5
-    adx_period: 24
-    volume_ma_period: 50
-    price_momentum_lookback: 17
+    learning_rate: 0.001121537768270694
+    hidden_dim: 224
+    num_layers: 5
+    kernel_size: 3
+    dropout: 0.4271404512568245
+    batch_size: 48
+    seq_len: 200
+    focal_alpha: 1.6880171070124859
+    focal_gamma: 3.868998543062246
+    class_multiplier_0: 3.6886965396711227
+    class_multiplier_1: 0.7527709851887578
+    class_multiplier_2: 4.489980522916921
+    rsi_period: 75
+    macd_fast_period: 36
+    macd_slow_period: 60
+    macd_signal_period: 9
+    bb_period: 18
+    bb_num_std_dev: 1.156392959670976
+    atr_period: 22
+    adx_period: 32
+    volume_ma_period: 43
+    price_momentum_lookback: 30
   State: 1
 ----------------------------------------
 Trial 47:
-  Value: 4.541716585858263
+  Value: 4.954875275363451
   Params:
-    learning_rate: 2.5521566307126103e-05
-    hidden_dim: 352
-    num_layers: 4
-    kernel_size: 3
-    dropout: 0.021291185498869367
-    batch_size: 128
-    seq_len: 120
-    focal_alpha: 1.3198081361456262
-    focal_gamma: 3.0336449192898383
-    class_multiplier_0: 3.623414781135982
-    class_multiplier_1: 0.9040054587961484
-    class_multiplier_2: 4.967419369506682
-    rsi_period: 9
-    macd_fast_period: 24
-    macd_slow_period: 48
-    macd_signal_period: 8
-    bb_period: 17
-    bb_num_std_dev: 1.0887626313927679
-    atr_period: 8
-    adx_period: 21
-    volume_ma_period: 43
-    price_momentum_lookback: 19
+    learning_rate: 0.0005133995654876163
+    hidden_dim: 224
+    num_layers: 5
+    kernel_size: 2
+    dropout: 0.40415119413181555
+    batch_size: 32
+    seq_len: 280
+    focal_alpha: 1.743363541798812
+    focal_gamma: 3.7756313459145114
+    class_multiplier_0: 3.7544950551118514
+    class_multiplier_1: 0.7327815104240587
+    class_multiplier_2: 4.283456813909189
+    rsi_period: 58
+    macd_fast_period: 39
+    macd_slow_period: 86
+    macd_signal_period: 16
+    bb_period: 16
+    bb_num_std_dev: 1.2044815660146264
+    atr_period: 15
+    adx_period: 44
+    volume_ma_period: 44
+    price_momentum_lookback: 46
   State: 1
 ----------------------------------------
 Trial 48:
-  Value: 4.683041226777322
+  Value: 4.291960577322688
   Params:
-    learning_rate: 8.18630025686959e-05
-    hidden_dim: 320
-    num_layers: 4
-    kernel_size: 2
-    dropout: 0.0023862476152018974
-    batch_size: 80
-    seq_len: 110
-    focal_alpha: 1.147472990650987
-    focal_gamma: 3.3709372750305033
-    class_multiplier_0: 3.037910249252836
-    class_multiplier_1: 0.9783943962331423
-    class_multiplier_2: 4.130203527645431
-    rsi_period: 37
-    macd_fast_period: 30
-    macd_slow_period: 22
-    macd_signal_period: 15
-    bb_period: 50
-    bb_num_std_dev: 1.23664060006898
-    atr_period: 21
-    adx_period: 29
-    volume_ma_period: 38
-    price_momentum_lookback: 3
+    learning_rate: 0.0013511721955245329
+    hidden_dim: 224
+    num_layers: 6
+    kernel_size: 3
+    dropout: 0.4106805447455629
+    batch_size: 32
+    seq_len: 250
+    focal_alpha: 1.453342283813231
+    focal_gamma: 3.538623433346661
+    class_multiplier_0: 3.61976510257521
+    class_multiplier_1: 0.8858799920550366
+    class_multiplier_2: 4.175042667000148
+    rsi_period: 68
+    macd_fast_period: 33
+    macd_slow_period: 65
+    macd_signal_period: 27
+    bb_period: 13
+    bb_num_std_dev: 1.0534351952612508
+    atr_period: 19
+    adx_period: 36
+    volume_ma_period: 39
+    price_momentum_lookback: 33
   State: 1
 ----------------------------------------
 Trial 49:
-  Value: 4.275466080113394
+  Value: 4.024618094768023
   Params:
-    learning_rate: 1.1050822661137438e-05
-    hidden_dim: 384
+    learning_rate: 0.0012364091625228252
+    hidden_dim: 256
     num_layers: 4
     kernel_size: 3
-    dropout: 0.1721955740044628
-    batch_size: 112
+    dropout: 0.4180796078470397
+    batch_size: 48
     seq_len: 120
-    focal_alpha: 1.1935617931236688
-    focal_gamma: 2.5023385722794105
-    class_multiplier_0: 3.8261758979624014
-    class_multiplier_1: 0.8725407000977365
-    class_multiplier_2: 4.79735298567158
-    rsi_period: 46
-    macd_fast_period: 22
-    macd_slow_period: 24
-    macd_signal_period: 20
-    bb_period: 33
-    bb_num_std_dev: 1.4586380957605427
-    atr_period: 24
-    adx_period: 26
-    volume_ma_period: 47
-    price_momentum_lookback: 12
+    focal_alpha: 1.5638180088435338
+    focal_gamma: 3.6483975787894
+    class_multiplier_0: 3.5347125773748496
+    class_multiplier_1: 0.9335607835986152
+    class_multiplier_2: 4.22817845514183
+    rsi_period: 72
+    macd_fast_period: 20
+    macd_slow_period: 68
+    macd_signal_period: 12
+    bb_period: 14
+    bb_num_std_dev: 1.1144858044605306
+    atr_period: 21
+    adx_period: 33
+    volume_ma_period: 42
+    price_momentum_lookback: 24
   State: 1
 ----------------------------------------
