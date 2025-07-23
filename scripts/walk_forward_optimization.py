@@ -482,7 +482,7 @@ class WalkForwardOptimizer:
                 logger.info(f"TorchScript model saved to: {scripted_model_path}")
             except Exception as e:
                 logger.error(f"Failed to export TorchScript model: {e}")
-                scripted_model_path = None
+                raise  # Re-raise the exception to crash the script
 
             # --- Save scaler ---
             import pickle
