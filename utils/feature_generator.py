@@ -477,8 +477,8 @@ class FeatureGenerator:
             DataFrame with generated features
         """
         # Define thresholds for different processing methods
-        small_threshold = 10000  # Use simple processing
-        medium_threshold = 100000  # Use parallel processing
+        small_threshold = 5000  # Use simple processing
+        medium_threshold = 12000  # Use parallel processing
         large_threshold = 500000  # Use batch processing
         
         total_rows = len(ohlcv_data)
