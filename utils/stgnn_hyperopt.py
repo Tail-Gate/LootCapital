@@ -342,12 +342,12 @@ def objective(trial: optuna.Trial) -> float:
             ],  # Full feature set (23 features, removed problematic adx)
             
             'learning_rate': trial.suggest_float('learning_rate', 0.0005, 0.0025, log=True), # Centered around 0.001578
-            'hidden_dim': trial.suggest_int('hidden_dim', 224, 288, step=32), # Centered around 256
+            'hidden_dim': trial.suggest_int('hidden_dim', 224, 512, step=32), # Centered around 256
             'num_layers': trial.suggest_int('num_layers', 4, 7), # Around 4
             'kernel_size': trial.suggest_int('kernel_size', 2, 3), # Around 2
-            'dropout': trial.suggest_float('dropout', 0.4, 0.5), # Around 0.4985
+            'dropout': trial.suggest_float('dropout', 0.3, 0.6), # Around 0.4985
             'batch_size': trial.suggest_int('batch_size', 32, 64, step=16), # Around 48
-            'seq_len': trial.suggest_int('seq_len', 120, 300, step=10), # Around 110
+            'seq_len': trial.suggest_int('seq_len', 40, 120, step=10), # Around 110
             'prediction_horizon': 15,
             'early_stopping_patience': 5,
             
@@ -356,17 +356,17 @@ def objective(trial: optuna.Trial) -> float:
             'focal_gamma': trial.suggest_float('focal_gamma', 3.0, 4.5), # Around 3.7522
             
             'class_multiplier_0': trial.suggest_float('class_multiplier_0', 3.5, 4.5),  # Around 3.9929
-            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 0.7, 1.0), # Around 0.8613
+            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 0.7, 2.0), # Around 0.8613
             'class_multiplier_2': trial.suggest_float('class_multiplier_2', 4.0, 5.0),  # Around 4.8036  # Up class
             
             # Price threshold (fixed)
             'price_threshold': 0.005,  # Fixed 0.5% threshold for classification
             
             # Feature engineering parameters (searchable)
-            'rsi_period': trial.suggest_int('rsi_period', 50, 100),
-            'macd_fast_period': trial.suggest_int('macd_fast_period', 20, 50),
-            'macd_slow_period': trial.suggest_int('macd_slow_period', 50, 90),
-            'macd_signal_period': trial.suggest_int('macd_signal_period', 9, 30),
+            'rsi_period': trial.suggest_int('rsi_period', 7, 30),
+            'macd_fast_period': trial.suggest_int('macd_fast_period', 10, 20),
+            'macd_slow_period': trial.suggest_int('macd_slow_period', 20, 50),
+            'macd_signal_period': trial.suggest_int('macd_signal_period', 9, 20),
             'bb_period': trial.suggest_int('bb_period', 10, 20),
             'bb_num_std_dev': trial.suggest_float('bb_num_std_dev', 1.0, 1.5),
             'atr_period': trial.suggest_int('atr_period', 15, 25),
