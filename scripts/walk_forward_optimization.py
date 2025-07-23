@@ -469,8 +469,54 @@ class WalkForwardOptimizer:
             # Save model
             logger.info("Saving model...")
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            model_path = self.output_dir / f'wfo_stgnn_{period_data["period_name"]}_{timestamp}.pt'
-            
+            model_dir = self.output_dir / f'wfo_stgnn_{period_data["period_name"]}_{timestamp}'
+            model_dir.mkdir(parents=True, exist_ok=True)
+
+            # --- TorchScript export ---
+            try:
+                scripted_model_path = model_dir / 'model_scripted.pt'
+                trainer.model.cpu()
+                trainer.model.eval()
+                scripted_model = torch.jit.script(trainer.model)
+                scripted_model.save(str(scripted_model_path))
+                logger.info(f"TorchScript model saved to: {scripted_model_path}")
+            except Exception as e:
+                logger.error(f"Failed to export TorchScript model: {e}")
+                scripted_model_path = None
+
+            # --- Save scaler ---
+            import pickle
+            scaler_path = model_dir / 'scaler.pkl'
+            try:
+                with open(scaler_path, 'wb') as f:
+                    pickle.dump(data_processor.scaler, f)
+                logger.info(f"Scaler saved to: {scaler_path}")
+            except Exception as e:
+                logger.error(f"Failed to save scaler: {e}")
+                scaler_path = None
+
+            # --- Save feature schema ---
+            features_path = model_dir / 'features.json'
+            try:
+                with open(features_path, 'w') as f:
+                    json.dump(list(config.features), f, indent=2)
+                logger.info(f"Feature schema saved to: {features_path}")
+            except Exception as e:
+                logger.error(f"Failed to save feature schema: {e}")
+                features_path = None
+
+            # --- Save model config (optional) ---
+            config_path = model_dir / 'model_config.json'
+            try:
+                with open(config_path, 'w') as f:
+                    json.dump(config.to_dict() if hasattr(config, 'to_dict') else dict(config), f, indent=2, default=str)
+                logger.info(f"Model config saved to: {config_path}")
+            except Exception as e:
+                logger.error(f"Failed to save model config: {e}")
+                config_path = None
+
+            # --- Save the original model checkpoint (state_dict and metadata) ---
+            checkpoint_path = model_dir / 'model_checkpoint.pt'
             torch.save({
                 'model_state_dict': trainer.model.state_dict(),
                 'config': config,
@@ -483,8 +529,16 @@ class WalkForwardOptimizer:
                     'true_labels': str(labels_file),
                     'predictions': str(pred_file),
                     'csv_summary': str(csv_file)
-                }
-            }, model_path)
+                },
+                'torchscript_path': str(scripted_model_path) if scripted_model_path else None,
+                'scaler_path': str(scaler_path) if scaler_path else None,
+                'features_path': str(features_path) if features_path else None,
+                'config_path': str(config_path) if config_path else None
+            }, checkpoint_path)
+            logger.info(f"Model checkpoint (state_dict and metadata) saved to: {checkpoint_path}")
+
+            # For backward compatibility, set model_path to the new checkpoint path
+            model_path = checkpoint_path
             
             period_time = time.time() - period_start_time
             logger.info(f"Period {period_data['period_name']} completed in {period_time:.2f} seconds")
