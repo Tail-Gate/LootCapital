@@ -468,20 +468,39 @@ class WalkForwardOptimizer:
             
             # Save model
             logger.info("Saving model...")
+            print("[DEBUG] Saving model...")
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             model_dir = self.output_dir / f'wfo_stgnn_{period_data["period_name"]}_{timestamp}'
             model_dir.mkdir(parents=True, exist_ok=True)
 
             # --- TorchScript export ---
             try:
+                print("[DEBUG] Starting TorchScript export...")
+                logger.info(f"Model type: {type(trainer.model)}")
+                print(f"[DEBUG] Model type: {type(trainer.model)}")
+                logger.info(f"Model device: {next(trainer.model.parameters()).device}")
+                print(f"[DEBUG] Model device: {next(trainer.model.parameters()).device}")
                 scripted_model_path = model_dir / 'model_scripted.pt'
                 trainer.model.cpu()
+                logger.info("Model moved to CPU.")
+                print("[DEBUG] Model moved to CPU.")
                 trainer.model.eval()
+                logger.info("Model set to eval mode.")
+                print("[DEBUG] Model set to eval mode.")
                 scripted_model = torch.jit.script(trainer.model)
+                logger.info("Model scripted with torch.jit.script.")
+                print("[DEBUG] Model scripted with torch.jit.script.")
                 scripted_model.save(str(scripted_model_path))
                 logger.info(f"TorchScript model saved to: {scripted_model_path}")
+                print(f"[DEBUG] TorchScript model saved to: {scripted_model_path}")
             except Exception as e:
                 logger.error(f"Failed to export TorchScript model: {e}")
+                print(f"[ERROR] Failed to export TorchScript model: {e}")
+                import traceback
+                tb_str = traceback.format_exc()
+                logger.error(f"Traceback for TorchScript export error:\n{tb_str}")
+                print(f"[ERROR] Traceback for TorchScript export error:\n{tb_str}")
+                scripted_model_path = None
                 raise  # Re-raise the exception to crash the script
 
             # --- Save scaler ---
