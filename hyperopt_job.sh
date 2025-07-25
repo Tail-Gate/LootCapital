@@ -85,7 +85,7 @@ export OPENBLAS_NUM_THREADS=32
 
 
 # --- Step 7.5: Determine resume point for walk-forward optimization ---
-RESUME_ARGS="--start-date 2025-03-01 --train-window-days 30 --test-window-days 30 --step-size-days 30"
+RESUME_ARGS="--start-date 2024-05-01"
 
 # --- Step 8: Run your Python script with memory monitoring ---
 echo "Starting memory-optimized walk_forward_optimization script..."
