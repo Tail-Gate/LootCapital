@@ -63,7 +63,7 @@ class GraphConvolution(nn.Module):
             if x.shape[1] != adj.shape[0]:
                 raise ValueError(f"Node dimension mismatch: x has {x.shape[1]} nodes but adj has {adj.shape[0]} nodes")
                 
-    def forward(self, x: torch.Tensor, adj: torch.Tensor, return_attention: bool = False) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, adj: torch.Tensor, return_attention: bool = False) -> torch.Tensor | Tuple[torch.Tensor, torch.Tensor]:
         """
         Args:
             x: Input features of shape [batch_size, num_nodes, in_features] or [num_nodes, in_features]
@@ -166,7 +166,7 @@ class TemporalConvolution(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.relu = nn.ReLU()
         
-    def forward(self, x: torch.Tensor, return_attention: bool = False) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, return_attention: bool = False) -> torch.Tensor | Tuple[torch.Tensor, torch.Tensor]:
         """
         Args:
             x: Input tensor of shape [batch_size, num_nodes, seq_len, in_channels]
