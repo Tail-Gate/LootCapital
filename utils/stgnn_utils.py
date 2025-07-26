@@ -6,9 +6,6 @@ import numpy as np
 import math
 import os
 
-import logging
-logger = logging.getLogger(__name__)
-
 class GraphConvolution(nn.Module):
     """Graph Convolution Layer for spatial dependencies with optimized operations"""
     def __init__(self, in_features: int, out_features: int, bias: bool = True, 
@@ -77,20 +74,16 @@ class GraphConvolution(nn.Module):
             Output features of shape [batch_size, num_nodes, out_features]
             Attention weights if return_attention is True
         """
-        # CRITICAL FIX: Validate inputs for NaN/Inf
+        # CRITICAL FIX: Validate inputs for NaN/Inf (TorchScript compatible)
         if torch.isnan(x).any() or torch.isinf(x).any():
-            logger.error(f"NaN/Inf detected in GraphConvolution input x. Shape: {x.shape}")
-            logger.error(f"Input x stats: min={x.min().item()}, max={x.max().item()}, mean={x.mean().item()}")
-            # Return zeros to prevent downstream errors
+            # Return zeros to prevent downstream errors (no logging for TorchScript compatibility)
             if x.dim() == 2:
                 return torch.zeros(x.shape[0], self.out_features, device=x.device)
             else:
                 return torch.zeros(x.shape[0], x.shape[1], self.out_features, device=x.device)
         
         if torch.isnan(adj).any() or torch.isinf(adj).any():
-            logger.error(f"NaN/Inf detected in GraphConvolution input adj. Shape: {adj.shape}")
-            logger.error(f"Input adj stats: min={adj.min().item()}, max={adj.max().item()}, mean={adj.mean().item()}")
-            # Return zeros to prevent downstream errors
+            # Return zeros to prevent downstream errors (no logging for TorchScript compatibility)
             if x.dim() == 2:
                 return torch.zeros(x.shape[0], self.out_features, device=x.device)
             else:
@@ -136,11 +129,9 @@ class GraphConvolution(nn.Module):
         if self.bias is not None:
             output += self.bias
         
-        # CRITICAL FIX: Validate GraphConvolution output
+        # CRITICAL FIX: Validate GraphConvolution output (TorchScript compatible)
         if torch.isnan(output).any() or torch.isinf(output).any():
-            logger.error(f"NaN/Inf detected in GraphConvolution output. Shape: {output.shape}")
-            logger.error(f"Output stats: min={output.min().item()}, max={output.max().item()}, mean={output.mean().item()}")
-            # Return zeros to prevent downstream errors
+            # Return zeros to prevent downstream errors (no logging for TorchScript compatibility)
             if x.dim() == 2:
                 return torch.zeros(x.shape[0], self.out_features, device=x.device)
             else:
@@ -184,11 +175,9 @@ class TemporalConvolution(nn.Module):
             Output tensor of shape [batch_size, num_nodes, seq_len, out_channels]
             If return_attention is True, also returns normalized attention weights
         """
-        # CRITICAL FIX: Validate TemporalConvolution input
+        # CRITICAL FIX: Validate TemporalConvolution input (TorchScript compatible)
         if torch.isnan(x).any() or torch.isinf(x).any():
-            logger.error(f"NaN/Inf detected in TemporalConvolution input x. Shape: {x.shape}")
-            logger.error(f"Input x stats: min={x.min().item()}, max={x.max().item()}, mean={x.mean().item()}")
-            # Return zeros to prevent downstream errors
+            # Return zeros to prevent downstream errors (no logging for TorchScript compatibility)
             batch_size, num_nodes, seq_len, in_channels = x.shape
             return torch.zeros(batch_size, num_nodes, seq_len, self.conv.out_channels, device=x.device)
         
@@ -210,11 +199,9 @@ class TemporalConvolution(nn.Module):
         x = x.reshape(batch_size, num_nodes, out_channels, out_seq_len)  # [batch_size, num_nodes, out_channels, out_seq_len]
         x = x.permute(0, 1, 3, 2)  # [batch_size, num_nodes, out_seq_len, out_channels]
         
-        # CRITICAL FIX: Validate TemporalConvolution output
+        # CRITICAL FIX: Validate TemporalConvolution output (TorchScript compatible)
         if torch.isnan(x).any() or torch.isinf(x).any():
-            logger.error(f"NaN/Inf detected in TemporalConvolution output. Shape: {x.shape}")
-            logger.error(f"Output stats: min={x.min().item()}, max={x.max().item()}, mean={x.mean().item()}")
-            # Return zeros to prevent downstream errors
+            # Return zeros to prevent downstream errors (no logging for TorchScript compatibility)
             return torch.zeros(batch_size, num_nodes, out_seq_len, out_channels, device=x.device)
         
         if return_attention:
@@ -276,18 +263,14 @@ class STGNNModel(nn.Module):
             - output: Model predictions of shape [batch_size, num_nodes, output_dim]
             - attention_dict: Dictionary containing attention weights for visualization
         """
-        # CRITICAL FIX: Validate inputs before processing
+        # CRITICAL FIX: Validate inputs before processing (TorchScript compatible)
         if torch.isnan(x).any() or torch.isinf(x).any():
-            logger.error(f"NaN/Inf detected in input x to STGNNModel. Shape: {x.shape}")
-            logger.error(f"Input x stats: min={x.min().item()}, max={x.max().item()}, mean={x.mean().item()}")
-            # Return zeros to prevent downstream errors
+            # Return zeros to prevent downstream errors (no logging for TorchScript compatibility)
             batch_size, num_nodes, seq_len, _ = x.shape
             return torch.zeros(batch_size, num_nodes, self.output_dim, device=x.device), {}
         
         if torch.isnan(adj).any() or torch.isinf(adj).any():
-            logger.error(f"NaN/Inf detected in input adj to STGNNModel. Shape: {adj.shape}")
-            logger.error(f"Input adj stats: min={adj.min().item()}, max={adj.max().item()}, mean={adj.mean().item()}")
-            # Return zeros to prevent downstream errors
+            # Return zeros to prevent downstream errors (no logging for TorchScript compatibility)
             batch_size, num_nodes, seq_len, _ = x.shape
             return torch.zeros(batch_size, num_nodes, self.output_dim, device=x.device), {}
         
@@ -296,11 +279,9 @@ class STGNNModel(nn.Module):
         # Input projection
         x = self.input_proj(x)  # [batch_size, num_nodes, seq_len, hidden_dim]
         
-        # CRITICAL FIX: Validate input projection
+        # CRITICAL FIX: Validate input projection (TorchScript compatible)
         if torch.isnan(x).any() or torch.isinf(x).any():
-            logger.error(f"NaN/Inf detected after input_proj. Shape: {x.shape}")
-            logger.error(f"Input projection stats: min={x.min().item()}, max={x.max().item()}, mean={x.mean().item()}")
-            # Return zeros to prevent downstream errors
+            # Return zeros to prevent downstream errors (no logging for TorchScript compatibility)
             return torch.zeros(batch_size, num_nodes, self.output_dim, device=x.device), {}
         
         attention_dict = {}
@@ -318,21 +299,17 @@ class STGNNModel(nn.Module):
             # Stack time steps back together
             x_spatial = torch.stack(x_spatial, dim=2)  # [batch_size, num_nodes, seq_len, hidden_dim]
             
-            # CRITICAL FIX: Validate spatial layer output
+            # CRITICAL FIX: Validate spatial layer output (TorchScript compatible)
             if torch.isnan(x_spatial).any() or torch.isinf(x_spatial).any():
-                logger.error(f"NaN/Inf detected after spatial layer {i}. Shape: {x_spatial.shape}")
-                logger.error(f"Spatial layer stats: min={x_spatial.min().item()}, max={x_spatial.max().item()}, mean={x_spatial.mean().item()}")
-                # Return zeros to prevent downstream errors
+                # Return zeros to prevent downstream errors (no logging for TorchScript compatibility)
                 return torch.zeros(batch_size, num_nodes, self.output_dim, device=x.device), {}
             
             # Temporal processing
             x_temporal, attn = self.temporal_layers[i](x_spatial, return_attention=True)  # [batch_size, num_nodes, seq_len, hidden_dim]
             
-            # CRITICAL FIX: Validate temporal layer output
+            # CRITICAL FIX: Validate temporal layer output (TorchScript compatible)
             if torch.isnan(x_temporal).any() or torch.isinf(x_temporal).any():
-                logger.error(f"NaN/Inf detected after temporal layer {i}. Shape: {x_temporal.shape}")
-                logger.error(f"Temporal layer stats: min={x_temporal.min().item()}, max={x_temporal.max().item()}, mean={x_temporal.mean().item()}")
-                # Return zeros to prevent downstream errors
+                # Return zeros to prevent downstream errors (no logging for TorchScript compatibility)
                 return torch.zeros(batch_size, num_nodes, self.output_dim, device=x.device), {}
             
             # Residual connection and layer normalization
@@ -341,11 +318,9 @@ class STGNNModel(nn.Module):
             x = x + x_temporal
             x = self.layer_norm(x)
             
-            # CRITICAL FIX: Validate layer normalization output
+            # CRITICAL FIX: Validate layer normalization output (TorchScript compatible)
             if torch.isnan(x).any() or torch.isinf(x).any():
-                logger.error(f"NaN/Inf detected after layer_norm {i}. Shape: {x.shape}")
-                logger.error(f"Layer norm stats: min={x.min().item()}, max={x.max().item()}, mean={x.mean().item()}")
-                # Return zeros to prevent downstream errors
+                # Return zeros to prevent downstream errors (no logging for TorchScript compatibility)
                 return torch.zeros(batch_size, num_nodes, self.output_dim, device=x.device), {}
             
             attention_dict[f'layer_{i}_temporal'] = attn
@@ -354,11 +329,9 @@ class STGNNModel(nn.Module):
         x = x[:, :, -1, :]  # [batch_size, num_nodes, hidden_dim]
         output = self.output_proj(x)  # [batch_size, num_nodes, output_dim]
         
-        # CRITICAL FIX: Validate output projection
+        # CRITICAL FIX: Validate output projection (TorchScript compatible)
         if torch.isnan(output).any() or torch.isinf(output).any():
-            logger.error(f"NaN/Inf detected after output_proj. Shape: {output.shape}")
-            logger.error(f"Output projection stats: min={output.min().item()}, max={output.max().item()}, mean={output.mean().item()}")
-            # Return zeros to prevent downstream errors
+            # Return zeros to prevent downstream errors (no logging for TorchScript compatibility)
             return torch.zeros(batch_size, num_nodes, self.output_dim, device=x.device), {}
         
         return output, attention_dict
