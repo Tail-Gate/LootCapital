@@ -8,6 +8,8 @@ This script implements walk-forward optimization to:
 3. Validate strategy performance on out-of-sample data
 4. Optimize hyperparameters over time
 5. Uses SMOTE for class balancing in training
+6. Saves TorchScript models for production inference
+7. Saves fitted scalers and feature lists for consistent preprocessing
 """
 
 import os
@@ -29,6 +31,7 @@ from imblearn.over_sampling import SMOTE
 import argparse
 import gc  # For garbage collection
 import psutil  # For memory monitoring
+import joblib  # For saving scaler
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -193,6 +196,10 @@ class WalkForwardOptimizer:
             'train_metrics': [],
             'test_metrics': [],
             'model_paths': [],
+            'torchscript_paths': [],
+            'scaler_paths': [],
+            'features_paths': [],
+            'metadata_paths': [],
             'configs': []
         }
         
@@ -471,6 +478,7 @@ class WalkForwardOptimizer:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             model_path = self.output_dir / f'wfo_stgnn_{period_data["period_name"]}_{timestamp}.pt'
             
+            # 1. Save regular PyTorch model
             torch.save({
                 'model_state_dict': trainer.model.state_dict(),
                 'config': config,
@@ -486,6 +494,65 @@ class WalkForwardOptimizer:
                 }
             }, model_path)
             
+            # 2. Convert to TorchScript and save
+            logger.info("Converting model to TorchScript...")
+            trainer.model.eval()  # Set to evaluation mode
+            
+            # Create dummy inputs for tracing with exact shapes and types
+            # X shape: (1, seq_len, num_nodes, input_dim)
+            dummy_X = X_train[0:1].clone()  # Take first sample as dummy input
+            # adj shape: (1, num_nodes, num_nodes)
+            dummy_adj = adj_train[0:1].clone()  # Take first sample as dummy input
+            
+            logger.info(f"TorchScript tracing with dummy inputs - X shape: {dummy_X.shape}, adj shape: {dummy_adj.shape}")
+            
+            # Trace the model
+            with torch.no_grad():
+                scripted_model = torch.jit.trace(trainer.model, (dummy_X, dummy_adj))
+            
+            # Save TorchScript model
+            torchscript_path = self.output_dir / f'wfo_stgnn_torchscript_{period_data["period_name"]}_{timestamp}.pt'
+            scripted_model.save(str(torchscript_path))
+            logger.info(f"TorchScript model saved to: {torchscript_path}")
+            
+            # 3. Save fitted scaler
+            logger.info("Saving fitted scaler...")
+            scaler_path = self.output_dir / f'wfo_stgnn_scaler_{period_data["period_name"]}_{timestamp}.joblib'
+            joblib.dump(data_processor.scaler, scaler_path)
+            logger.info(f"Scaler saved to: {scaler_path}")
+            
+            # 4. Save feature list (order is critical for inference)
+            logger.info("Saving feature list...")
+            features_path = self.output_dir / f'wfo_stgnn_features_{period_data["period_name"]}_{timestamp}.json'
+            with open(features_path, 'w') as f:
+                json.dump(config.features, f, indent=4)
+            logger.info(f"Feature list saved to: {features_path}")
+            
+            # 5. Save inference metadata
+            inference_metadata = {
+                'model_path': str(model_path),
+                'torchscript_path': str(torchscript_path),
+                'scaler_path': str(scaler_path),
+                'features_path': str(features_path),
+                'input_shapes': {
+                    'X_shape': list(dummy_X.shape),
+                    'adj_shape': list(dummy_adj.shape)
+                },
+                'config': {
+                    'num_nodes': config.num_nodes,
+                    'input_dim': config.input_dim,
+                    'seq_len': config.seq_len,
+                    'output_dim': config.output_dim
+                },
+                'period_name': period_data['period_name'],
+                'timestamp': timestamp
+            }
+            
+            metadata_path = self.output_dir / f'wfo_stgnn_inference_metadata_{period_data["period_name"]}_{timestamp}.json'
+            with open(metadata_path, 'w') as f:
+                json.dump(inference_metadata, f, indent=4)
+            logger.info(f"Inference metadata saved to: {metadata_path}")
+            
             period_time = time.time() - period_start_time
             logger.info(f"Period {period_data['period_name']} completed in {period_time:.2f} seconds")
             
@@ -494,6 +561,10 @@ class WalkForwardOptimizer:
                 'train_metrics': train_metrics,
                 'test_metrics': test_metrics,
                 'model_path': str(model_path),
+                'torchscript_path': str(torchscript_path),
+                'scaler_path': str(scaler_path),
+                'features_path': str(features_path),
+                'metadata_path': str(metadata_path),
                 'config': config,
                 'training_history': training_history
             }
@@ -547,6 +618,10 @@ class WalkForwardOptimizer:
                 self.results['train_metrics'].append(result['train_metrics'])
                 self.results['test_metrics'].append(result['test_metrics'])
                 self.results['model_paths'].append(result['model_path'])
+                self.results['torchscript_paths'].append(result['torchscript_path'])
+                self.results['scaler_paths'].append(result['scaler_path'])
+                self.results['features_paths'].append(result['features_path'])
+                self.results['metadata_paths'].append(result['metadata_path'])
                 self.results['configs'].append(result['config'])
                 
                 # Log results
@@ -554,6 +629,11 @@ class WalkForwardOptimizer:
                 logger.info(f"  Test Accuracy: {result['test_metrics']['classification_report']['accuracy']:.4f}")
                 logger.info(f"  Test F1 (Up): {result['test_metrics']['f1'][2]:.4f}")
                 logger.info(f"  Test F1 (Down): {result['test_metrics']['f1'][0]:.4f}")
+                logger.info(f"  Inference files created:")
+                logger.info(f"    TorchScript: {result['torchscript_path']}")
+                logger.info(f"    Scaler: {result['scaler_path']}")
+                logger.info(f"    Features: {result['features_path']}")
+                logger.info(f"    Metadata: {result['metadata_path']}")
             else:
                 failed_periods += 1
                 logger.error(f"✗ Period {split['period_name']} failed")
