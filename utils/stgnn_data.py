@@ -361,8 +361,21 @@ class STGNNDataProcessor:
         # Store original price data for event-based analysis
         self._original_prices = asset_data['close'].copy()
         
-        # Create sequences
-        X, y = self.create_sequences_lazy(features)
+        # FIXED: Add proper feature scaling like in multi-asset path
+        # Fit scaler on training data (use first 80% of data)
+        if not self.scaler_fitted:
+            print("Fitting scaler on single asset data...")
+            train_size = int(len(features) * 0.8)
+            train_features = features.iloc[:train_size]
+            self.fit_scaler(train_features)
+            print(f"Scaler fitted on {len(train_features)} samples with {len(train_features.columns)} features")
+        
+        # Transform features using fitted scaler
+        print("Transforming features using fitted scaler...")
+        scaled_features = self.transform_features(features)
+        
+        # Create sequences from scaled features
+        X, y = self.create_sequences_lazy(scaled_features)
         
         # CRITICAL FIX: Validate sequences after creation
         if len(X) == 0:
@@ -385,7 +398,7 @@ class STGNNDataProcessor:
                 return np.array([]), np.array([])
         
         # Clean up immediately
-        del data, asset_data, features
+        del data, asset_data, features, scaled_features
         manage_memory()
         
         return X, y

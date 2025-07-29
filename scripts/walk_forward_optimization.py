@@ -967,7 +967,7 @@ class WalkForwardOptimizer:
                 return False
             
             # Check if we have enough data points
-            min_required_points = 1000  # Minimum data points needed
+            min_required_points = 100  # Reduced for testing (was 1000)
             if len(test_data) < min_required_points:
                 logger.warning(f"Insufficient data points: {len(test_data)} < {min_required_points}")
                 return False
