@@ -199,7 +199,7 @@ class WalkForwardOptimizer:
                  train_window_days: int = 180,  # 6 months training
                  test_window_days: int = 30,    # 1 month testing
                  step_size_days: int = 15,      # 2 weeks step
-                 price_threshold: float = 0.005,
+                 price_threshold: float = 0.02,
                  output_dir: str = "models",
                  reports_dir: str = "reports",
                  plots_dir: str = "plots",
@@ -931,7 +931,7 @@ class WalkForwardOptimizer:
                 adx_period=optimized_params.get('adx_period', 14),
                 volume_ma_period=optimized_params.get('volume_ma_period', 20),
                 price_momentum_lookback=optimized_params.get('price_momentum_lookback', 5),
-                price_threshold=optimized_params.get('price_threshold', 0.005)  # 0.5% threshold
+                price_threshold=optimized_params.get('price_threshold', 0.02)  # 2% threshold
             )
             
             # Store optimized class multipliers for use in training
@@ -945,16 +945,16 @@ class WalkForwardOptimizer:
             config = STGNNConfig(
                 num_nodes=self.initial_config.num_nodes,
                 input_dim=self.initial_config.input_dim,
-                hidden_dim=96,  # Restored complexity for better learning
+                hidden_dim=352,  # Optimized value
                 output_dim=3,  # 3 classes: down/no direction/up
-                num_layers=2,  # Restored 2 layers for deeper learning
-                dropout=0.2,  # Keep reduced regularization
-                kernel_size=3,
-                learning_rate=0.0005,  # Restored for stable training
-                batch_size=2,  # Keep small for memory management
-                num_epochs=40,  # Restored for more training time
-                early_stopping_patience=8,  # Restored for more training time
-                seq_len=150,  # Increased for better capture of technical indicator patterns
+                num_layers=7,  # Optimized value
+                dropout=0.5505394438393119,  # Optimized value
+                kernel_size=2,  # Optimized value
+                learning_rate=0.002096519264498227,  # Optimized value
+                batch_size=64,  # Optimized value
+                num_epochs=40,  # Keep fixed for walk-forward
+                early_stopping_patience=8,
+                seq_len=70,  # Optimized value
                 prediction_horizon=15,
                 features=self.initial_config.features,
                 assets=self.initial_config.assets,
@@ -962,27 +962,27 @@ class WalkForwardOptimizer:
                 buy_threshold=0.6,
                 sell_threshold=0.4,
                 retrain_interval=24,
-                focal_alpha=1.0,  # Keep this as 1.0 given you have class_weights
-                focal_gamma=2.0,   # Default focusing parameter
-                # Default feature engineering parameters
-                rsi_period=14,
-                macd_fast_period=12,
-                macd_slow_period=26,
-                macd_signal_period=9,
-                bb_period=20,
-                bb_num_std_dev=2.0,
-                atr_period=14,
-                adx_period=14,
-                volume_ma_period=20,
-                price_momentum_lookback=5,
-                price_threshold=0.005  # 0.5% threshold
+                focal_alpha=1.59329918873379,  # Optimized value
+                focal_gamma=3.6839150893608212,  # Optimized value
+                # Optimized feature engineering parameters
+                rsi_period=21,  # Optimized value
+                macd_fast_period=14,  # Optimized value
+                macd_slow_period=31,  # Optimized value
+                macd_signal_period=17,  # Optimized value
+                bb_period=14,  # Optimized value
+                bb_num_std_dev=1.3402253735507053,  # Optimized value
+                atr_period=20,  # Optimized value
+                adx_period=35,  # Optimized value
+                volume_ma_period=39,  # Optimized value
+                price_momentum_lookback=42,  # Optimized value
+                price_threshold=0.02  # 2% threshold
             )
             
-            # Use default class multipliers
+            # Use optimized class multipliers
             self.optimized_class_multipliers = {
-                'class_multiplier_0': 3.2,
-                'class_multiplier_1': 2.0,
-                'class_multiplier_2': 3.2
+                'class_multiplier_0': 3.9480498898039085,  # Optimized value
+                'class_multiplier_1': 1.5127980818724454,  # Optimized value
+                'class_multiplier_2': 4.9326461874194445   # Optimized value
             }
         
         return config
@@ -1245,16 +1245,16 @@ def create_wfo_config():
     config = STGNNConfig(
         num_nodes=len(assets),
         input_dim=len(features),
-        hidden_dim=96,  # Restored complexity for better learning
+        hidden_dim=352,  # Optimized value
         output_dim=3,  # 3 classes: down/no direction/up
-        num_layers=2,  # Restored 2 layers for deeper learning
-        dropout=0.2,  # Keep reduced regularization
-        kernel_size=3,
-        learning_rate=0.0005,  # Restored for stable training
-        batch_size=2,  # Keep small for memory management
-        num_epochs=40,  # Restored for more training time
-        early_stopping_patience=8,  # Restored for more training time
-        seq_len=150,  # Increased for better capture of technical indicator patterns
+        num_layers=7,  # Optimized value
+        dropout=0.5505394438393119,  # Optimized value
+        kernel_size=2,  # Optimized value
+        learning_rate=0.002096519264498227,  # Optimized value
+        batch_size=64,  # Optimized value
+        num_epochs=40,  # Keep fixed for walk-forward
+        early_stopping_patience=8,
+        seq_len=70,  # Optimized value
         prediction_horizon=15,
         features=features,
         assets=assets,
@@ -1262,8 +1262,20 @@ def create_wfo_config():
         buy_threshold=0.6,
         sell_threshold=0.4,
         retrain_interval=24,
-        focal_alpha=1.0,  # Keep this as 1.0 given you have class_weights
-        focal_gamma=2.0   # Default focusing parameter
+        focal_alpha=1.59329918873379,  # Optimized value
+        focal_gamma=3.6839150893608212,  # Optimized value
+        # Optimized feature engineering parameters
+        rsi_period=21,  # Optimized value
+        macd_fast_period=14,  # Optimized value
+        macd_slow_period=31,  # Optimized value
+        macd_signal_period=17,  # Optimized value
+        bb_period=14,  # Optimized value
+        bb_num_std_dev=1.3402253735507053,  # Optimized value
+        atr_period=20,  # Optimized value
+        adx_period=35,  # Optimized value
+        volume_ma_period=39,  # Optimized value
+        price_momentum_lookback=42,  # Optimized value
+        price_threshold=0.02  # 2% threshold
     )
     
     return config
@@ -1297,7 +1309,7 @@ Examples:
     --train-window-days 180 \\
     --test-window-days 30 \\
     --step-size-days 15 \\
-    --price-threshold 0.005
+    --price-threshold 0.02
         """
     )
     
@@ -1363,7 +1375,7 @@ Examples:
     parser.add_argument(
         '--price-threshold',
         type=float,
-        default=0.005,  # 0.5% threshold for meaningful price movements
+        default=0.02,  # 2% threshold for meaningful price movements
         help='Price threshold for classification (default: 0.02 for 2% movements)'
     )
     
