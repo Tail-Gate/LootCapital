@@ -608,6 +608,11 @@ class WalkForwardOptimizer:
                 # adj shape: (1, num_nodes, num_nodes)
                 dummy_adj = adj_train[0:1].clone()  # Take first sample as dummy input
                 
+                # Move dummy inputs to same device as model
+                device = next(trainer.model.parameters()).device
+                dummy_X = dummy_X.to(device)
+                dummy_adj = dummy_adj.to(device)
+                
                 logger.info(f"DEBUG: TorchScript tracing with dummy inputs - X shape: {dummy_X.shape}, adj shape: {dummy_adj.shape}")
                 logger.info(f"DEBUG: X dtype: {dummy_X.dtype}, adj dtype: {dummy_adj.dtype}")
                 
