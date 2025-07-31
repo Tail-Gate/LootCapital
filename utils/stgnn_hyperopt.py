@@ -341,38 +341,38 @@ def objective(trial: optuna.Trial) -> float:
                 'vwap_ratio', 'cumulative_delta'
             ],  # Full feature set (23 features, removed problematic adx)
             
-            'learning_rate': trial.suggest_float('learning_rate', 0.0005, 0.0025, log=True), # Centered around 0.001578
-            'hidden_dim': trial.suggest_int('hidden_dim', 224, 288, step=32), # Centered around 256
-            'num_layers': trial.suggest_int('num_layers', 4, 7), # Around 4
-            'kernel_size': trial.suggest_int('kernel_size', 2, 3), # Around 2
-            'dropout': trial.suggest_float('dropout', 0.4, 0.5), # Around 0.4985
-            'batch_size': trial.suggest_int('batch_size', 32, 64, step=16), # Around 48
-            'seq_len': trial.suggest_int('seq_len', 120, 300, step=10), # Around 110
+            'learning_rate': trial.suggest_float('learning_rate', 0.0001, 0.005, log=True), # Wider range
+            'hidden_dim': trial.suggest_int('hidden_dim', 64, 512, step=64), # Wider range, larger step if memory is an issue
+            'num_layers': trial.suggest_int('num_layers', 2, 8), # Wider range
+            'kernel_size': trial.suggest_int('kernel_size', 2, 5), # Wider range
+            'dropout': trial.suggest_float('dropout', 0.2, 0.6), # Wider range
+            'batch_size': trial.suggest_int('batch_size', 16, 64, step=16), # Added 16 for memory flexibility
+            'seq_len': trial.suggest_int('seq_len', 60, 360, step=30), # Wider range for history, maybe longer
             'prediction_horizon': 15,
-            'early_stopping_patience': 5,
+            'early_stopping_patience': 5, # Increased patience for better convergence            # Focal Loss parameters (minimal ranges)
             
-            # Focal Loss parameters (minimal ranges)
-            'focal_alpha': trial.suggest_float('focal_alpha', 1.0, 1.8), # Around 1.4054
-            'focal_gamma': trial.suggest_float('focal_gamma', 3.0, 4.5), # Around 3.7522
             
-            'class_multiplier_0': trial.suggest_float('class_multiplier_0', 3.5, 4.5),  # Around 3.9929
-            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 0.7, 1.0), # Around 0.8613
-            'class_multiplier_2': trial.suggest_float('class_multiplier_2', 4.0, 5.0),  # Around 4.8036  # Up class
+            # Focal Loss parameters (wider ranges for better optimization)
+            'focal_alpha': trial.suggest_float('focal_alpha', 0.5, 2.5), # Wider range
+            'focal_gamma': trial.suggest_float('focal_gamma', 2.0, 6.0), # Wider range
             
-            # Price threshold (fixed)
-            'price_threshold': 0.005,  # Fixed 0.5% threshold for classification
+            'class_multiplier_0': trial.suggest_float('class_multiplier_0', 3.0, 7.0),  # Down class, increased upper bound
+            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 0.5, 1.2), # No Direction, slightly wider
+            'class_multiplier_2': trial.suggest_float('class_multiplier_2', 3.0, 7.0),  # Up class, increased upper bound
             
+            'price_threshold': 0.02,
+
             # Feature engineering parameters (searchable)
-            'rsi_period': trial.suggest_int('rsi_period', 50, 100),
-            'macd_fast_period': trial.suggest_int('macd_fast_period', 20, 50),
-            'macd_slow_period': trial.suggest_int('macd_slow_period', 50, 90),
+            'rsi_period': trial.suggest_int('rsi_period', 14, 100), # Typical RSI starts at 14
+            'macd_fast_period': trial.suggest_int('macd_fast_period', 12, 60), # Common range
+            'macd_slow_period': trial.suggest_int('macd_slow_period', 26, 120), # Common range
             'macd_signal_period': trial.suggest_int('macd_signal_period', 9, 30),
-            'bb_period': trial.suggest_int('bb_period', 10, 20),
-            'bb_num_std_dev': trial.suggest_float('bb_num_std_dev', 1.0, 1.5),
-            'atr_period': trial.suggest_int('atr_period', 15, 25),
-            'adx_period': trial.suggest_int('adx_period', 30, 45),
-            'volume_ma_period': trial.suggest_int('volume_ma_period', 30, 45),
-            'price_momentum_lookback': trial.suggest_int('price_momentum_lookback', 20, 50),
+            'bb_period': trial.suggest_int('bb_period', 10, 30), # Wider
+            'bb_num_std_dev': trial.suggest_float('bb_num_std_dev', 1.0, 2.5), # Wider
+            'atr_period': trial.suggest_int('atr_period', 14, 30), # Typical ATR starts at 14
+            'adx_period': trial.suggest_int('adx_period', 30, 45), # REMOVE if not using ADX feature
+            'volume_ma_period': trial.suggest_int('volume_ma_period', 20, 60), # Wider
+            'price_momentum_lookback': trial.suggest_int('price_momentum_lookback', 20, 60), # Wider
         }
         
         print(f"[OBJECTIVE] Config: {config_dict}")
@@ -442,7 +442,7 @@ def objective(trial: optuna.Trial) -> float:
             
             # Use the full data range (5 years)
             end_time = latest_date
-            start_time = end_time - timedelta(days=90)
+            start_time = end_time - timedelta(days=365)
             
             print(f"[OBJECTIVE] Data file date range: {earliest_date} to {latest_date}")
             print(f"[OBJECTIVE] Using full 5-year data range: {start_time} to {end_time}")
@@ -546,401 +546,11 @@ def objective(trial: optuna.Trial) -> float:
             logger.error("Trainer model is None")
             return float('inf')
         
-        # DISABLE SMOTE for hyperparameter optimization to prevent memory explosion
-        # Override the train method to skip SMOTE processing
-        print("[OBJECTIVE] Overriding train method to skip SMOTE...")
-        logger.info("[OBJECTIVE] Overriding train method to skip SMOTE...")
-        original_train = trainer.train
-        print("[OBJECTIVE] Original train method saved for override")
-        logger.info("[OBJECTIVE] Original train method saved for override")
-        
-        def train_without_smote():
-            print("\n" + "-"*50)
-            print("🎯 TRAINING WITHOUT SMOTE STARTING")
-            print("-"*50)
-            print("[TRAIN] Starting training WITHOUT SMOTE...")
-            logger.info("[TRAIN] Starting training WITHOUT SMOTE...")
-            
-            # Load data in chunks using the data processor's memory-efficient methods
-            print("[TRAIN] Loading data using data processor...")
-            logger.info("[TRAIN] Loading data using data processor...")
-            X, adj, y_orig_returns = data_processor.prepare_data(start_time, end_time)  # Let's rename y to y_orig_returns for clarity
-
-            print(f"[TRAIN] Data loaded. X shape: {X.shape}, adj shape: {adj.shape}, y shape: {y_orig_returns.shape}")
-            logger.info(f"[TRAIN] Data loaded. X shape: {X.shape}, adj shape: {adj.shape}, y shape: {y_orig_returns.shape}")
-            logger.debug(f"[TRAIN] Data loaded. X: {X.shape}, adj: {adj.shape}, y: {y_orig_returns.shape}")
-
-            # CRITICAL FIX: Validate data shapes and content
-            print("[TRAIN] Validating data shapes and content...")
-            logger.info("[TRAIN] Validating data shapes and content...")
-            
-            if X is None or adj is None or y_orig_returns is None:
-                print("[TRAIN] ERROR: Data preparation returned None values")
-                logger.error("Data preparation returned None values")
-                return float('inf')
-            
-            # CRITICAL FIX: Validate that we have actual data
-            if len(X) == 0:
-                print("[TRAIN] ERROR: Data preparation returned empty X tensor")
-                logger.error("Data preparation returned empty X tensor")
-                return float('inf')
-            if len(y_orig_returns) == 0:
-                print("[TRAIN] ERROR: Data preparation returned empty y tensor")
-                logger.error("Data preparation returned empty y tensor")
-                return float('inf')
-            
-            # CRITICAL DEBUG: Check for NaN/Inf in X before any processing
-            print("[TRAIN] Checking for NaN/Inf values in X tensor...")
-            logger.info("[TRAIN] Checking for NaN/Inf values in X tensor...")
-            
-            if torch.isnan(X).any() or torch.isinf(X).any():
-                print("[TRAIN] CRITICAL: NaN/Inf detected in X tensor BEFORE any processing!")
-                logger.error(f"CRITICAL: NaN/Inf detected in X tensor BEFORE any processing!")
-                logger.error(f"X shape: {X.shape}")
-                logger.error(f"X stats: min={X.min().item()}, max={X.max().item()}, mean={X.mean().item()}")
-                logger.error(f"NaN count: {torch.isnan(X).sum().item()}")
-                logger.error(f"Inf count: {torch.isinf(X).sum().item()}")
-                return float('inf')
-            
-            print("[TRAIN] X tensor validation passed - no NaN/Inf values")
-            logger.info("[TRAIN] X tensor validation passed - no NaN/Inf values")
-            
-            # CRITICAL DEBUG: Check for NaN/Inf in adj before any processing
-            print("[TRAIN] Checking for NaN/Inf values in adj tensor...")
-            logger.info("[TRAIN] Checking for NaN/Inf values in adj tensor...")
-            
-            if torch.isnan(adj).any() or torch.isinf(adj).any():
-                print("[TRAIN] CRITICAL: NaN/Inf detected in adj tensor BEFORE any processing!")
-                logger.error(f"CRITICAL: NaN/Inf detected in adj tensor BEFORE any processing!")
-                logger.error(f"adj shape: {adj.shape}")
-                logger.error(f"adj stats: min={adj.min().item()}, max={adj.max().item()}, mean={adj.mean().item()}")
-                logger.error(f"NaN count: {torch.isnan(adj).sum().item()}")
-                logger.error(f"Inf count: {torch.isinf(adj).sum().item()}")
-                return float('inf')
-            
-            print("[TRAIN] Adj tensor validation passed - no NaN/Inf values")
-            logger.info("[TRAIN] Adj tensor validation passed - no NaN/Inf values")
-            
-            print(f"[TRAIN] Data validation passed - X shape: {X.shape}, y shape: {y_orig_returns.shape}")
-            logger.debug(f"Data validation passed - X: {X.shape}, y: {y_orig_returns.shape}")
-
-            # Convert to classification targets using optimized price threshold
-            print("[TRAIN] Converting to classification targets...")
-            logger.info("[TRAIN] Converting to classification targets...")
-            print(f"[TRAIN] Price threshold: {config_dict['price_threshold']}")
-            logger.info(f"[TRAIN] Price threshold: {config_dict['price_threshold']}")
-            
-            y_flat = y_orig_returns.flatten().cpu().numpy()
-            print(f"[TRAIN] Flattened y shape: {y_flat.shape}")
-            logger.info(f"[TRAIN] Flattened y shape: {y_flat.shape}")
-            
-            classes = np.ones(len(y_flat), dtype=int)  # Default to no direction
-            classes[y_flat > config_dict['price_threshold']] = 2   # Up
-            classes[y_flat < -config_dict['price_threshold']] = 0  # Down
-
-            # Log class distribution
-            unique_classes, class_counts = np.unique(classes, return_counts=True)
-            print(f"[TRAIN] Class distribution: {dict(zip(unique_classes, class_counts))}")
-            logger.info(f"[TRAIN] Class distribution: {dict(zip(unique_classes, class_counts))}")
-
-            y_classes = torch.LongTensor(classes.reshape(y_orig_returns.shape))
-            print(f"[TRAIN] Classification targets y_classes prepared: {y_classes.shape}")
-            logger.info(f"[TRAIN] Classification targets y_classes prepared: {y_classes.shape}")
-            logger.debug(f"Classification targets y_classes prepared: {y_classes.shape}")
-
-            # Split data. X_train, y_train, X_val, y_val should remain on CPU here.
-            print("[TRAIN] Splitting data into train/validation sets...")
-            logger.info("[TRAIN] Splitting data into train/validation sets...")
-            
-            X_train, y_train, X_val, y_val = data_processor.split_data(X.cpu(), y_classes.cpu())
-
-            print(f"[TRAIN] Splitting data: X_train {X_train.shape}, X_val {X_val.shape}")
-            print(f"[TRAIN] Splitting data: y_train {y_train.shape}, y_val {y_val.shape}")
-            logger.info(f"[TRAIN] Splitting data: X_train {X_train.shape}, X_val {X_val.shape}")
-            logger.info(f"[TRAIN] Splitting data: y_train {y_train.shape}, y_val {y_val.shape}")
-            logger.debug(f"Splitting data: X_train: {X_train.shape}, X_val: {X_val.shape}")
-
-            if len(X_val) == 0:
-                print(f"[TRAIN] ERROR: Validation set is empty! X_val shape: {X_val.shape}, total X samples: {len(X)}")
-                logger.error(f"Validation set is empty! X_val shape: {X_val.shape}, total X samples: {len(X)}")
-                return float('inf')
-            if len(X_train) == 0:
-                print(f"[TRAIN] ERROR: Training set is empty! X_train shape: {X_train.shape}, total X samples: {len(X)}")
-                logger.error(f"Training set is empty! X_train shape: {X_train.shape}, total X samples: {len(X)}")
-                return float('inf')
-            
-            # Log data statistics for debugging
-            logger.info(f"Data statistics - X: {X.shape}, X_train: {X_train.shape}, X_val: {X_val.shape}")
-            print(f"[TRAIN] Data statistics - X: {X.shape}, X_train: {X_train.shape}, X_val: {X_val.shape}")
-            logger.debug(f"Data statistics - X: {X.shape}, X_train: {X_train.shape}, X_val: {X_val.shape}")
-            logger.info(f"Batch size: {config.batch_size}, Train samples: {len(X_train)}, Val samples: {len(X_val)}")
-            print(f"[TRAIN] Batch size: {config.batch_size}, Train samples: {len(X_train)}, Val samples: {len(X_val)}")
-
-            # !!! Crucial Fix: Update trainer.adj attribute !!!
-            # The 'adj' here is the local variable from data_processor.prepare_data()
-            # It must be moved to the correct device and assigned to the trainer's attribute.
-            print("[TRAIN] Moving adjacency matrix to correct device...")
-            logger.info("[TRAIN] Moving adjacency matrix to correct device...")
-            trainer.adj = adj.to(device)
-            logger.info(f"Adjacency matrix moved to device: {trainer.adj.device}")
-            print(f"[TRAIN] Adjacency matrix moved to device: {trainer.adj.device}")
-
-            # Calculate class weights using the prepared data to ensure consistency
-            print(f"[TRAIN] Calculating class weights...")
-            logger.info(f"[TRAIN] Calculating class weights...")
-            class_weights = calculate_weighted_class_weights(y_orig_returns)
-            print(f"[TRAIN] Class weights calculated: {class_weights}")
-            logger.info(f"[TRAIN] Class weights calculated: {class_weights}")
-            
-            class_weights = class_weights.to(device)
-            print(f"[TRAIN] Class weights moved to device: {class_weights.device}")
-            logger.info(f"[TRAIN] Class weights moved to device: {class_weights.device}")
-            
-            # Update the trainer's criterion with the calculated weights
-            print("[TRAIN] Updating trainer criterion with WeightedFocalLoss...")
-            logger.info("[TRAIN] Updating trainer criterion with WeightedFocalLoss...")
-            trainer.criterion = WeightedFocalLoss(
-                class_weights=class_weights,
-                alpha=config_dict['focal_alpha'],
-                gamma=config_dict['focal_gamma']
-            )
-            logger.info(f"Updated criterion with class weights: {class_weights}")
-            print(f"[TRAIN] Updated criterion with class weights: {class_weights}")
-
-            # Skipping SMOTE for memory efficiency during hyperparameter optimization
-            print("[TRAIN] Skipping SMOTE for memory efficiency during hyperparameter optimization")
-            logger.info("Skipping SMOTE for memory efficiency during hyperparameter optimization")
-            print("[TRAIN] Using original (unbalanced) training data")
-            logger.info("[TRAIN] Using original (unbalanced) training data")
-
-            # CRITICAL FIX: Validate data before creating DataLoaders
-            print("[TRAIN] Validating data before creating DataLoaders...")
-            logger.info("[TRAIN] Validating data before creating DataLoaders...")
-            
-            if len(X_train) == 0:
-                print("[TRAIN] ERROR: Training set is empty! Cannot create DataLoader")
-                logger.error(f"Training set is empty! Cannot create DataLoader")
-                return float('inf')
-            if len(X_val) == 0:
-                print("[TRAIN] ERROR: Validation set is empty! Cannot create DataLoader")
-                logger.error(f"Validation set is empty! Cannot create DataLoader")
-                return float('inf')
-            
-            # Validate minimum data requirements
-            min_train_samples = config.batch_size * 2  # At least 2 batches
-            min_val_samples = config.batch_size  # At least 1 batch
-            
-            print(f"[TRAIN] Minimum requirements - Train: {min_train_samples}, Val: {min_val_samples}")
-            logger.info(f"[TRAIN] Minimum requirements - Train: {min_train_samples}, Val: {min_val_samples}")
-            
-            if len(X_train) < min_train_samples:
-                print(f"[TRAIN] ERROR: Insufficient training samples: {len(X_train)} < {min_train_samples}")
-                logger.error(f"Insufficient training samples: {len(X_train)} < {min_train_samples}")
-                return float('inf')
-            if len(X_val) < min_val_samples:
-                print(f"[TRAIN] ERROR: Insufficient validation samples: {len(X_val)} < {min_val_samples}")
-                logger.error(f"Insufficient validation samples: {len(X_val)} < {min_val_samples}")
-                return float('inf')
-            
-            # Create dataloaders with original (unbalanced) training data
-            print("[TRAIN] Creating DataLoaders...")
-            logger.info("[TRAIN] Creating DataLoaders...")
-            
-            train_loader = data_processor.create_dataloader(X_train, y_train, drop_last=True)
-            val_loader = data_processor.create_dataloader(X_val, y_val, drop_last=False)
-
-            print(f"[TRAIN] DataLoaders created successfully")
-            logger.info(f"[TRAIN] DataLoaders created successfully")
-            logger.debug(f"Creating DataLoaders: X_train: {X_train.shape}, y_train: {y_train.shape}, X_val: {X_val.shape}, y_val: {y_val.shape}")
-
-            # CRITICAL FIX: Validate DataLoaders after creation
-            print("[TRAIN] Validating DataLoaders after creation...")
-            logger.info("[TRAIN] Validating DataLoaders after creation...")
-            
-            if len(train_loader) == 0:
-                print(f"[TRAIN] ERROR: Train DataLoader is empty! Number of samples: {len(X_train)}, Batch size: {config.batch_size}")
-                logger.error(f"Train DataLoader is empty! Number of samples: {len(X_train)}, Batch size: {config.batch_size}")
-                logger.error(f"Train samples: {len(X_train)}, Batch size: {config.batch_size}, Drop last: True")
-                return float('inf')
-            if len(val_loader) == 0:
-                print(f"[TRAIN] ERROR: Validation DataLoader is empty! Number of samples: {len(X_val)}, Batch size: {config.batch_size}")
-                logger.error(f"Validation DataLoader is empty! Number of samples: {len(X_val)}, Batch size: {config.batch_size}")
-                logger.error(f"Val samples: {len(X_val)}, Batch size: {config.batch_size}, Drop last: False")
-                return float('inf')
-            
-            # CRITICAL DEBUG: Check first batch for NaN/Inf values
-            print("[TRAIN] Checking first train batch for NaN/Inf values...")
-            logger.info("[TRAIN] Checking first train batch for NaN/Inf values...")
-            
-            try:
-                first_train_batch = next(iter(train_loader))
-                X_batch, y_batch = first_train_batch
-                
-                print(f"[TRAIN] First batch shapes - X_batch: {X_batch.shape}, y_batch: {y_batch.shape}")
-                logger.info(f"[TRAIN] First batch shapes - X_batch: {X_batch.shape}, y_batch: {y_batch.shape}")
-                
-                if torch.isnan(X_batch).any() or torch.isinf(X_batch).any():
-                    print("[TRAIN] CRITICAL: NaN/Inf detected in first train batch!")
-                    logger.error(f"CRITICAL: NaN/Inf detected in first train batch!")
-                    logger.error(f"X_batch shape: {X_batch.shape}")
-                    logger.error(f"X_batch stats: min={X_batch.min().item()}, max={X_batch.max().item()}, mean={X_batch.mean().item()}")
-                    logger.error(f"NaN count: {torch.isnan(X_batch).sum().item()}")
-                    logger.error(f"Inf count: {torch.isinf(X_batch).sum().item()}")
-                    return float('inf')
-                
-                print(f"[TRAIN] First train batch validation passed - X_batch shape: {X_batch.shape}")
-                logger.info(f"First train batch validation passed - X_batch shape: {X_batch.shape}")
-                
-            except Exception as e:
-                print(f"[TRAIN] ERROR: Error checking first train batch: {e}")
-                logger.error(f"Error checking first train batch: {e}")
-                return float('inf')
-            
-            logger.info(f"DataLoader validation passed - Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
-            print(f"[TRAIN] DataLoader validation passed - Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
-            
-            # DEBUG: Double-check DataLoader state immediately after validation
-            logger.info(f"DEBUG: Immediately after validation check - Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
-            print(f"[TRAIN] DEBUG: Immediately after validation check - Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
-            
-            # Training loop
-            patience_counter = 0
-            
-            print(f"[TRAIN] Starting training loop for {trainer.config.num_epochs} epochs...")
-            logger.info(f"[TRAIN] Starting training loop for {trainer.config.num_epochs} epochs...")
-            logger.debug(f"Starting training loop for {trainer.config.num_epochs} epochs...")
-            
-            print(f"[TRAIN] Training configuration - Batch size: {config.batch_size}, Learning rate: {config.learning_rate}")
-            logger.info(f"[TRAIN] Training configuration - Batch size: {config.batch_size}, Learning rate: {config.learning_rate}")
-
-            for epoch in range(trainer.config.num_epochs):
-                print(f"\n[TRAIN] Epoch {epoch+1}/{trainer.config.num_epochs}")
-                logger.info(f"[TRAIN] Epoch {epoch+1}/{trainer.config.num_epochs}")
-                
-                # DEBUG: Check DataLoader state at start of each epoch
-                print(f"[TRAIN] DEBUG: Epoch {epoch + 1} - Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
-                logger.info(f"DEBUG: Epoch {epoch + 1} - Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
-                
-                # Train epoch
-                print(f"[TRAIN] Starting training epoch {epoch+1}...")
-                logger.info(f"[TRAIN] Starting training epoch {epoch+1}...")
-                train_loss, train_acc = trainer.train_epoch(train_loader)
-                
-                # Check for infinite values
-                print(f"[TRAIN] Epoch {epoch+1} training results - Loss: {train_loss:.6f}, Acc: {train_acc:.6f}")
-                logger.info(f"[TRAIN] Epoch {epoch+1} training results - Loss: {train_loss:.6f}, Acc: {train_acc:.6f}")
-                
-                if np.isinf(train_loss) or np.isnan(train_loss):
-                    print(f"[TRAIN] ERROR: Training loss is infinite/NaN: {train_loss}")
-                    logger.error(f"Training loss is infinite/NaN: {train_loss}")
-                    return float('inf')
-                
-                trainer.train_losses.append(train_loss)
-                trainer.train_accuracies.append(train_acc)
-                print(f"[TRAIN] Training metrics stored successfully")
-                logger.info(f"[TRAIN] Training metrics stored successfully")
-                
-                # DEBUG: Check val_loader state right before validation
-                print(f"[TRAIN] DEBUG: About to call validate - val_loader length: {len(val_loader)}")
-                logger.info(f"DEBUG: About to call validate - val_loader length: {len(val_loader)}")
-                if len(val_loader) == 0:
-                    print("[TRAIN] ERROR: val_loader is empty right before validate call!")
-                    logger.error("DEBUG: val_loader is empty right before validate call!")
-                    logger.error("DEBUG: This suggests the DataLoader was exhausted or corrupted between validation check and actual validation")
-                    return float('inf')
-                
-                # Validate
-                print(f"[TRAIN] Starting validation epoch {epoch+1}...")
-                logger.info(f"[TRAIN] Starting validation epoch {epoch+1}...")
-                val_loss, val_acc = trainer.validate(val_loader)
-                
-                # Check for infinite values
-                print(f"[TRAIN] Epoch {epoch+1} validation results - Loss: {val_loss:.6f}, Acc: {val_acc:.6f}")
-                logger.info(f"[TRAIN] Epoch {epoch+1} validation results - Loss: {val_loss:.6f}, Acc: {val_acc:.6f}")
-                
-                if np.isinf(val_loss) or np.isnan(val_loss):
-                    print(f"[TRAIN] ERROR: Validation loss is infinite/NaN: {val_loss}")
-                    logger.error(f"Validation loss is infinite/NaN: {val_loss}")
-                    return float('inf')
-                
-                trainer.val_losses.append(val_loss)
-                trainer.val_accuracies.append(val_acc)
-                print(f"[TRAIN] Validation metrics stored successfully")
-                logger.info(f"[TRAIN] Validation metrics stored successfully")
-                
-                # Early stopping
-                print(f"[TRAIN] Early stopping check - Current val_loss: {val_loss:.6f}, Best val_loss: {trainer.best_val_loss:.6f}")
-                logger.info(f"[TRAIN] Early stopping check - Current val_loss: {val_loss:.6f}, Best val_loss: {trainer.best_val_loss:.6f}")
-                
-                if val_loss < trainer.best_val_loss:
-                    print(f"[TRAIN] New best validation loss! Updating best model...")
-                    logger.info(f"[TRAIN] New best validation loss! Updating best model...")
-                    trainer.best_val_loss = val_loss
-                    trainer.best_model_state = trainer.model.state_dict().copy()
-                    patience_counter = 0
-                    print(f"[TRAIN] Best model updated, patience counter reset to 0")
-                    logger.info(f"[TRAIN] Best model updated, patience counter reset to 0")
-                else:
-                    patience_counter += 1
-                    print(f"[TRAIN] No improvement, patience counter: {patience_counter}/{trainer.config.early_stopping_patience}")
-                    logger.info(f"[TRAIN] No improvement, patience counter: {patience_counter}/{trainer.config.early_stopping_patience}")
-                    
-                if patience_counter >= trainer.config.early_stopping_patience:
-                    print(f"[TRAIN] Early stopping triggered at epoch {epoch + 1}")
-                    logger.info(f'Early stopping at epoch {epoch + 1}')
-                    break
-                    
-                if (epoch + 1) % 5 == 0:  # Log every 5 epochs for ultra-minimal training
-                    print(f"\n[TRAIN] Progress Update - Epoch {epoch + 1}/{trainer.config.num_epochs}:")
-                    print(f"[TRAIN] Train Loss: {train_loss:.6f}, Train Acc: {train_acc:.6f}")
-                    print(f"[TRAIN] Val Loss: {val_loss:.6f}, Val Acc: {val_acc:.6f}")
-                    logger.info(f'Epoch {epoch + 1}/{trainer.config.num_epochs}:')
-                    logger.info(f'Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}')
-                    logger.info(f'Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}')
-                    
-            # Load best model
-            print("[TRAIN] Training loop completed, loading best model...")
-            logger.info("[TRAIN] Training loop completed, loading best model...")
-            
-            if trainer.best_model_state is not None:
-                print("[TRAIN] Loading best model state...")
-                logger.info("[TRAIN] Loading best model state...")
-                trainer.model.load_state_dict(trainer.best_model_state)
-                print("[TRAIN] Best model state loaded successfully")
-                logger.info("[TRAIN] Best model state loaded successfully")
-            else:
-                print("[TRAIN] WARNING: No best model state found, using current model")
-                logger.warning("[TRAIN] WARNING: No best model state found, using current model")
-                
-            print("[TRAIN] Training complete. Loading best model state.")
-            logger.info("[TRAIN] Training complete. Loading best model state.")
-            logger.debug("Training complete. Loading best model state.")
-
-            print("[TRAIN] Preparing training history for return...")
-            logger.info("[TRAIN] Preparing training history for return...")
-            
-            training_history = {
-                'train_losses': trainer.train_losses,
-                'val_losses': trainer.val_losses,
-                'train_accuracies': trainer.train_accuracies,
-                'val_accuracies': trainer.val_accuracies,
-                'X_val': X_val,  # Store validation data for evaluation
-                'y_val': y_val,   # Store validation labels for evaluation
-                'smote_info': {
-                    'class_distribution_before': 'Skipped for memory efficiency',
-                    'class_distribution_after': 'Skipped for memory efficiency',
-                    'original_batch_size': X_train.shape[0],
-                    'balanced_batch_size': X_train.shape[0]  # No change since SMOTE skipped
-                }
-            }
-            
-            print(f"[TRAIN] Training history prepared - {len(trainer.train_losses)} epochs completed")
-            logger.info(f"[TRAIN] Training history prepared - {len(trainer.train_losses)} epochs completed")
-            
-            return training_history
-        
-        # Replace the train method
-        trainer.train = train_without_smote
+        # ENABLE SMOTE for hyperparameter optimization with memory concerns now fixed
+        print("[OBJECTIVE] SMOTE is now enabled for hyperparameter optimization...")
+        logger.info("[OBJECTIVE] SMOTE is now enabled for hyperparameter optimization...")
+        print("[OBJECTIVE] Using original trainer.train() method with SMOTE processing")
+        logger.info("[OBJECTIVE] Using original trainer.train() method with SMOTE processing")
         
         # Override class weights calculation with multipliers
         def calculate_weighted_class_weights(y_orig_returns):
