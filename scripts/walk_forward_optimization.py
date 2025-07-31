@@ -616,9 +616,9 @@ class WalkForwardOptimizer:
                 logger.info(f"DEBUG: TorchScript tracing with dummy inputs - X shape: {dummy_X.shape}, adj shape: {dummy_adj.shape}")
                 logger.info(f"DEBUG: X dtype: {dummy_X.dtype}, adj dtype: {dummy_adj.dtype}")
                 
-                # Trace the model
+                # Trace the model with strict=False to handle dictionary outputs
                 with torch.no_grad():
-                    scripted_model = torch.jit.trace(trainer.model, (dummy_X, dummy_adj))
+                    scripted_model = torch.jit.trace(trainer.model, (dummy_X, dummy_adj), strict=False)
                 logger.info("DEBUG: TorchScript tracing completed")
                 
                 # Save TorchScript model
