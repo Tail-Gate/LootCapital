@@ -77,6 +77,39 @@ def manage_memory():
         # Force more aggressive cleanup
         gc.collect()
 
+def check_file_system_info():
+    """Check file system information for debugging"""
+    logger.info("DEBUG: File system information:")
+    logger.info(f"DEBUG: Current working directory: {os.getcwd()}")
+    logger.info(f"DEBUG: User: {os.getenv('USER', 'unknown')}")
+    logger.info(f"DEBUG: Home directory: {os.path.expanduser('~')}")
+    
+    # Check disk space
+    try:
+        import shutil
+        total, used, free = shutil.disk_usage('.')
+        logger.info(f"DEBUG: Disk space - Total: {total // (1024**3)} GB, Used: {used // (1024**3)} GB, Free: {free // (1024**3)} GB")
+    except Exception as e:
+        logger.warning(f"DEBUG: Could not check disk space: {e}")
+    
+    # Check if we can write to current directory
+    test_file = Path("test_write_current_dir.txt")
+    try:
+        with open(test_file, 'w') as f:
+            f.write("test")
+        logger.info("DEBUG: ✓ Can write to current directory")
+        test_file.unlink()
+    except Exception as e:
+        logger.error(f"DEBUG: ✗ Cannot write to current directory: {e}")
+    
+    # List current directory contents
+    logger.info("DEBUG: Current directory contents:")
+    for item in Path('.').iterdir():
+        if item.is_file():
+            logger.info(f"DEBUG:   File: {item.name}")
+        elif item.is_dir():
+            logger.info(f"DEBUG:   Dir:  {item.name}")
+
 class EnhancedSTGNNDataProcessor(STGNNDataProcessor):
     """Enhanced STGNN data processor that uses FeatureGenerator for comprehensive features"""
     
@@ -184,11 +217,52 @@ class WalkForwardOptimizer:
         self.plots_dir = Path(plots_dir)
         self.logs_dir = Path(logs_dir)
         
+        # DEBUG: Log directory paths and creation
+        logger.info(f"DEBUG: Initializing output directories...")
+        logger.info(f"DEBUG: Output dir path: {self.output_dir}")
+        logger.info(f"DEBUG: Reports dir path: {self.reports_dir}")
+        logger.info(f"DEBUG: Plots dir path: {self.plots_dir}")
+        logger.info(f"DEBUG: Logs dir path: {self.logs_dir}")
+        
         # Create output directories
-        self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.reports_dir.mkdir(parents=True, exist_ok=True)
-        self.plots_dir.mkdir(parents=True, exist_ok=True)
-        self.logs_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            logger.info("DEBUG: Creating output directory...")
+            self.output_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"DEBUG: Output directory created/exists: {self.output_dir.exists()}")
+            logger.info(f"DEBUG: Output directory is writable: {os.access(self.output_dir, os.W_OK)}")
+            
+            logger.info("DEBUG: Creating reports directory...")
+            self.reports_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"DEBUG: Reports directory created/exists: {self.reports_dir.exists()}")
+            logger.info(f"DEBUG: Reports directory is writable: {os.access(self.reports_dir, os.W_OK)}")
+            
+            logger.info("DEBUG: Creating plots directory...")
+            self.plots_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"DEBUG: Plots directory created/exists: {self.plots_dir.exists()}")
+            logger.info(f"DEBUG: Plots directory is writable: {os.access(self.plots_dir, os.W_OK)}")
+            
+            logger.info("DEBUG: Creating logs directory...")
+            self.logs_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"DEBUG: Logs directory created/exists: {self.logs_dir.exists()}")
+            logger.info(f"DEBUG: Logs directory is writable: {os.access(self.logs_dir, os.W_OK)}")
+            
+            # Test write permissions by creating a test file
+            test_file = self.output_dir / "test_write_permission.txt"
+            try:
+                with open(test_file, 'w') as f:
+                    f.write("test")
+                logger.info("DEBUG: ✓ Write permission test passed")
+                test_file.unlink()  # Clean up test file
+                logger.info("DEBUG: ✓ Test file cleaned up")
+            except Exception as e:
+                logger.error(f"DEBUG: ✗ Write permission test failed: {e}")
+                
+        except Exception as e:
+            logger.error(f"DEBUG: Error creating directories: {e}")
+            logger.error(f"DEBUG: Exception type: {type(e).__name__}")
+            import traceback
+            logger.error(f"DEBUG: Directory creation traceback: {traceback.format_exc()}")
+            raise
         
         # Results storage
         self.results = {
@@ -478,80 +552,222 @@ class WalkForwardOptimizer:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             model_path = self.output_dir / f'wfo_stgnn_{period_data["period_name"]}_{timestamp}.pt'
             
+            # DEBUG: Log file path and directory info
+            logger.info(f"DEBUG: Model save path: {model_path}")
+            logger.info(f"DEBUG: Output directory exists: {self.output_dir.exists()}")
+            logger.info(f"DEBUG: Output directory is writable: {os.access(self.output_dir, os.W_OK)}")
+            logger.info(f"DEBUG: Period name: {period_data['period_name']}")
+            logger.info(f"DEBUG: Timestamp: {timestamp}")
+            
             # 1. Save regular PyTorch model
-            torch.save({
-                'model_state_dict': trainer.model.state_dict(),
-                'config': config,
-                'training_history': training_history,
-                'train_metrics': train_metrics,
-                'test_metrics': test_metrics,
-                'period_data': period_data,
-                'probability_files': {
-                    'probabilities': str(prob_file),
-                    'true_labels': str(labels_file),
-                    'predictions': str(pred_file),
-                    'csv_summary': str(csv_file)
+            try:
+                logger.info("DEBUG: Starting PyTorch model save...")
+                model_data = {
+                    'model_state_dict': trainer.model.state_dict(),
+                    'config': config,
+                    'training_history': training_history,
+                    'train_metrics': train_metrics,
+                    'test_metrics': test_metrics,
+                    'period_data': period_data,
+                    'probability_files': {
+                        'probabilities': str(prob_file),
+                        'true_labels': str(labels_file),
+                        'predictions': str(pred_file),
+                        'csv_summary': str(csv_file)
+                    }
                 }
-            }, model_path)
+                logger.info(f"DEBUG: Model data keys: {list(model_data.keys())}")
+                logger.info(f"DEBUG: Model state dict keys: {list(model_data['model_state_dict'].keys())}")
+                
+                torch.save(model_data, model_path)
+                logger.info(f"DEBUG: PyTorch model save completed")
+                
+                # Verify file was created
+                if model_path.exists():
+                    file_size = model_path.stat().st_size
+                    logger.info(f"DEBUG: PyTorch model file created successfully - Size: {file_size} bytes")
+                else:
+                    logger.error(f"DEBUG: PyTorch model file was NOT created!")
+                    
+            except Exception as e:
+                logger.error(f"DEBUG: Error saving PyTorch model: {e}")
+                logger.error(f"DEBUG: Exception type: {type(e).__name__}")
+                import traceback
+                logger.error(f"DEBUG: PyTorch save traceback: {traceback.format_exc()}")
+                raise
             
             # 2. Convert to TorchScript and save
             logger.info("Converting model to TorchScript...")
-            trainer.model.eval()  # Set to evaluation mode
-            
-            # Create dummy inputs for tracing with exact shapes and types
-            # X shape: (1, seq_len, num_nodes, input_dim)
-            dummy_X = X_train[0:1].clone()  # Take first sample as dummy input
-            # adj shape: (1, num_nodes, num_nodes)
-            dummy_adj = adj_train[0:1].clone()  # Take first sample as dummy input
-            
-            logger.info(f"TorchScript tracing with dummy inputs - X shape: {dummy_X.shape}, adj shape: {dummy_adj.shape}")
-            
-            # Trace the model
-            with torch.no_grad():
-                scripted_model = torch.jit.trace(trainer.model, (dummy_X, dummy_adj))
-            
-            # Save TorchScript model
-            torchscript_path = self.output_dir / f'wfo_stgnn_torchscript_{period_data["period_name"]}_{timestamp}.pt'
-            scripted_model.save(str(torchscript_path))
-            logger.info(f"TorchScript model saved to: {torchscript_path}")
+            try:
+                trainer.model.eval()  # Set to evaluation mode
+                logger.info("DEBUG: Model set to eval mode")
+                
+                # Create dummy inputs for tracing with exact shapes and types
+                # X shape: (1, seq_len, num_nodes, input_dim)
+                dummy_X = X_train[0:1].clone()  # Take first sample as dummy input
+                # adj shape: (1, num_nodes, num_nodes)
+                dummy_adj = adj_train[0:1].clone()  # Take first sample as dummy input
+                
+                logger.info(f"DEBUG: TorchScript tracing with dummy inputs - X shape: {dummy_X.shape}, adj shape: {dummy_adj.shape}")
+                logger.info(f"DEBUG: X dtype: {dummy_X.dtype}, adj dtype: {dummy_adj.dtype}")
+                
+                # Trace the model
+                with torch.no_grad():
+                    scripted_model = torch.jit.trace(trainer.model, (dummy_X, dummy_adj))
+                logger.info("DEBUG: TorchScript tracing completed")
+                
+                # Save TorchScript model
+                torchscript_path = self.output_dir / f'wfo_stgnn_torchscript_{period_data["period_name"]}_{timestamp}.pt'
+                logger.info(f"DEBUG: TorchScript save path: {torchscript_path}")
+                
+                scripted_model.save(str(torchscript_path))
+                logger.info(f"DEBUG: TorchScript model save completed")
+                
+                # Verify file was created
+                if torchscript_path.exists():
+                    file_size = torchscript_path.stat().st_size
+                    logger.info(f"DEBUG: TorchScript model file created successfully - Size: {file_size} bytes")
+                else:
+                    logger.error(f"DEBUG: TorchScript model file was NOT created!")
+                    
+            except Exception as e:
+                logger.error(f"DEBUG: Error saving TorchScript model: {e}")
+                logger.error(f"DEBUG: Exception type: {type(e).__name__}")
+                import traceback
+                logger.error(f"DEBUG: TorchScript save traceback: {traceback.format_exc()}")
+                raise
             
             # 3. Save fitted scaler
             logger.info("Saving fitted scaler...")
-            scaler_path = self.output_dir / f'wfo_stgnn_scaler_{period_data["period_name"]}_{timestamp}.joblib'
-            joblib.dump(data_processor.scaler, scaler_path)
-            logger.info(f"Scaler saved to: {scaler_path}")
+            try:
+                scaler_path = self.output_dir / f'wfo_stgnn_scaler_{period_data["period_name"]}_{timestamp}.joblib'
+                logger.info(f"DEBUG: Scaler save path: {scaler_path}")
+                logger.info(f"DEBUG: Scaler type: {type(data_processor.scaler)}")
+                logger.info(f"DEBUG: Scaler attributes: {dir(data_processor.scaler)}")
+                
+                joblib.dump(data_processor.scaler, scaler_path)
+                logger.info(f"DEBUG: Scaler save completed")
+                
+                # Verify file was created
+                if scaler_path.exists():
+                    file_size = scaler_path.stat().st_size
+                    logger.info(f"DEBUG: Scaler file created successfully - Size: {file_size} bytes")
+                else:
+                    logger.error(f"DEBUG: Scaler file was NOT created!")
+                    
+            except Exception as e:
+                logger.error(f"DEBUG: Error saving scaler: {e}")
+                logger.error(f"DEBUG: Exception type: {type(e).__name__}")
+                import traceback
+                logger.error(f"DEBUG: Scaler save traceback: {traceback.format_exc()}")
+                raise
             
             # 4. Save feature list (order is critical for inference)
             logger.info("Saving feature list...")
-            features_path = self.output_dir / f'wfo_stgnn_features_{period_data["period_name"]}_{timestamp}.json'
-            with open(features_path, 'w') as f:
-                json.dump(config.features, f, indent=4)
-            logger.info(f"Feature list saved to: {features_path}")
+            try:
+                features_path = self.output_dir / f'wfo_stgnn_features_{period_data["period_name"]}_{timestamp}.json'
+                logger.info(f"DEBUG: Features save path: {features_path}")
+                logger.info(f"DEBUG: Features list: {config.features}")
+                logger.info(f"DEBUG: Features count: {len(config.features)}")
+                
+                with open(features_path, 'w') as f:
+                    json.dump(config.features, f, indent=4)
+                logger.info(f"DEBUG: Features save completed")
+                
+                # Verify file was created
+                if features_path.exists():
+                    file_size = features_path.stat().st_size
+                    logger.info(f"DEBUG: Features file created successfully - Size: {file_size} bytes")
+                    
+                    # Verify content
+                    with open(features_path, 'r') as f:
+                        loaded_features = json.load(f)
+                    logger.info(f"DEBUG: Loaded features count: {len(loaded_features)}")
+                    logger.info(f"DEBUG: Features match: {loaded_features == config.features}")
+                else:
+                    logger.error(f"DEBUG: Features file was NOT created!")
+                    
+            except Exception as e:
+                logger.error(f"DEBUG: Error saving features: {e}")
+                logger.error(f"DEBUG: Exception type: {type(e).__name__}")
+                import traceback
+                logger.error(f"DEBUG: Features save traceback: {traceback.format_exc()}")
+                raise
             
             # 5. Save inference metadata
-            inference_metadata = {
-                'model_path': str(model_path),
-                'torchscript_path': str(torchscript_path),
-                'scaler_path': str(scaler_path),
-                'features_path': str(features_path),
-                'input_shapes': {
-                    'X_shape': list(dummy_X.shape),
-                    'adj_shape': list(dummy_adj.shape)
-                },
-                'config': {
-                    'num_nodes': config.num_nodes,
-                    'input_dim': config.input_dim,
-                    'seq_len': config.seq_len,
-                    'output_dim': config.output_dim
-                },
-                'period_name': period_data['period_name'],
-                'timestamp': timestamp
-            }
+            logger.info("Saving inference metadata...")
+            try:
+                inference_metadata = {
+                    'model_path': str(model_path),
+                    'torchscript_path': str(torchscript_path),
+                    'scaler_path': str(scaler_path),
+                    'features_path': str(features_path),
+                    'input_shapes': {
+                        'X_shape': list(dummy_X.shape),
+                        'adj_shape': list(dummy_adj.shape)
+                    },
+                    'config': {
+                        'num_nodes': config.num_nodes,
+                        'input_dim': config.input_dim,
+                        'seq_len': config.seq_len,
+                        'output_dim': config.output_dim
+                    },
+                    'period_name': period_data['period_name'],
+                    'timestamp': timestamp
+                }
+                
+                logger.info(f"DEBUG: Metadata keys: {list(inference_metadata.keys())}")
+                logger.info(f"DEBUG: Input shapes: {inference_metadata['input_shapes']}")
+                
+                metadata_path = self.output_dir / f'wfo_stgnn_inference_metadata_{period_data["period_name"]}_{timestamp}.json'
+                logger.info(f"DEBUG: Metadata save path: {metadata_path}")
+                
+                with open(metadata_path, 'w') as f:
+                    json.dump(inference_metadata, f, indent=4)
+                logger.info(f"DEBUG: Metadata save completed")
+                
+                # Verify file was created
+                if metadata_path.exists():
+                    file_size = metadata_path.stat().st_size
+                    logger.info(f"DEBUG: Metadata file created successfully - Size: {file_size} bytes")
+                    
+                    # Verify content
+                    with open(metadata_path, 'r') as f:
+                        loaded_metadata = json.load(f)
+                    logger.info(f"DEBUG: Loaded metadata keys: {list(loaded_metadata.keys())}")
+                else:
+                    logger.error(f"DEBUG: Metadata file was NOT created!")
+                    
+            except Exception as e:
+                logger.error(f"DEBUG: Error saving metadata: {e}")
+                logger.error(f"DEBUG: Exception type: {type(e).__name__}")
+                import traceback
+                logger.error(f"DEBUG: Metadata save traceback: {traceback.format_exc()}")
+                raise
             
-            metadata_path = self.output_dir / f'wfo_stgnn_inference_metadata_{period_data["period_name"]}_{timestamp}.json'
-            with open(metadata_path, 'w') as f:
-                json.dump(inference_metadata, f, indent=4)
-            logger.info(f"Inference metadata saved to: {metadata_path}")
+            # Final verification - list all created files
+            logger.info("DEBUG: Final file verification:")
+            expected_files = [
+                model_path,
+                torchscript_path,
+                scaler_path,
+                features_path,
+                metadata_path
+            ]
+            
+            for file_path in expected_files:
+                if file_path.exists():
+                    file_size = file_path.stat().st_size
+                    logger.info(f"DEBUG: ✓ {file_path.name} - {file_size} bytes")
+                else:
+                    logger.error(f"DEBUG: ✗ {file_path.name} - NOT FOUND!")
+            
+            # List all files in output directory
+            logger.info("DEBUG: All files in output directory:")
+            for file_path in self.output_dir.iterdir():
+                if file_path.is_file():
+                    file_size = file_path.stat().st_size
+                    logger.info(f"DEBUG:   {file_path.name} - {file_size} bytes")
             
             period_time = time.time() - period_start_time
             logger.info(f"Period {period_data['period_name']} completed in {period_time:.2f} seconds")
@@ -1229,6 +1445,9 @@ def main():
     logger.info("="*80)
     logger.info(f"Arguments: {vars(args)}")
     main_start_time = time.time()
+    
+    # Check file system information for debugging
+    check_file_system_info()
     
     try:
         # Create configuration
