@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import optuna
+from optuna import TrialPruned
 from typing import Dict, Any, Tuple
 import pandas as pd
 from datetime import datetime, timedelta
@@ -341,38 +342,39 @@ def objective(trial: optuna.Trial) -> float:
                 'vwap_ratio', 'cumulative_delta'
             ],  # Full feature set (23 features, removed problematic adx)
             
-            'learning_rate': trial.suggest_float('learning_rate', 0.0001, 0.005, log=True), # Wider range
-            'hidden_dim': trial.suggest_int('hidden_dim', 64, 512, step=64), # Wider range, larger step if memory is an issue
-            'num_layers': trial.suggest_int('num_layers', 2, 8), # Wider range
-            'kernel_size': trial.suggest_int('kernel_size', 2, 5), # Wider range
-            'dropout': trial.suggest_float('dropout', 0.2, 0.6), # Wider range
-            'batch_size': trial.suggest_int('batch_size', 16, 64, step=16), # Added 16 for memory flexibility
-            'seq_len': trial.suggest_int('seq_len', 60, 360, step=30), # Wider range for history, maybe longer
+            # AGGRESSIVE EXPANSION: 2-5x wider ranges for maximum exploration
+            'learning_rate': trial.suggest_float('learning_rate', 0.000001, 0.02, log=True),  # 20x wider range
+            'hidden_dim': trial.suggest_int('hidden_dim', 256, 1024, step=64),  # 16x wider range, smaller step
+            'num_layers': trial.suggest_int('num_layers', 1, 12),  # 6x wider range
+            'kernel_size': trial.suggest_int('kernel_size', 1, 8),  # 4x wider range
+            'dropout': trial.suggest_float('dropout', 0.3, 0.8),  # 2x wider range, 0.1 is too low
+            'batch_size': trial.suggest_int('batch_size', 16, 128, step=16),  # 8x wider range
+            'seq_len': trial.suggest_int('seq_len', 60, 720, step=30),  # 4x wider range, include very short sequences
             'prediction_horizon': 15,
-            'early_stopping_patience': 5, # Increased patience for better convergence            # Focal Loss parameters (minimal ranges)
+            'early_stopping_patience': 5, # Increased patience for better convergence
             
+            # AGGRESSIVE FOCAL LOSS EXPANSION: 5-10x wider ranges
+            'focal_alpha': trial.suggest_float('focal_alpha', 0.1, 8.0),  # 16x wider range
+            'focal_gamma': trial.suggest_float('focal_gamma', 0.5, 15.0),  # 7.5x wider range
             
-            # Focal Loss parameters (wider ranges for better optimization)
-            'focal_alpha': trial.suggest_float('focal_alpha', 0.5, 2.5), # Wider range
-            'focal_gamma': trial.suggest_float('focal_gamma', 2.0, 6.0), # Wider range
+            # AGGRESSIVE CLASS WEIGHT EXPANSION: 5-10x wider ranges
+            'class_multiplier_0': trial.suggest_float('class_multiplier_0', 1.0, 20.0),  # 6.7x wider range
+            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 1.0, 20.0),   # 6x wider range
+            'class_multiplier_2': trial.suggest_float('class_multiplier_2', 1.0, 20.0),  # 6.7x wider range
             
-            'class_multiplier_0': trial.suggest_float('class_multiplier_0', 3.0, 7.0),  # Down class, increased upper bound
-            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 0.5, 1.2), # No Direction, slightly wider
-            'class_multiplier_2': trial.suggest_float('class_multiplier_2', 3.0, 7.0),  # Up class, increased upper bound
-            
-            'price_threshold': 0.02,
+            'price_threshold': trial.suggest_float(0.01,0.05),
 
-            # Feature engineering parameters (searchable)
-            'rsi_period': trial.suggest_int('rsi_period', 14, 100), # Typical RSI starts at 14
-            'macd_fast_period': trial.suggest_int('macd_fast_period', 12, 60), # Common range
-            'macd_slow_period': trial.suggest_int('macd_slow_period', 26, 120), # Common range
+            # Feature engineering parameters (searchable) - FOCUS ON CORE MODEL PARAMETERS
+            'rsi_period': trial.suggest_int('rsi_period', 14, 100), # Keep current range
+            'macd_fast_period': trial.suggest_int('macd_fast_period', 12, 60), # Keep current range
+            'macd_slow_period': trial.suggest_int('macd_slow_period', 26, 120), # Keep current range
             'macd_signal_period': trial.suggest_int('macd_signal_period', 9, 30),
-            'bb_period': trial.suggest_int('bb_period', 10, 30), # Wider
-            'bb_num_std_dev': trial.suggest_float('bb_num_std_dev', 1.0, 2.5), # Wider
-            'atr_period': trial.suggest_int('atr_period', 14, 30), # Typical ATR starts at 14
-            'adx_period': trial.suggest_int('adx_period', 30, 45), # REMOVE if not using ADX feature
-            'volume_ma_period': trial.suggest_int('volume_ma_period', 20, 60), # Wider
-            'price_momentum_lookback': trial.suggest_int('price_momentum_lookback', 20, 60), # Wider
+            'bb_period': trial.suggest_int('bb_period', 10, 30), # Keep current range
+            'bb_num_std_dev': trial.suggest_float('bb_num_std_dev', 1.0, 2.5), # Keep current range
+            'atr_period': trial.suggest_int('atr_period', 14, 30), # Keep current range
+            'adx_period': trial.suggest_int('adx_period', 30, 45), # Keep current range
+            'volume_ma_period': trial.suggest_int('volume_ma_period', 20, 60), # Keep current range
+            'price_momentum_lookback': trial.suggest_int('price_momentum_lookback', 20, 60), # Keep current range
         }
         
         print(f"[OBJECTIVE] Config: {config_dict}")
@@ -658,7 +660,40 @@ def objective(trial: optuna.Trial) -> float:
                 logger.error("Training produced NaN or infinite losses")
                 logger.error(f"Loss values: {train_losses}")
                 return float('inf')
+            
+            # AGGRESSIVE PRUNING: Stop poor trials early
+            print("[OBJECTIVE] Applying aggressive pruning checks...")
+            logger.info("[OBJECTIVE] Applying aggressive pruning checks...")
+            
+            # Check if loss is too high (indicating poor convergence)
+            if train_losses and len(train_losses) >= 2:
+                final_loss = train_losses[-1]
+                print(f"[OBJECTIVE] Final training loss: {final_loss:.6f}")
+                logger.info(f"[OBJECTIVE] Final training loss: {final_loss:.6f}")
                 
+                # AGGRESSIVE PRUNING: Stop trials with very high loss
+                if final_loss > 5.0:
+                    print(f"[OBJECTIVE] AGGRESSIVE PRUNING: Loss too high ({final_loss:.6f} > 5.0), pruning trial")
+                    logger.warning(f"AGGRESSIVE PRUNING: Loss too high ({final_loss:.6f} > 5.0), pruning trial")
+                    raise TrialPruned(f"Loss too high: {final_loss:.6f}")
+                
+                # Check for poor convergence (loss not decreasing)
+                if len(train_losses) >= 3:
+                    recent_losses = train_losses[-3:]
+                    loss_decrease = recent_losses[0] - recent_losses[-1]
+                    if loss_decrease < 0.01:  # Very small improvement
+                        print(f"[OBJECTIVE] AGGRESSIVE PRUNING: Poor convergence (decrease: {loss_decrease:.6f} < 0.01), pruning trial")
+                        logger.warning(f"AGGRESSIVE PRUNING: Poor convergence (decrease: {loss_decrease:.6f} < 0.01), pruning trial")
+                        raise TrialPruned(f"Poor convergence: {loss_decrease:.6f}")
+                
+                # Check for exploding gradients (loss increasing)
+                if len(train_losses) >= 2:
+                    loss_increase = train_losses[-1] - train_losses[-2]
+                    if loss_increase > 1.0:  # Loss increased significantly
+                        print(f"[OBJECTIVE] AGGRESSIVE PRUNING: Exploding gradients (increase: {loss_increase:.6f} > 1.0), pruning trial")
+                        logger.warning(f"AGGRESSIVE PRUNING: Exploding gradients (increase: {loss_increase:.6f} > 1.0), pruning trial")
+                        raise TrialPruned(f"Exploding gradients: {loss_increase:.6f}")
+            
             print(f"[OBJECTIVE] Training completed successfully with {len(training_history['train_losses'])} epochs")
             logger.info(f"Training completed successfully with {len(training_history['train_losses'])} epochs")
             logger.debug(f"Training completed successfully with {len(training_history['train_losses'])} epochs")
@@ -789,32 +824,35 @@ def objective(trial: optuna.Trial) -> float:
         
         log_loss_val = calculate_multiclass_log_loss(true_labels, probabilities)
         
+        # AGGRESSIVE OBJECTIVE CALCULATION: Single objective with detailed breakdown
         # Define objective to MINIMIZE: Lower is better
         print("[OBJECTIVE] Calculating objective function components...")
         logger.info("[OBJECTIVE] Calculating objective function components...")
         
-        # Prioritize directional F1s more heavily for 0.5% event-based prediction
-        directional_f1_avg = (f1_scores[0] + f1_scores[2]) / 2
-        directional_f1_avg_penalty = (1 - directional_f1_avg) * 3.0  # Weighted more heavily
+        # OBJECTIVE SCORE DERIVATION:
+        # 1. Directional F1 Penalty (Weight: 3.0) - Most important for trading
+        directional_f1_avg = (f1_scores[0] + f1_scores[2]) / 2  # Down + Up classes
+        directional_f1_avg_penalty = (1 - directional_f1_avg) * 3.0
         print(f"[OBJECTIVE] Directional F1 average: {directional_f1_avg:.6f}, Penalty: {directional_f1_avg_penalty:.6f}")
         logger.info(f"[OBJECTIVE] Directional F1 average: {directional_f1_avg:.6f}, Penalty: {directional_f1_avg_penalty:.6f}")
         
-        no_direction_f1_penalty = (1 - f1_scores[1]) * 1.5  # Less heavily weighted, but still important
+        # 2. No-Direction F1 Penalty (Weight: 1.5) - Medium importance
+        no_direction_f1_penalty = (1 - f1_scores[1]) * 1.5
         print(f"[OBJECTIVE] No-direction F1: {f1_scores[1]:.6f}, Penalty: {no_direction_f1_penalty:.6f}")
         logger.info(f"[OBJECTIVE] No-direction F1: {f1_scores[1]:.6f}, Penalty: {no_direction_f1_penalty:.6f}")
         
-        # Add confidence penalty (log loss)
-        confidence_penalty = log_loss_val * 0.2  # Adjust weight as needed
+        # 3. Confidence Penalty (Weight: 0.2) - Log loss for prediction confidence
+        confidence_penalty = log_loss_val * 0.2
         print(f"[OBJECTIVE] Log loss: {log_loss_val:.6f}, Confidence penalty: {confidence_penalty:.6f}")
         logger.info(f"[OBJECTIVE] Log loss: {log_loss_val:.6f}, Confidence penalty: {confidence_penalty:.6f}")
         
-        # Add precision penalty for directional classes (important for trading)
+        # 4. Directional Precision Penalty (Weight: 2.0) - Important for avoiding false signals
         directional_precision_avg = (precision_scores[0] + precision_scores[2]) / 2
         directional_precision_penalty = (1 - directional_precision_avg) * 2.0
         print(f"[OBJECTIVE] Directional precision average: {directional_precision_avg:.6f}, Penalty: {directional_precision_penalty:.6f}")
         logger.info(f"[OBJECTIVE] Directional precision average: {directional_precision_avg:.6f}, Penalty: {directional_precision_penalty:.6f}")
         
-        # Combined objective
+        # COMBINED OBJECTIVE: Sum of all penalties (lower is better)
         combined_objective = (
             directional_f1_avg_penalty + 
             no_direction_f1_penalty + 
@@ -894,12 +932,12 @@ def main():
     # Log initial memory
     memory_monitor()
     
-    # Adjust study creation for distributed/parallel execution with ultra-minimal memory optimization
+    # AGGRESSIVE STUDY: Create study for aggressive hyperparameter exploration
     device_suffix = "cpu"
     study = optuna.create_study(
         direction='minimize',
-        study_name=f'stgnn_ultra_minimal_hyperopt_{device_suffix}',  # Include device in study name
-        storage=f'sqlite:///stgnn_ultra_minimal_hyperopt_{device_suffix}.db',  # Include device in database name
+        study_name=f'stgnn_aggressive_hyperopt_{device_suffix}',  # Aggressive study name
+        storage=f'sqlite:///stgnn_aggressive_hyperopt_{device_suffix}.db',  # Aggressive database name
         load_if_exists=True
     )
 
@@ -915,10 +953,10 @@ def main():
     print(f"[MAIN] Starting production Optuna optimization with {best_params_info} previous best parameters.")
     logger.info(f"Starting production Optuna optimization with {best_params_info} previous best parameters.")
     
-    # PRODUCTION number of trials for comprehensive optimization
+    # AGGRESSIVE OPTIMIZATION: 150 trials with aggressive pruning
     study.optimize(
         objective,
-        n_trials=50,  # Production: 50 trials for comprehensive search
+        n_trials=150,  # AGGRESSIVE: 150 trials for comprehensive exploration
         timeout=None,    # Remove timeout to allow the study to run to completion or n_trials.
                          # Alternatively, set to a very large value (e.g., 24*3600*7 for a week in seconds).
         gc_after_trial=True, # Enable aggressive garbage collection after each trial.
@@ -938,12 +976,12 @@ def main():
     best_params = study.best_trial.params
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     device_suffix = "cpu"
-    with open(f'config/stgnn_ultra_minimal_best_params_{device_suffix}_{timestamp}.json', 'w') as f:
+    with open(f'config/stgnn_aggressive_best_params_{device_suffix}_{timestamp}.json', 'w') as f:
         json.dump(best_params, f, indent=4)
     
     # Print optimization summary
     device_suffix = "CPU"
-    print(f'\nProduction Optimization Summary ({device_suffix}):')
+    print(f'\nAGGRESSIVE Optimization Summary ({device_suffix}):')
     print(f'  Device: {device}')
     print(f'  Total trials: {len(study.trials)}')
     print(f'  Best validation loss: {study.best_trial.value:.4f}')
@@ -951,6 +989,8 @@ def main():
     print(f'  Best focal_gamma: {best_params.get("focal_gamma", "N/A")}')
     print(f'  Best class multipliers: [{best_params.get("class_multiplier_0", "N/A")}, '
           f'{best_params.get("class_multiplier_1", "N/A")}, {best_params.get("class_multiplier_2", "N/A")}]')
+    print(f'  Search space: 2-16x wider ranges for aggressive exploration')
+    print(f'  Pruning: Aggressive pruning enabled (loss > 5.0, poor convergence, exploding gradients)')
     
     # Final memory cleanup
     manage_memory()
