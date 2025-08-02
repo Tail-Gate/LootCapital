@@ -540,7 +540,7 @@ def main():
     # Run optimization with small number of trials for testing
     study.optimize(
         objective,
-        n_trials=2,  # Small number for testing
+        n_trials=1500,  # Small number for testing
         timeout=None,
         gc_after_trial=True,
         show_progress_bar=True
