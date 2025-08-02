@@ -50,16 +50,50 @@ class XGBoostHyperoptTrainer:
         # Get XGBoost parameters
         params = self.config.to_xgboost_params()
         
-        # Train with early stopping
-        evals = [(dtrain, 'train'), (dval, 'val')]
-        self.model = xgb.train(
-            params,
-            dtrain,
-            num_boost_round=self.config.n_estimators,
-            evals=evals,
-            early_stopping_rounds=self.config.early_stopping_rounds,
-            verbose_eval=False
-        )
+        # Handle focal loss if enabled
+        if self.config.use_focal_loss:
+            from .xgboost_utils import focal_loss_objective, focal_loss_eval
+            
+            # Create wrapper functions with config parameters
+            def focal_objective_wrapper(predt, dtrain):
+                class_multipliers = [self.config.class_multiplier_0, 
+                                   self.config.class_multiplier_1, 
+                                   self.config.class_multiplier_2]
+                return focal_loss_objective(predt, dtrain, self.config.focal_alpha, 
+                                         self.config.focal_gamma, class_multipliers)
+            
+            def focal_eval_wrapper(predt, dtrain):
+                class_multipliers = [self.config.class_multiplier_0, 
+                                   self.config.class_multiplier_1, 
+                                   self.config.class_multiplier_2]
+                return focal_loss_eval(predt, dtrain, self.config.focal_alpha, 
+                                    self.config.focal_gamma, class_multipliers)
+            
+            print(f"[TRAINER] Using focal loss with alpha={self.config.focal_alpha}, gamma={self.config.focal_gamma}")
+            print(f"[TRAINER] Class multipliers: [0: {self.config.class_multiplier_0}, 1: {self.config.class_multiplier_1}, 2: {self.config.class_multiplier_2}]")
+            
+            # Train with custom objective only (evaluation will use built-in metric)
+            evals = [(dtrain, 'train'), (dval, 'val')]
+            self.model = xgb.train(
+                params,
+                dtrain,
+                num_boost_round=self.config.n_estimators,
+                evals=evals,
+                early_stopping_rounds=self.config.early_stopping_rounds,
+                verbose_eval=False,
+                obj=focal_objective_wrapper
+            )
+        else:
+            # Train with standard objective
+            evals = [(dtrain, 'train'), (dval, 'val')]
+            self.model = xgb.train(
+                params,
+                dtrain,
+                num_boost_round=self.config.n_estimators,
+                evals=evals,
+                early_stopping_rounds=self.config.early_stopping_rounds,
+                verbose_eval=False
+            )
         
         # Get best score and feature importance
         self.best_score = self.model.best_score

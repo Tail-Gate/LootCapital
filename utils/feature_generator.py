@@ -13,32 +13,45 @@ import time
 import psutil
 from tqdm import tqdm
 
-def generate_features_chunk(chunk: pd.DataFrame, order_book_data: Optional[pd.DataFrame], indicators) -> pd.DataFrame:
+def generate_features_chunk(chunk: pd.DataFrame, order_book_data: Optional[pd.DataFrame], indicators, config: Optional[Dict] = None) -> pd.DataFrame:
     """
     Top-level function for multiprocessing: generate features for a single chunk.
     Args:
         chunk: DataFrame chunk with OHLCV data
         order_book_data: Optional DataFrame with order book data
         indicators: TechnicalIndicators instance with configurable parameters
+        config: Optional configuration dictionary with feature parameters
     Returns:
         DataFrame with generated features
     """
     features = pd.DataFrame(index=chunk.index)
     
+    # Get config parameters with defaults
+    config = config or {}
+    
     # Price-based features
-    features.loc[:, 'returns'] = chunk['close'].pct_change()
+    returns_period = config.get('returns_period', 1)
+    log_returns_period = config.get('log_returns_period', 1)
+    
+    features.loc[:, 'returns'] = chunk['close'].pct_change(periods=returns_period)
     features.loc[:, 'returns'] = features['returns'].replace([np.inf, -np.inf], np.nan)
     features.loc[:, 'log_returns'] = np.log1p(features['returns'])
     features.loc[:, 'log_returns'] = features['log_returns'].replace([np.inf, -np.inf], np.nan)
     
     # Technical indicators using configurable parameters
-    rsi = indicators.calculate_rsi(chunk['close'])
-    atr = indicators.calculate_atr(chunk, high=chunk['high'], low=chunk['low'], close=chunk['close'])
+    rsi_period = config.get('rsi_period', 14)
+    atr_period = config.get('atr_period', 14)
+    
+    rsi = indicators.calculate_rsi(chunk['close'], period=rsi_period)
+    atr = indicators.calculate_atr(chunk, high=chunk['high'], low=chunk['low'], close=chunk['close'], period=atr_period)
     features.loc[:, 'rsi'] = rsi.astype(np.float32)
     features.loc[:, 'atr'] = atr.astype(np.float32)
     
     # Bollinger Bands with configurable parameters
-    bb_result = indicators.calculate_bollinger_bands(chunk['close'])
+    bb_period = config.get('bollinger_period', 20)
+    bb_std_dev = config.get('bollinger_std_dev', 2.0)
+    
+    bb_result = indicators.calculate_bollinger_bands(chunk['close'], period=bb_period, num_std=bb_std_dev)
     features.loc[:, 'bb_upper'] = bb_result['upper'].astype(np.float32)
     features.loc[:, 'bb_middle'] = bb_result['middle'].astype(np.float32)
     features.loc[:, 'bb_lower'] = bb_result['lower'].astype(np.float32)
@@ -46,49 +59,69 @@ def generate_features_chunk(chunk: pd.DataFrame, order_book_data: Optional[pd.Da
     features.loc[:, 'bb_width'] = features['bb_width'].replace([np.inf, -np.inf], np.nan)
     
     # Volume features with configurable parameters
+    volume_ma_period = config.get('volume_ma_period', 20)
+    volume_std_period = config.get('volume_std_period', 20)
+    volume_surge_period = config.get('volume_surge_period', 20)
+    
     features.loc[:, 'volume'] = chunk['volume'].astype(np.float32)
-    features.loc[:, 'volume_ma'] = indicators.calculate_volume_ma(chunk['volume']).astype(np.float32)
-    features.loc[:, 'volume_std'] = chunk['volume'].rolling(window=20).std().astype(np.float32)
-    features.loc[:, 'volume_surge'] = indicators.calculate_volume_surge_factor(chunk['volume']).astype(np.float32)
+    features.loc[:, 'volume_ma'] = indicators.calculate_volume_ma(chunk['volume'], period=volume_ma_period).astype(np.float32)
+    features.loc[:, 'volume_std'] = chunk['volume'].rolling(window=volume_std_period).std().astype(np.float32)
+    features.loc[:, 'volume_surge'] = indicators.calculate_volume_surge_factor(chunk['volume'], period=volume_surge_period).astype(np.float32)
     features.loc[:, 'volume_ratio'] = (chunk['volume'] / features['volume_ma']).astype(np.float32)
     
     # MACD features with configurable parameters
-    macd_result = indicators.calculate_macd(chunk['close'])
+    macd_fast_period = config.get('macd_fast_period', 12)
+    macd_slow_period = config.get('macd_slow_period', 26)
+    macd_signal_period = config.get('macd_signal_period', 9)
+    
+    macd_result = indicators.calculate_macd(chunk['close'], fast_period=macd_fast_period, slow_period=macd_slow_period, signal_period=macd_signal_period)
     features.loc[:, 'macd'] = macd_result['macd'].astype(np.float32)
     features.loc[:, 'macd_signal'] = macd_result['signal'].astype(np.float32)
     features.loc[:, 'macd_hist'] = macd_result['hist'].astype(np.float32)
     
-    # Moving Average Crossover
-    short_ma = chunk['close'].rolling(window=5).mean()
-    long_ma = chunk['close'].rolling(window=10).mean()
+    # Moving Average Crossover with configurable parameters
+    short_ma_period = config.get('short_ma_period', 5)
+    long_ma_period = config.get('long_ma_period', 10)
+    
+    short_ma = chunk['close'].rolling(window=short_ma_period).mean()
+    long_ma = chunk['close'].rolling(window=long_ma_period).mean()
     features.loc[:, 'ma_crossover'] = (short_ma - long_ma).astype(np.float32)
     
     # Swing RSI with configurable parameters
-    features.loc[:, 'swing_rsi'] = indicators.calculate_rsi(chunk['close']).astype(np.float32)
+    swing_rsi_period = config.get('swing_rsi_period', 14)
+    features.loc[:, 'swing_rsi'] = indicators.calculate_rsi(chunk['close'], period=swing_rsi_period).astype(np.float32)
     
-    # VWAP Ratio
-    vwap = (chunk['volume'] * (chunk['high'] + chunk['low'] + chunk['close']) / 3).cumsum() / chunk['volume'].cumsum()
+    # VWAP Ratio with configurable parameters
+    vwap_period = config.get('vwap_period', 20)
+    vwap = (chunk['volume'] * (chunk['high'] + chunk['low'] + chunk['close']) / 3).rolling(window=vwap_period).sum() / chunk['volume'].rolling(window=vwap_period).sum()
     features.loc[:, 'vwap_ratio'] = (chunk['close'] / vwap).astype(np.float32)
     
     # Momentum features with configurable parameters
-    momentum = indicators.calculate_price_momentum(chunk['close'])
-    vol_regime = indicators.calculate_volatility_regime(chunk['close'])
+    price_momentum_lookback = config.get('price_momentum_lookback', 5)
+    volatility_regime_period = config.get('volatility_regime_period', 20)
+    
+    momentum = indicators.calculate_price_momentum(chunk['close'], lookback=price_momentum_lookback)
+    vol_regime = indicators.calculate_volatility_regime(chunk['close'], period=volatility_regime_period)
     features.loc[:, 'price_momentum'] = momentum.astype(np.float32)
     features.loc[:, 'volatility_regime'] = vol_regime.astype(np.float32)
     
     # Support/Resistance with configurable parameters
-    support, resistance = indicators.calculate_support_resistance(chunk['high'], chunk['low'], chunk['close'])
+    support_resistance_period = config.get('support_resistance_period', 20)
+    support, resistance = indicators.calculate_support_resistance(chunk['high'], chunk['low'], chunk['close'], period=support_resistance_period)
     features.loc[:, 'support'] = support.astype(np.float32)
     features.loc[:, 'resistance'] = resistance.astype(np.float32)
     
     # Breakout detection with configurable parameters
-    features.loc[:, 'breakout_intensity'] = indicators.calculate_breakout_intensity(chunk['close'], atr).astype(np.float32)
+    breakout_period = config.get('breakout_period', 20)
+    features.loc[:, 'breakout_intensity'] = indicators.calculate_breakout_intensity(chunk['close'], atr, period=breakout_period).astype(np.float32)
     
     # Trend strength with configurable parameters
-    features.loc[:, 'adx'] = indicators.calculate_directional_movement(chunk['high'], chunk['low'], chunk['close']).astype(np.float32)
+    adx_period = config.get('adx_period', 14)
+    features.loc[:, 'adx'] = indicators.calculate_directional_movement(chunk['high'], chunk['low'], chunk['close'], period=adx_period).astype(np.float32)
     
     # Cumulative delta with configurable parameters
-    features.loc[:, 'cumulative_delta'] = indicators.calculate_cumulative_delta(chunk['close'], chunk['volume']).astype(np.float32)
+    cumulative_delta_period = config.get('cumulative_delta_period', 20)
+    features.loc[:, 'cumulative_delta'] = indicators.calculate_cumulative_delta(chunk['close'], chunk['volume'], period=cumulative_delta_period).astype(np.float32)
     
     # Add order book features if available
     if order_book_data is not None:
@@ -390,7 +423,7 @@ class FeatureGenerator:
                 order_book_batch = self._optimize_dtypes(order_book_batch)
             
             # Generate features for the batch
-            features = generate_features_chunk(batch_data, order_book_batch, self.indicators)
+            features = generate_features_chunk(batch_data, order_book_batch, self.indicators, self.config)
             
             # Cache results if batch_id is provided
             if batch_id:
@@ -449,7 +482,7 @@ class FeatureGenerator:
             batch_order_book = order_book_data.iloc[start_idx:end_idx] if order_book_data is not None else None
             
             # Generate features for batch
-            batch_features = generate_features_chunk(batch_ohlcv, batch_order_book, self.indicators)
+            batch_features = generate_features_chunk(batch_ohlcv, batch_order_book, self.indicators, self.config)
             
             # Store results
             for col in batch_features.columns:
@@ -485,7 +518,7 @@ class FeatureGenerator:
         
         if total_rows <= small_threshold:
             # Small dataset: use simple processing
-            return generate_features_chunk(ohlcv_data, order_book_data, self.indicators)
+            return generate_features_chunk(ohlcv_data, order_book_data, self.indicators, self.config)
         elif total_rows <= medium_threshold:
             # Medium dataset: use parallel processing
             return self.parallel_feature_generation(ohlcv_data, order_book_data)
@@ -530,7 +563,7 @@ class FeatureGenerator:
             # Map the feature generation function to each chunk
             results = pool.starmap(
                 generate_features_chunk,
-                zip(chunks, ob_chunks, [self.indicators]*len(chunks))
+                zip(chunks, ob_chunks, [self.indicators]*len(chunks), [self.config]*len(chunks))
             )
         
         # Combine the results and optimize memory

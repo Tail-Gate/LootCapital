@@ -50,6 +50,12 @@ class XGBoostHyperoptConfig:
     scale_pos_weight: float = 1.0
     focal_alpha: float = 1.0
     focal_gamma: float = 2.0
+    use_focal_loss: bool = True  # Enable focal loss by default
+    
+    # Class multipliers for handling class imbalance
+    class_multiplier_0: float = 1.0  # Multiplier for class 0 (Down)
+    class_multiplier_1: float = 1.0  # Multiplier for class 1 (Hold) 
+    class_multiplier_2: float = 1.0  # Multiplier for class 2 (Up)
     
     # Feature selection parameters
     use_feature_selection: bool = False
@@ -119,18 +125,27 @@ class XGBoostHyperoptConfig:
     
     def to_xgboost_params(self) -> Dict[str, Any]:
         """Convert to XGBoost parameters"""
-        return {
+        params = {
             'max_depth': self.max_depth,
             'learning_rate': self.learning_rate,
-            'n_estimators': self.n_estimators,
             'subsample': self.subsample,
             'colsample_bytree': self.colsample_bytree,
             'reg_alpha': self.reg_alpha,
             'reg_lambda': self.reg_lambda,
             'min_child_weight': self.min_child_weight,
             'gamma': self.gamma,
-            'objective': 'multi:softprob',
-            'eval_metric': self.eval_metric,
             'num_class': self.num_classes,
             'random_state': self.random_state
-        } 
+        }
+        
+        # Use focal loss if enabled, otherwise use standard multi-class
+        if self.use_focal_loss:
+            # For custom objectives, we need to pass the function directly to xgb.train
+            # We'll handle this in the trainer instead of here
+            params['objective'] = 'multi:softprob'  # Use standard objective as base
+            params['eval_metric'] = 'mlogloss'  # Use standard metric as base
+        else:
+            params['objective'] = 'multi:softprob'
+            params['eval_metric'] = self.eval_metric
+            
+        return params 

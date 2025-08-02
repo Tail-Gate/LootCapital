@@ -273,6 +273,16 @@ def objective(trial: optuna.Trial) -> float:
             
             # Class imbalance parameters
             'scale_pos_weight': trial.suggest_float('scale_pos_weight', 0.5, 3.0),
+            
+            # Focal loss parameters
+            'use_focal_loss': trial.suggest_categorical('use_focal_loss', [True]),
+            'focal_alpha': trial.suggest_float('focal_alpha', 0.5, 3.0),
+            'focal_gamma': trial.suggest_float('focal_gamma', 1.0, 5.0),
+            
+            # Class multiplier parameters for handling class imbalance
+            'class_multiplier_0': trial.suggest_float('class_multiplier_0', 0.5, 3.0),  # Down class
+            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 0.1, 1.0),  # Hold class (reduce weight since it dominates)
+            'class_multiplier_2': trial.suggest_float('class_multiplier_2', 0.5, 3.0),  # Up class
         }
         
         # Log trial start
@@ -648,13 +658,21 @@ def objective(trial: optuna.Trial) -> float:
             'sharpe_objective': sharpe_objective,
             'feature_count': len(features.columns),
             'use_feature_selection': config_dict['use_feature_selection'],
-            'feature_selection_method': config_dict['feature_selection_method'] if config_dict['use_feature_selection'] else 'none'
+            'feature_selection_method': config_dict['feature_selection_method'] if config_dict['use_feature_selection'] else 'none',
+            'use_focal_loss': config_dict['use_focal_loss'],
+            'focal_alpha': config_dict['focal_alpha'],
+            'focal_gamma': config_dict['focal_gamma'],
+            'class_multiplier_0': config_dict['class_multiplier_0'],
+            'class_multiplier_1': config_dict['class_multiplier_1'],
+            'class_multiplier_2': config_dict['class_multiplier_2']
         }
         log_trial_complete(trial.number, sharpe_objective, metrics)
         
         logger.info(f"[OBJECTIVE] XGBoost Sharpe Ratio Trial Results:")
         logger.info(f"  Max Depth: {config_dict['max_depth']}, LR: {config_dict['learning_rate']:.4f}")
         logger.info(f"  Price Threshold: {config_dict['price_threshold']:.4f}")
+        logger.info(f"  Focal Loss: {config_dict['use_focal_loss']}, Alpha: {config_dict['focal_alpha']:.4f}, Gamma: {config_dict['focal_gamma']:.4f}")
+        logger.info(f"  Class Multipliers: [0: {config_dict['class_multiplier_0']:.4f}, 1: {config_dict['class_multiplier_1']:.4f}, 2: {config_dict['class_multiplier_2']:.4f}]")
         logger.info(f"  Sharpe Ratio: {sharpe_ratio:.4f}")
         logger.info(f"  Win Rate: {win_rate:.4f}")
         logger.info(f"  Profit Factor: {profit_factor:.4f}")

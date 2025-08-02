@@ -429,3 +429,101 @@ def create_shap_plots(explanation, save_path=None):
     except Exception as e:
         print(f"Error creating SHAP plots: {e}")
         return None 
+
+def focal_loss_objective(predt, dtrain, alpha=1.0, gamma=2.0, class_multipliers=None):
+    """
+    Custom focal loss objective function for XGBoost to handle class imbalance.
+    
+    Args:
+        predt: Predicted probabilities (raw scores from XGBoost)
+        dtrain: Training data matrix
+        alpha: Class weighting factor (default: 1.0)
+        gamma: Focusing parameter (default: 2.0)
+        class_multipliers: List of class multipliers [class_0, class_1, class_2] (default: None)
+        
+    Returns:
+        Tuple of (gradient, hessian)
+    """
+    import xgboost as xgb
+    
+    # Get labels
+    y = dtrain.get_label()
+    num_classes = len(np.unique(y))
+    
+    # Convert raw scores to probabilities using softmax
+    def softmax(x):
+        exp_x = np.exp(x - np.max(x, axis=1, keepdims=True))
+        return exp_x / np.sum(exp_x, axis=1, keepdims=True)
+    
+    # Reshape predictions to (n_samples, n_classes)
+    predt_reshaped = predt.reshape(-1, num_classes)
+    probs = softmax(predt_reshaped)
+    
+    # Convert labels to one-hot encoding
+    y_onehot = np.zeros((len(y), num_classes))
+    y_onehot[np.arange(len(y)), y.astype(int)] = 1
+    
+    # Calculate focal loss
+    pt = np.sum(probs * y_onehot, axis=1)
+    focal_weight = alpha * (1 - pt) ** gamma
+    
+    # Apply class multipliers if provided
+    if class_multipliers is not None and len(class_multipliers) == num_classes:
+        # Create class weight matrix
+        class_weights = np.array(class_multipliers)
+        # Apply weights to focal loss
+        focal_weight = focal_weight * np.sum(y_onehot * class_weights, axis=1)
+    
+    # Calculate gradients and hessians
+    grad = focal_weight[:, np.newaxis] * (probs - y_onehot)
+    hess = focal_weight[:, np.newaxis] * probs * (1 - probs)
+    
+    # Flatten for XGBoost
+    grad = grad.flatten()
+    hess = hess.flatten()
+    
+    return grad, hess
+
+def focal_loss_eval(predt, dtrain, alpha=1.0, gamma=2.0, class_multipliers=None):
+    """
+    Custom focal loss evaluation metric for XGBoost.
+    
+    Args:
+        predt: Predicted probabilities (raw scores from XGBoost)
+        dtrain: Training data matrix
+        alpha: Class weighting factor (default: 1.0)
+        gamma: Focusing parameter (default: 2.0)
+        class_multipliers: List of class multipliers [class_0, class_1, class_2] (default: None)
+        
+    Returns:
+        Tuple of (metric_name, metric_value, is_higher_better)
+    """
+    import xgboost as xgb
+    
+    # Get labels
+    y = dtrain.get_label()
+    num_classes = len(np.unique(y))
+    
+    # Convert raw scores to probabilities using softmax
+    def softmax(x):
+        exp_x = np.exp(x - np.max(x, axis=1, keepdims=True))
+        return exp_x / np.sum(exp_x, axis=1, keepdims=True)
+    
+    # Reshape predictions to (n_samples, n_classes)
+    predt_reshaped = predt.reshape(-1, num_classes)
+    probs = softmax(predt_reshaped)
+    
+    # Convert labels to one-hot encoding
+    y_onehot = np.zeros((len(y), num_classes))
+    y_onehot[np.arange(len(y)), y.astype(int)] = 1
+    
+    # Calculate focal loss
+    pt = np.sum(probs * y_onehot, axis=1)
+    focal_loss = -alpha * (1 - pt) ** gamma * np.log(pt + 1e-15)
+    
+    # Apply class multipliers if provided
+    if class_multipliers is not None and len(class_multipliers) == num_classes:
+        class_weights = np.array(class_multipliers)
+        focal_loss = focal_loss * np.sum(y_onehot * class_weights, axis=1)
+    
+    return 'focal_loss', np.mean(focal_loss), False 
