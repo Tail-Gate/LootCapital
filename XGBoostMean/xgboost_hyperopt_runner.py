@@ -455,59 +455,213 @@ def objective(trial: optuna.Trial) -> float:
         # Log evaluation results
         log_evaluation_results(evaluation_results)
         
-        # Calculate mean reversion specific objective
-        f1_scores = evaluation_results['f1']
-        precision_scores = evaluation_results['precision']
-        log_loss_val = evaluation_results['log_loss']
+        # SHARPE RATIO OBJECTIVE FUNCTION FOR LIVE TRADING SIMULATION
+        logger.info("[SHARPE] Starting Sharpe ratio calculation for live trading simulation...")
         
-        # Mean reversion specific objective (focus on directional accuracy)
-        directional_f1_avg = (f1_scores[0] + f1_scores[2]) / 2  # Down + Up
-        directional_f1_penalty = (1 - directional_f1_avg) * 3.0
+        # Get predictions and probabilities
+        import xgboost as xgb
+        dtest = xgb.DMatrix(X_val)
+        y_pred_proba = trainer.model.predict(dtest, output_margin=False)
+        y_pred_raw = trainer.model.predict(dtest, output_margin=False)
         
-        hold_f1_penalty = (1 - f1_scores[1]) * 1.0  # Less weight on hold
-        confidence_penalty = log_loss_val * 0.2
+        # Convert probabilities to class predictions
+        y_pred = np.argmax(y_pred_proba, axis=1)
         
-        directional_precision_avg = (precision_scores[0] + precision_scores[2]) / 2
-        directional_precision_penalty = (1 - directional_precision_avg) * 2.0
+        # Walk-forward validation with 40% holdout
+        def calculate_sharpe_ratio_trading_simulation(features_val, y_val, y_pred, y_pred_proba, data_val):
+            """Calculate Sharpe ratio through trading simulation"""
+            
+            # Trading parameters
+            position_size = 0.04  # 4% of portfolio
+            leverage = 100  # 100x leverage
+            effective_position = position_size * leverage  # 400% effective position
+            stop_loss = 0.008  # 0.8% stop loss
+            trading_fee = 0.0002  # 0.02% per trade
+            max_hold_hours = 24  # Max 24 hours hold time
+            
+            # Initialize trading simulation
+            portfolio_value = 10000  # Starting portfolio value
+            trades = []
+            current_position = None
+            entry_time = None
+            entry_price = None
+            
+            # Get price data for validation set
+            prices = data_val['close'].values
+            timestamps = data_val.index
+            
+            # Weekly Sharpe calculation parameters
+            weekly_returns = []
+            current_week_returns = []
+            current_week_start = None
+            
+            for i in range(len(y_pred)):
+                current_time = timestamps[i]
+                current_price = prices[i]
+                prediction = y_pred[i]
+                confidence = np.max(y_pred_proba[i])
+                
+                # Weekly grouping for Sharpe calculation
+                if current_week_start is None:
+                    current_week_start = current_time
+                elif (current_time - current_week_start).days >= 7:
+                    # End of week, calculate weekly return
+                    if current_week_returns:
+                        weekly_return = np.sum(current_week_returns)
+                        weekly_returns.append(weekly_return)
+                        current_week_returns = []
+                    current_week_start = current_time
+                
+                # Check for stop loss on existing position
+                if current_position is not None:
+                    hold_hours = (current_time - entry_time).total_seconds() / 3600
+                    
+                    # Calculate current P&L
+                    if current_position == 'long':
+                        pnl_pct = (current_price - entry_price) / entry_price
+                    else:  # short
+                        pnl_pct = (entry_price - current_price) / entry_price
+                    
+                    # Check stop loss or max hold time
+                    if pnl_pct <= -stop_loss or hold_hours >= max_hold_hours:
+                        # Close position
+                        trade_return = pnl_pct * effective_position - (2 * trading_fee)  # Entry + exit fees
+                        trades.append({
+                            'type': current_position,
+                            'entry_price': entry_price,
+                            'exit_price': current_price,
+                            'return': trade_return,
+                            'hold_hours': hold_hours,
+                            'reason': 'stop_loss' if pnl_pct <= -stop_loss else 'max_hold_time'
+                        })
+                        
+                        # Add to weekly returns
+                        current_week_returns.append(trade_return)
+                        
+                        # Update portfolio
+                        portfolio_value *= (1 + trade_return)
+                        current_position = None
+                        entry_time = None
+                        entry_price = None
+                
+                # Check for new trading signals (only take signals 0 and 2)
+                if current_position is None and prediction in [0, 2]:  # Early Down or Early Up
+                    # Open new position
+                    current_position = 'short' if prediction == 0 else 'long'
+                    entry_time = current_time
+                    entry_price = current_price
+                    
+                    # Pay entry fee
+                    portfolio_value *= (1 - trading_fee)
+            
+            # Close any remaining position at the end
+            if current_position is not None:
+                final_price = prices[-1]
+                if current_position == 'long':
+                    pnl_pct = (final_price - entry_price) / entry_price
+                else:  # short
+                    pnl_pct = (entry_price - final_price) / entry_price
+                
+                trade_return = pnl_pct * effective_position - (2 * trading_fee)
+                trades.append({
+                    'type': current_position,
+                    'entry_price': entry_price,
+                    'exit_price': final_price,
+                    'return': trade_return,
+                    'hold_hours': (timestamps[-1] - entry_time).total_seconds() / 3600,
+                    'reason': 'end_of_period'
+                })
+                current_week_returns.append(trade_return)
+            
+            # Add final week returns
+            if current_week_returns:
+                weekly_return = np.sum(current_week_returns)
+                weekly_returns.append(weekly_return)
+            
+            # Calculate Sharpe ratio (weekly)
+            if len(weekly_returns) < 2:
+                return -10.0, 0.0, 0.0, 0.0  # Penalty for insufficient data
+            
+            weekly_returns = np.array(weekly_returns)
+            sharpe_ratio = np.mean(weekly_returns) / (np.std(weekly_returns) + 1e-8)
+            
+            # Calculate additional metrics
+            if trades:
+                trade_returns = [t['return'] for t in trades]
+                profitable_trades = [r for r in trade_returns if r > 0]
+                win_rate = len(profitable_trades) / len(trade_returns) if trade_returns else 0
+                
+                # Profit factor
+                gross_profit = sum([r for r in trade_returns if r > 0])
+                gross_loss = abs(sum([r for r in trade_returns if r < 0]))
+                profit_factor = gross_profit / (gross_loss + 1e-8)
+                
+                # Max drawdown
+                cumulative_returns = np.cumsum(trade_returns)
+                running_max = np.maximum.accumulate(cumulative_returns)
+                drawdown = cumulative_returns - running_max
+                max_drawdown = np.min(drawdown)
+            else:
+                win_rate = 0.0
+                profit_factor = 0.0
+                max_drawdown = 0.0
+            
+            return sharpe_ratio, win_rate, profit_factor, max_drawdown
         
-        # Feature selection penalty (encourage using fewer features if selection is enabled)
-        feature_penalty = 0.0
-        if config_dict['use_feature_selection']:
-            feature_count = len(features.columns)
-            optimal_feature_count = (config_dict['min_features'] + config_dict['max_features']) / 2
-            feature_penalty = abs(feature_count - optimal_feature_count) * 0.01
-        
-        # Combined objective for mean reversion
-        combined_objective = (
-            directional_f1_penalty + 
-            hold_f1_penalty + 
-            confidence_penalty + 
-            directional_precision_penalty +
-            feature_penalty
+        # Calculate Sharpe ratio through trading simulation
+        sharpe_ratio, win_rate, profit_factor, max_drawdown = calculate_sharpe_ratio_trading_simulation(
+            features.iloc[split_idx:val_idx], y_val, y_pred, y_pred_proba, data.iloc[split_idx:val_idx]
         )
         
-        # Log trial completion
+        logger.info(f"[SHARPE] Trading Simulation Results:")
+        logger.info(f"[SHARPE] Sharpe Ratio (weekly): {sharpe_ratio:.4f}")
+        logger.info(f"[SHARPE] Win Rate: {win_rate:.4f}")
+        logger.info(f"[SHARPE] Profit Factor: {profit_factor:.4f}")
+        logger.info(f"[SHARPE] Max Drawdown: {max_drawdown:.4f}")
+        
+        # SHARPE RATIO OBJECTIVE FUNCTION (lower is better, so we negate Sharpe)
+        # Prioritize Sharpe ratio (70%), Profit Factor (20%), Win Rate (5%), Max Drawdown (5%)
+        sharpe_penalty = -sharpe_ratio * 0.7  # Negative because we minimize
+        profit_factor_penalty = (1 - min(profit_factor, 3.0)) * 0.2  # Cap at 3.0
+        win_rate_penalty = (1 - win_rate) * 0.05
+        drawdown_penalty = abs(max_drawdown) * 0.05  # Penalize large drawdowns
+        
+        # Combined Sharpe-based objective
+        sharpe_objective = sharpe_penalty + profit_factor_penalty + win_rate_penalty + drawdown_penalty
+        
+        logger.info(f"[SHARPE] Objective Components:")
+        logger.info(f"[SHARPE] Sharpe Penalty: {sharpe_penalty:.4f}")
+        logger.info(f"[SHARPE] Profit Factor Penalty: {profit_factor_penalty:.4f}")
+        logger.info(f"[SHARPE] Win Rate Penalty: {win_rate_penalty:.4f}")
+        logger.info(f"[SHARPE] Drawdown Penalty: {drawdown_penalty:.4f}")
+        logger.info(f"[SHARPE] Combined Sharpe Objective: {sharpe_objective:.4f}")
+        
+        # Log trial completion with Sharpe metrics
         metrics = {
             'max_depth': config_dict['max_depth'],
             'learning_rate': config_dict['learning_rate'],
             'price_threshold': config_dict['price_threshold'],
-            'f1_scores': f1_scores.tolist(),
-            'combined_objective': combined_objective,
+            'sharpe_ratio': sharpe_ratio,
+            'win_rate': win_rate,
+            'profit_factor': profit_factor,
+            'max_drawdown': max_drawdown,
+            'sharpe_objective': sharpe_objective,
             'feature_count': len(features.columns),
             'use_feature_selection': config_dict['use_feature_selection'],
             'feature_selection_method': config_dict['feature_selection_method'] if config_dict['use_feature_selection'] else 'none'
         }
-        log_trial_complete(trial.number, combined_objective, metrics)
+        log_trial_complete(trial.number, sharpe_objective, metrics)
         
-        logger.info(f"[OBJECTIVE] XGBoost Mean Reversion Trial Results:")
+        logger.info(f"[OBJECTIVE] XGBoost Sharpe Ratio Trial Results:")
         logger.info(f"  Max Depth: {config_dict['max_depth']}, LR: {config_dict['learning_rate']:.4f}")
         logger.info(f"  Price Threshold: {config_dict['price_threshold']:.4f}")
-        logger.info(f"  Feature Selection: {config_dict['use_feature_selection']} ({config_dict['feature_selection_method'] if config_dict['use_feature_selection'] else 'none'})")
-        logger.info(f"  Feature Count: {len(features.columns)}")
-        logger.info(f"  F1 Scores: Down={f1_scores[0]:.4f}, Hold={f1_scores[1]:.4f}, Up={f1_scores[2]:.4f}")
-        logger.info(f"  Combined Objective: {combined_objective:.4f}")
+        logger.info(f"  Sharpe Ratio: {sharpe_ratio:.4f}")
+        logger.info(f"  Win Rate: {win_rate:.4f}")
+        logger.info(f"  Profit Factor: {profit_factor:.4f}")
+        logger.info(f"  Max Drawdown: {max_drawdown:.4f}")
+        logger.info(f"  Sharpe Objective: {sharpe_objective:.4f}")
         
-        return combined_objective
+        return sharpe_objective
         
     except TrialPruned:
         # Re-raise TrialPruned exceptions
@@ -540,7 +694,7 @@ def main():
     # Run optimization with small number of trials for testing
     study.optimize(
         objective,
-        n_trials=1500,  # Small number for testing
+        n_trials=2000,  # Small number for testing
         timeout=None,
         gc_after_trial=True,
         show_progress_bar=True
