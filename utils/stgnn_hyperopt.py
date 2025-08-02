@@ -344,12 +344,12 @@ def objective(trial: optuna.Trial) -> float:
             
             # AGGRESSIVE EXPANSION: 2-5x wider ranges for maximum exploration
             'learning_rate': trial.suggest_float('learning_rate', 0.000001, 0.02, log=True),  # 20x wider range
-            'hidden_dim': trial.suggest_int('hidden_dim', 256, 1024, step=64),  # 16x wider range, smaller step
+            'hidden_dim': trial.suggest_int('hidden_dim', 16, 1024, step=16),  # 16x wider range, smaller step
             'num_layers': trial.suggest_int('num_layers', 1, 12),  # 6x wider range
             'kernel_size': trial.suggest_int('kernel_size', 1, 8),  # 4x wider range
             'dropout': trial.suggest_float('dropout', 0.3, 0.8),  # 2x wider range, 0.1 is too low
             'batch_size': trial.suggest_int('batch_size', 16, 128, step=16),  # 8x wider range
-            'seq_len': trial.suggest_int('seq_len', 60, 720, step=30),  # 4x wider range, include very short sequences
+            'seq_len': trial.suggest_int('seq_len', 15, 720, step=15),  # 4x wider range, include very short sequences
             'prediction_horizon': 15,
             'early_stopping_patience': 5, # Increased patience for better convergence
             
@@ -362,7 +362,7 @@ def objective(trial: optuna.Trial) -> float:
             'class_multiplier_1': trial.suggest_float('class_multiplier_1', 1.0, 20.0),   # 6x wider range
             'class_multiplier_2': trial.suggest_float('class_multiplier_2', 1.0, 20.0),  # 6.7x wider range
             
-            'price_threshold': trial.suggest_float(0.01,0.05),
+            'price_threshold': trial.suggest_float('price_threshold', 0.01, 0.05),
 
             # Feature engineering parameters (searchable) - FOCUS ON CORE MODEL PARAMETERS
             'rsi_period': trial.suggest_int('rsi_period', 14, 100), # Keep current range
