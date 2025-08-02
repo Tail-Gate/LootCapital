@@ -953,10 +953,10 @@ def main():
     print(f"[MAIN] Starting production Optuna optimization with {best_params_info} previous best parameters.")
     logger.info(f"Starting production Optuna optimization with {best_params_info} previous best parameters.")
     
-    # AGGRESSIVE OPTIMIZATION: 150 trials with aggressive pruning
+    # ULTRA-AGGRESSIVE OPTIMIZATION: 1000 trials with aggressive pruning
     study.optimize(
         objective,
-        n_trials=150,  # AGGRESSIVE: 150 trials for comprehensive exploration
+        n_trials=1000,  # ULTRA-AGGRESSIVE: 1000 trials for exhaustive exploration
         timeout=None,    # Remove timeout to allow the study to run to completion or n_trials.
                          # Alternatively, set to a very large value (e.g., 24*3600*7 for a week in seconds).
         gc_after_trial=True, # Enable aggressive garbage collection after each trial.
@@ -981,7 +981,7 @@ def main():
     
     # Print optimization summary
     device_suffix = "CPU"
-    print(f'\nAGGRESSIVE Optimization Summary ({device_suffix}):')
+    print(f'\nULTRA-AGGRESSIVE Optimization Summary ({device_suffix}):')
     print(f'  Device: {device}')
     print(f'  Total trials: {len(study.trials)}')
     print(f'  Best validation loss: {study.best_trial.value:.4f}')
@@ -991,6 +991,7 @@ def main():
           f'{best_params.get("class_multiplier_1", "N/A")}, {best_params.get("class_multiplier_2", "N/A")}]')
     print(f'  Search space: 2-16x wider ranges for aggressive exploration')
     print(f'  Pruning: Aggressive pruning enabled (loss > 5.0, poor convergence, exploding gradients)')
+    print(f'  Trials: 1000 trials for exhaustive hyperparameter exploration')
     
     # Final memory cleanup
     manage_memory()
