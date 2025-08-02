@@ -276,13 +276,13 @@ def objective(trial: optuna.Trial) -> float:
             
             # Focal loss parameters
             'use_focal_loss': trial.suggest_categorical('use_focal_loss', [True]),
-            'focal_alpha': trial.suggest_float('focal_alpha', 0.5, 3.0),
+            'focal_alpha': trial.suggest_float('focal_alpha', 1.0, 5.0),  # More aggressive alpha range
             'focal_gamma': trial.suggest_float('focal_gamma', 1.0, 5.0),
             
             # Class multiplier parameters for handling class imbalance
-            'class_multiplier_0': trial.suggest_float('class_multiplier_0', 0.5, 3.0),  # Down class
-            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 0.1, 1.0),  # Hold class (reduce weight since it dominates)
-            'class_multiplier_2': trial.suggest_float('class_multiplier_2', 0.5, 3.0),  # Up class
+            'class_multiplier_0': trial.suggest_float('class_multiplier_0', 2.0, 5.0),  # Down class - much higher emphasis
+            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 0.05, 0.5),  # Hold class - much lower weight since it dominates
+            'class_multiplier_2': trial.suggest_float('class_multiplier_2', 2.0, 5.0),  # Up class - much higher emphasis
         }
         
         # Log trial start
@@ -453,11 +453,16 @@ def objective(trial: optuna.Trial) -> float:
             log_trial_pruned(trial.number, reason)
             raise TrialPruned(reason)
         
-        # Additional pruning check: if model stopped early due to poor performance
-        if hasattr(trainer.model, 'best_iteration') and trainer.model.best_iteration < 5:
-            reason = f"Early stopping at iteration {trainer.model.best_iteration} with score {training_history['best_score']:.4f}"
-            log_trial_pruned(trial.number, reason)
-            raise TrialPruned(reason)
+        # Additional pruning check: if model stopped very early due to poor performance
+        if hasattr(trainer.model, 'best_iteration'):
+            if trainer.model.best_iteration == 0 and training_history['best_score'] < 0.3:
+                reason = f"Model stopped at iteration 0 with poor score: {training_history['best_score']:.4f}"
+                log_trial_pruned(trial.number, reason)
+                raise TrialPruned(reason)
+            elif trainer.model.best_iteration < 3 and training_history['best_score'] < 0.1:
+                reason = f"Early stopping at iteration {trainer.model.best_iteration} with very poor score: {training_history['best_score']:.4f}"
+                log_trial_pruned(trial.number, reason)
+                raise TrialPruned(reason)
         
         # Evaluate on validation set
         evaluation_results = trainer.evaluate(X_val, y_val)
@@ -500,10 +505,10 @@ def objective(trial: optuna.Trial) -> float:
             prices = data_val['close'].values
             timestamps = data_val.index
             
-            # Weekly Sharpe calculation parameters
-            weekly_returns = []
-            current_week_returns = []
-            current_week_start = None
+            # Daily Sharpe calculation parameters
+            daily_returns = []
+            current_day_returns = []
+            current_day_start = None
             
             for i in range(len(y_pred)):
                 current_time = timestamps[i]
@@ -511,16 +516,16 @@ def objective(trial: optuna.Trial) -> float:
                 prediction = y_pred[i]
                 confidence = np.max(y_pred_proba[i])
                 
-                # Weekly grouping for Sharpe calculation
-                if current_week_start is None:
-                    current_week_start = current_time
-                elif (current_time - current_week_start).days >= 7:
-                    # End of week, calculate weekly return
-                    if current_week_returns:
-                        weekly_return = np.sum(current_week_returns)
-                        weekly_returns.append(weekly_return)
-                        current_week_returns = []
-                    current_week_start = current_time
+                # Daily grouping for Sharpe calculation
+                if current_day_start is None:
+                    current_day_start = current_time
+                elif (current_time - current_day_start).days >= 1:
+                    # End of day, calculate daily return
+                    if current_day_returns:
+                        daily_return = np.sum(current_day_returns)
+                        daily_returns.append(daily_return)
+                        current_day_returns = []
+                    current_day_start = current_time
                 
                 # Check for stop loss on existing position
                 if current_position is not None:
@@ -545,8 +550,8 @@ def objective(trial: optuna.Trial) -> float:
                             'reason': 'stop_loss' if pnl_pct <= -stop_loss else 'max_hold_time'
                         })
                         
-                        # Add to weekly returns
-                        current_week_returns.append(trade_return)
+                        # Add to daily returns
+                        current_day_returns.append(trade_return)
                         
                         # Update portfolio
                         portfolio_value *= (1 + trade_return)
@@ -581,19 +586,19 @@ def objective(trial: optuna.Trial) -> float:
                     'hold_hours': (timestamps[-1] - entry_time).total_seconds() / 3600,
                     'reason': 'end_of_period'
                 })
-                current_week_returns.append(trade_return)
+                current_day_returns.append(trade_return)
             
-            # Add final week returns
-            if current_week_returns:
-                weekly_return = np.sum(current_week_returns)
-                weekly_returns.append(weekly_return)
+            # Add final day returns
+            if current_day_returns:
+                daily_return = np.sum(current_day_returns)
+                daily_returns.append(daily_return)
             
-            # Calculate Sharpe ratio (weekly)
-            if len(weekly_returns) < 2:
+            # Calculate Sharpe ratio (daily)
+            if len(daily_returns) < 2:
                 return -10.0, 0.0, 0.0, 0.0  # Penalty for insufficient data
             
-            weekly_returns = np.array(weekly_returns)
-            sharpe_ratio = np.mean(weekly_returns) / (np.std(weekly_returns) + 1e-8)
+            daily_returns = np.array(daily_returns)
+            sharpe_ratio = np.mean(daily_returns) / (np.std(daily_returns) + 1e-8)
             
             # Calculate additional metrics
             if trades:
@@ -624,7 +629,7 @@ def objective(trial: optuna.Trial) -> float:
         )
         
         logger.info(f"[SHARPE] Trading Simulation Results:")
-        logger.info(f"[SHARPE] Sharpe Ratio (weekly): {sharpe_ratio:.4f}")
+        logger.info(f"[SHARPE] Sharpe Ratio (daily): {sharpe_ratio:.4f}")
         logger.info(f"[SHARPE] Win Rate: {win_rate:.4f}")
         logger.info(f"[SHARPE] Profit Factor: {profit_factor:.4f}")
         logger.info(f"[SHARPE] Max Drawdown: {max_drawdown:.4f}")
@@ -667,6 +672,14 @@ def objective(trial: optuna.Trial) -> float:
             'class_multiplier_2': config_dict['class_multiplier_2']
         }
         log_trial_complete(trial.number, sharpe_objective, metrics)
+        
+        # Save scaler if trial is successful
+        if sharpe_objective < float('inf'):
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            scaler_path = f'config/xgboost_scaler_trial_{trial.number}_{timestamp}.joblib'
+            trainer.save_scaler(scaler_path)
+            # Store scaler path in trial user attributes for later retrieval
+            trial.set_user_attr('scaler_path', scaler_path)
         
         logger.info(f"[OBJECTIVE] XGBoost Sharpe Ratio Trial Results:")
         logger.info(f"  Max Depth: {config_dict['max_depth']}, LR: {config_dict['learning_rate']:.4f}")
@@ -724,6 +737,26 @@ def main():
     
     with open(f'config/xgboost_mean_reversion_best_params_test_{timestamp}.json', 'w') as f:
         json.dump(best_params, f, indent=4)
+    
+    # Save best scaler
+    best_trial = study.best_trial
+    if hasattr(best_trial, 'user_attrs') and 'scaler_path' in best_trial.user_attrs:
+        best_scaler_path = best_trial.user_attrs['scaler_path']
+        import os
+        import shutil
+        
+        # Create best scaler path alongside best params
+        best_scaler_dest = f'config/xgboost_best_scaler_{timestamp}.joblib'
+        
+        # Copy the best scaler to central location
+        if os.path.exists(best_scaler_path):
+            shutil.copy2(best_scaler_path, best_scaler_dest)
+            logger.info(f'Best scaler saved to: {best_scaler_dest}')
+            logger.info(f'Best scaler copied from: {best_scaler_path}')
+        else:
+            logger.warning(f'Best scaler file not found: {best_scaler_path}')
+    else:
+        logger.warning('No scaler path found in best trial user attributes')
     
     logger.info(f'\nXGBoost Mean Reversion Optimization Summary:')
     logger.info(f'  Total trials: {len(study.trials)}')

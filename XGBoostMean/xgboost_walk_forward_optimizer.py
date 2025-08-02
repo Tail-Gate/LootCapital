@@ -333,6 +333,10 @@ class XGBoostWalkForwardOptimizer:
             self.logger.info("Evaluating on test data...")
             test_metrics = trainer.evaluate(X_test, y_test)
             
+            # Save the model and all artifacts
+            self.logger.info("Saving XGBoost model and artifacts...")
+            saved_paths = self.save_xgboost_model(trainer, config, period_data, test_metrics)
+            
             period_time = time.time() - period_start_time
             self.logger.info(f"Period {period_data['period_name']} completed in {period_time:.2f} seconds")
             
@@ -341,7 +345,8 @@ class XGBoostWalkForwardOptimizer:
                 'train_metrics': train_metrics,
                 'test_metrics': test_metrics,
                 'training_history': training_history,
-                'config': config
+                'config': config,
+                'saved_paths': saved_paths
             }
             
         except Exception as e:
@@ -385,7 +390,7 @@ class XGBoostWalkForwardOptimizer:
             saved_paths['scaler_path'] = str(scaler_path)
             self.logger.info(f"Saved scaler: {scaler_path}")
             
-            # 5. Save inference metadata
+            # 5. Save inference metadata with trading signal focus
             metadata = {
                 'model_path': str(model_path),
                 'config_path': str(config_path),
@@ -393,7 +398,19 @@ class XGBoostWalkForwardOptimizer:
                 'scaler_path': str(scaler_path),
                 'period_name': period_name,
                 'timestamp': timestamp,
-                'test_metrics': test_metrics
+                'test_metrics': test_metrics,
+                # PRIORITY: Trading Signal Metrics
+                'trading_signal_metrics': {
+                    'up_f1': test_metrics['f1'][2],
+                    'down_f1': test_metrics['f1'][0],
+                    'hold_f1': test_metrics['f1'][1],
+                    'combined_trading_f1': (test_metrics['f1'][2] + test_metrics['f1'][0]) / 2,
+                    'up_precision': test_metrics['precision'][2],
+                    'down_precision': test_metrics['precision'][0],
+                    'up_recall': test_metrics['recall'][2],
+                    'down_recall': test_metrics['recall'][0]
+                },
+                'overall_accuracy': test_metrics['classification_report']['accuracy']
             }
             
             metadata_path = self.output_dir / f'wfo_xgboost_metadata_{period_name}_{timestamp}.json'
@@ -449,11 +466,14 @@ class XGBoostWalkForwardOptimizer:
                 self.results['test_metrics'].append(result['test_metrics'])
                 self.results['configs'].append(result['config'])
                 
-                # Log results
+                # Log results - PRIORITIZE F1 SCORES FOR TRADING SIGNALS
                 self.logger.info(f"✓ Period {split['period_name']} completed successfully")
-                self.logger.info(f"  Test Accuracy: {result['test_metrics']['classification_report']['accuracy']:.4f}")
-                self.logger.info(f"  Test F1 (Up): {result['test_metrics']['f1'][2]:.4f}")
-                self.logger.info(f"  Test F1 (Down): {result['test_metrics']['f1'][0]:.4f}")
+                self.logger.info(f"  🎯 TRADING SIGNAL F1 SCORES:")
+                self.logger.info(f"    UP (Buy Signal): {result['test_metrics']['f1'][2]:.4f}")
+                self.logger.info(f"    DOWN (Sell Signal): {result['test_metrics']['f1'][0]:.4f}")
+                self.logger.info(f"  📊 Other Metrics:")
+                self.logger.info(f"    Hold (No Trade): {result['test_metrics']['f1'][1]:.4f}")
+                self.logger.info(f"    Overall Accuracy: {result['test_metrics']['classification_report']['accuracy']:.4f}")
             else:
                 failed_periods += 1
                 self.logger.error(f"✗ Period {split['period_name']} failed")
@@ -515,35 +535,65 @@ class XGBoostWalkForwardOptimizer:
             'test_f1_hold': test_f1_hold
         }
         
-        # Print summary
+        # Print summary - PRIORITIZE TRADING SIGNAL F1 SCORES
         print("\n" + "="*80)
-        print("XGBOOST WALK-FORWARD OPTIMIZATION SUMMARY REPORT")
+        print("🎯 XGBOOST WALK-FORWARD OPTIMIZATION - TRADING SIGNAL FOCUS")
         print("="*80)
         print(f"Total periods: {summary['total_periods']}")
-        print(f"Mean test accuracy: {summary['mean_test_accuracy']:.4f} ± {summary['std_test_accuracy']:.4f}")
+        
+        # PRIORITY: Trading Signal F1 Scores
+        print(f"\n🎯 TRADING SIGNAL F1 SCORES (PRIORITY METRICS):")
+        print(f"  📈 UP (Buy Signal): {summary['mean_f1_up']:.4f} ± {np.std(summary['test_f1_up']):.4f}")
+        print(f"  📉 DOWN (Sell Signal): {summary['mean_f1_down']:.4f} ± {np.std(summary['test_f1_down']):.4f}")
+        print(f"  📊 Combined Trading Signal: {(summary['mean_f1_up'] + summary['mean_f1_down']) / 2:.4f}")
+        
+        # Secondary metrics
+        print(f"\n📊 OTHER METRICS:")
+        print(f"  ⏸️  Hold (No Trade): {summary['mean_f1_hold']:.4f}")
+        print(f"  📋 Overall Accuracy: {summary['mean_test_accuracy']:.4f} ± {summary['std_test_accuracy']:.4f}")
+        
+        # Best/Worst periods for trading signals
+        best_up_period = summary['periods'][np.argmax(summary['test_f1_up'])]
+        best_down_period = summary['periods'][np.argmax(summary['test_f1_down'])]
+        worst_up_period = summary['periods'][np.argmin(summary['test_f1_up'])]
+        worst_down_period = summary['periods'][np.argmin(summary['test_f1_down'])]
+        
+        print(f"\n🏆 BEST TRADING SIGNAL PERIODS:")
+        print(f"  📈 Best UP Signal: {best_up_period} (F1: {np.max(summary['test_f1_up']):.4f})")
+        print(f"  📉 Best DOWN Signal: {best_down_period} (F1: {np.max(summary['test_f1_down']):.4f})")
+        print(f"  📈 Worst UP Signal: {worst_up_period} (F1: {np.min(summary['test_f1_up']):.4f})")
+        print(f"  📉 Worst DOWN Signal: {worst_down_period} (F1: {np.min(summary['test_f1_down']):.4f})")
         
         # Print focal loss information if available
         if 'focal_loss_enabled' in summary and summary['focal_loss_enabled']:
-            print(f"\nFocal Loss Configuration:")
+            print(f"\n🔧 FOCAL LOSS CONFIGURATION:")
             print(f"  Alpha: {summary['focal_alpha']:.4f}")
             print(f"  Gamma: {summary['focal_gamma']:.4f}")
             print(f"  Class Multipliers: [0: {summary['class_multipliers']['class_0']:.4f}, 1: {summary['class_multipliers']['class_1']:.4f}, 2: {summary['class_multipliers']['class_2']:.4f}]")
         else:
-            print(f"\nLoss Function: Standard Cross-Entropy")
+            print(f"\n🔧 Loss Function: Standard Cross-Entropy")
         
-        print(f"\nMean F1 Scores:")
-        print(f"  Up: {summary['mean_f1_up']:.4f}")
-        print(f"  Down: {summary['mean_f1_down']:.4f}")
-        print(f"  Hold: {summary['mean_f1_hold']:.4f}")
-        print(f"\nBest period: {summary['best_period']} (accuracy: {summary['best_accuracy']:.4f})")
-        print(f"Worst period: {summary['worst_period']} (accuracy: {summary['worst_accuracy']:.4f})")
-        
-        # Print period-by-period results
-        print("\nPeriod-by-Period Results:")
-        print(f"{'Period':<20} {'Accuracy':<10} {'F1(Up)':<8} {'F1(Down)':<10} {'F1(Hold)':<10}")
+        # Print period-by-period results - PRIORITIZE TRADING SIGNALS
+        print("\n📊 PERIOD-BY-PERIOD TRADING SIGNAL RESULTS:")
+        print(f"{'Period':<20} {'📈UP F1':<8} {'📉DOWN F1':<10} {'⏸️HOLD F1':<10} {'📋Accuracy':<10}")
         print("-" * 65)
         for i, period in enumerate(self.results['periods']):
-            print(f"{period:<20} {test_accuracies[i]:<10.4f} {test_f1_up[i]:<8.4f} {test_f1_down[i]:<10.4f} {test_f1_hold[i]:<10.4f}")
+            # Highlight periods with good trading signals
+            up_f1 = test_f1_up[i]
+            down_f1 = test_f1_down[i]
+            combined_trading = (up_f1 + down_f1) / 2
+            
+            # Add indicators for good trading performance
+            up_indicator = "🔥" if up_f1 > 0.1 else "📈" if up_f1 > 0.05 else "📈"
+            down_indicator = "🔥" if down_f1 > 0.1 else "📉" if down_f1 > 0.05 else "📉"
+            
+            print(f"{period:<20} {up_indicator}{up_f1:<7.4f} {down_indicator}{down_f1:<9.4f} {test_f1_hold[i]:<10.4f} {test_accuracies[i]:<10.4f}")
+        
+        # Summary of trading signal performance
+        print(f"\n🎯 TRADING SIGNAL SUMMARY:")
+        print(f"  📈 UP Signals - Mean: {summary['mean_f1_up']:.4f}, Best: {np.max(summary['test_f1_up']):.4f}, Worst: {np.min(summary['test_f1_up']):.4f}")
+        print(f"  📉 DOWN Signals - Mean: {summary['mean_f1_down']:.4f}, Best: {np.max(summary['test_f1_down']):.4f}, Worst: {np.min(summary['test_f1_down']):.4f}")
+        print(f"  📊 Combined Trading - Mean: {(summary['mean_f1_up'] + summary['mean_f1_down']) / 2:.4f}")
         
         # Save detailed report
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -562,42 +612,49 @@ class XGBoostWalkForwardOptimizer:
     def create_visualizations(self, summary: dict):
         """Create visualizations of walk-forward results"""
         
-        # Plot 1: Accuracy over time
+        # Plot 1: TRADING SIGNAL F1 SCORES (PRIORITY)
         plt.figure(figsize=(12, 8))
         
         plt.subplot(2, 2, 1)
-        plt.plot(summary['test_accuracies'], marker='o')
-        plt.title('XGBoost Test Accuracy Over Time')
+        plt.plot(summary['test_f1_up'], label='UP (Buy Signal)', marker='o', color='green', linewidth=2)
+        plt.plot(summary['test_f1_down'], label='DOWN (Sell Signal)', marker='s', color='red', linewidth=2)
+        plt.title('🎯 TRADING SIGNAL F1 SCORES (PRIORITY)', fontweight='bold')
         plt.xlabel('Period')
-        plt.ylabel('Accuracy')
+        plt.ylabel('F1 Score')
+        plt.legend()
         plt.grid(True)
+        plt.ylim(0, 1)
         
-        # Plot 2: F1 scores over time
+        # Plot 2: Combined Trading Signal Performance
         plt.subplot(2, 2, 2)
-        plt.plot(summary['test_f1_up'], label='Up', marker='o')
-        plt.plot(summary['test_f1_down'], label='Down', marker='s')
-        plt.plot(summary['test_f1_hold'], label='Hold', marker='^')
-        plt.title('XGBoost F1 Scores Over Time')
+        combined_trading = [(up + down) / 2 for up, down in zip(summary['test_f1_up'], summary['test_f1_down'])]
+        plt.plot(combined_trading, label='Combined Trading Signal', marker='o', color='purple', linewidth=2)
+        plt.title('📊 Combined Trading Signal Performance', fontweight='bold')
         plt.xlabel('Period')
-        plt.ylabel('F1 Score')
+        plt.ylabel('Average F1 Score')
         plt.legend()
         plt.grid(True)
+        plt.ylim(0, 1)
         
-        # Plot 3: Distribution of accuracies
+        # Plot 3: Trading Signal F1 Distribution
         plt.subplot(2, 2, 3)
-        plt.hist(summary['test_accuracies'], bins=10, alpha=0.7, edgecolor='black')
-        plt.title('Distribution of XGBoost Test Accuracies')
-        plt.xlabel('Accuracy')
+        plt.hist(summary['test_f1_up'], bins=8, alpha=0.7, color='green', label='UP Signals', edgecolor='black')
+        plt.hist(summary['test_f1_down'], bins=8, alpha=0.7, color='red', label='DOWN Signals', edgecolor='black')
+        plt.title('📊 Trading Signal F1 Score Distribution', fontweight='bold')
+        plt.xlabel('F1 Score')
         plt.ylabel('Frequency')
-        plt.axvline(summary['mean_test_accuracy'], color='red', linestyle='--', label=f'Mean: {summary["mean_test_accuracy"]:.4f}')
+        plt.legend()
+        plt.axvline(summary['mean_f1_up'], color='green', linestyle='--', label=f'UP Mean: {summary["mean_f1_up"]:.4f}')
+        plt.axvline(summary['mean_f1_down'], color='red', linestyle='--', label=f'DOWN Mean: {summary["mean_f1_down"]:.4f}')
         plt.legend()
         
-        # Plot 4: Box plot of F1 scores
+        # Plot 4: Trading Signal Box Plot
         plt.subplot(2, 2, 4)
-        f1_data = [summary['test_f1_up'], summary['test_f1_down'], summary['test_f1_hold']]
-        plt.boxplot(f1_data, tick_labels=['Up', 'Down', 'Hold'])
-        plt.title('XGBoost F1 Score Distribution by Class')
+        trading_f1_data = [summary['test_f1_up'], summary['test_f1_down']]
+        plt.boxplot(trading_f1_data, tick_labels=['UP (Buy)', 'DOWN (Sell)'])
+        plt.title('🎯 Trading Signal F1 Score Distribution', fontweight='bold')
         plt.ylabel('F1 Score')
+        plt.ylim(0, 1)
         
         plt.tight_layout()
         
@@ -643,13 +700,14 @@ def main():
     if args.end_date:
         end_date = datetime.strptime(args.end_date, '%Y-%m-%d')
     else:
-        end_date = datetime.now()
+        # Default to 2025-05-29
+        end_date = datetime(2025, 5, 29)
         
     if args.start_date:
         start_date = datetime.strptime(args.start_date, '%Y-%m-%d')
     else:
-        # Default to 2 years ago
-        start_date = end_date - timedelta(days=730)
+        # Default to 2024-01-02
+        start_date = datetime(2024, 1, 2)
     
     # Run optimization
     results = optimizer.run_optimization(start_date, end_date)

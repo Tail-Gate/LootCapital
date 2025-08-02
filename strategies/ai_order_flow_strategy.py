@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from strategies.order_flow_strategy import OrderFlowStrategy, OrderFlowConfig
 from utils.lstm_utils import LSTMAttentionModel, train_lstm, predict_lstm, save_lstm, load_lstm
-from utils.xgboost_utils import train_xgboost, predict_xgboost, explain_xgboost, save_xgboost, load_xgboost
+from XGBoostMean.xgboost_utils import train_xgboost, predict_xgboost, explain_xgboost, save_xgboost, load_xgboost
 
 @dataclass
 class AIOrderFlowConfig(OrderFlowConfig):

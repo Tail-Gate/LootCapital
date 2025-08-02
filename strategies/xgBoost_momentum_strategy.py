@@ -5,7 +5,7 @@ import pandas as pd
 import xgboost as xgb
 
 from strategies.technical_strategy import TechnicalStrategy, TechnicalConfig, TradeType
-from utils import xgboost_utils
+from XGBoostMean import xgboost_utils
 from utils.feature_generator import FeatureGenerator
 
 @dataclass

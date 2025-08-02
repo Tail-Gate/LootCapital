@@ -474,14 +474,18 @@ def focal_loss_objective(predt, dtrain, alpha=1.0, gamma=2.0, class_multipliers=
         # Apply weights to focal loss
         focal_weight = focal_weight * np.sum(y_onehot * class_weights, axis=1)
     
+    # Clip focal weight to prevent numerical instability
+    focal_weight = np.clip(focal_weight, 0.1, 10.0)
+    
     # Calculate gradients and hessians
     grad = focal_weight[:, np.newaxis] * (probs - y_onehot)
     hess = focal_weight[:, np.newaxis] * probs * (1 - probs)
     
-    # Flatten for XGBoost
-    grad = grad.flatten()
-    hess = hess.flatten()
+    # Clip gradients and hessians to prevent numerical instability
+    grad = np.clip(grad, -10.0, 10.0)
+    hess = np.clip(hess, 0.01, 10.0)
     
+    # For XGBoost 2.1.0+, return in shape (n_samples, n_classes)
     return grad, hess
 
 def focal_loss_eval(predt, dtrain, alpha=1.0, gamma=2.0, class_multipliers=None):

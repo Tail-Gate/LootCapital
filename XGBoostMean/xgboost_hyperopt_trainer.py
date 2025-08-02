@@ -3,7 +3,8 @@ from sklearn.metrics import classification_report, precision_recall_fscore_suppo
 import logging
 import numpy as np
 from imblearn.over_sampling import SMOTE
-from sklearn.preprocessing import label_binarize
+from sklearn.preprocessing import label_binarize, MinMaxScaler
+import joblib
 
 class XGBoostHyperoptTrainer:
     """Advanced XGBoost trainer with memory management and comprehensive logging"""
@@ -14,6 +15,7 @@ class XGBoostHyperoptTrainer:
         self.model = None
         self.best_model = None
         self.best_score = 0.0
+        self.scaler = MinMaxScaler()
         
         # Set up logging
         self.logger = logging.getLogger(__name__)
@@ -32,10 +34,15 @@ class XGBoostHyperoptTrainer:
         if self.data_processor:
             self.data_processor.manage_memory()
         
+        # Scale features
+        print("[TRAINER] Scaling features with MinMaxScaler...")
+        X_train_scaled = self.scaler.fit_transform(X_train)
+        X_val_scaled = self.scaler.transform(X_val)
+        
         # Apply SMOTE to training data only
         print("[TRAINER] Applying SMOTE for class balance...")
         smote = SMOTE(random_state=self.config.random_state, k_neighbors=3)
-        X_train_balanced, y_train_balanced = smote.fit_resample(X_train, y_train)
+        X_train_balanced, y_train_balanced = smote.fit_resample(X_train_scaled, y_train)
         
         # Log class distribution
         unique_before, counts_before = np.unique(y_train, return_counts=True)
@@ -45,7 +52,7 @@ class XGBoostHyperoptTrainer:
         
         # Create DMatrix
         dtrain = xgb.DMatrix(X_train_balanced, label=y_train_balanced)
-        dval = xgb.DMatrix(X_val, label=y_val)
+        dval = xgb.DMatrix(X_val_scaled, label=y_val)
         
         # Get XGBoost parameters
         params = self.config.to_xgboost_params()
@@ -114,7 +121,10 @@ class XGBoostHyperoptTrainer:
         """Comprehensive model evaluation"""
         print("[TRAINER] Evaluating model...")
         
-        dtest = xgb.DMatrix(X_test, label=y_test)
+        # Scale test data using fitted scaler
+        X_test_scaled = self.scaler.transform(X_test)
+        
+        dtest = xgb.DMatrix(X_test_scaled, label=y_test)
         
         # Get predictions
         probabilities = self.model.predict(dtest)
@@ -152,4 +162,14 @@ class XGBoostHyperoptTrainer:
             'predictions': predictions,
             'true_labels': y_test,
             'probabilities': probabilities
-        } 
+        }
+    
+    def save_scaler(self, path):
+        """Save the fitted scaler"""
+        joblib.dump(self.scaler, path)
+        print(f"[TRAINER] Saved scaler to {path}")
+    
+    def load_scaler(self, path):
+        """Load a fitted scaler"""
+        self.scaler = joblib.load(path)
+        print(f"[TRAINER] Loaded scaler from {path}") 

@@ -48,14 +48,14 @@ class XGBoostHyperoptConfig:
     
     # Class imbalance handling
     scale_pos_weight: float = 1.0
-    focal_alpha: float = 1.0
-    focal_gamma: float = 2.0
+    focal_alpha: float = 3.0  # More aggressive default for minority class emphasis
+    focal_gamma: float = 3.0  # More aggressive default for focusing on hard examples
     use_focal_loss: bool = True  # Enable focal loss by default
     
     # Class multipliers for handling class imbalance
-    class_multiplier_0: float = 1.0  # Multiplier for class 0 (Down)
-    class_multiplier_1: float = 1.0  # Multiplier for class 1 (Hold) 
-    class_multiplier_2: float = 1.0  # Multiplier for class 2 (Up)
+    class_multiplier_0: float = 3.0  # Multiplier for class 0 (Down) - high emphasis for trading signals
+    class_multiplier_1: float = 0.3  # Multiplier for class 1 (Hold) - low weight since it dominates
+    class_multiplier_2: float = 3.0  # Multiplier for class 2 (Up) - high emphasis for trading signals
     
     # Feature selection parameters
     use_feature_selection: bool = False

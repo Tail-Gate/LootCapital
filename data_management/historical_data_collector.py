@@ -13,7 +13,11 @@ from concurrent.futures import ThreadPoolExecutor
 import threading
 from queue import Queue
 import os
-from .high_frequency_collector import HighFrequencyCollector
+import argparse
+try:
+    from .high_frequency_collector import HighFrequencyCollector
+except ImportError:
+    from high_frequency_collector import HighFrequencyCollector
 
 class HistoricalDataCollector(HighFrequencyCollector):
     """
@@ -729,3 +733,61 @@ class HistoricalDataCollector(HighFrequencyCollector):
             self.logger.info(f"Saved final batch of {len(order_book_data)} order book snapshots")
         
         self.logger.info("Historical order book collection completed") 
+
+async def main():
+    """Main function to run historical data collection."""
+    parser = argparse.ArgumentParser(description='Collect historical market data')
+    parser.add_argument('--exchange', default='okx', help='Exchange ID (default: okx)')
+    parser.add_argument('--symbol', default='ETH-USDT-SWAP', help='Trading symbol (default: ETH-USDT-SWAP)')
+    parser.add_argument('--interval', default='15m', help='OHLCV interval (default: 15m)')
+    parser.add_argument('--start-time', required=True, help='Start time (YYYY-MM-DD HH:MM:SS)')
+    parser.add_argument('--end-time', help='End time (YYYY-MM-DD HH:MM:SS, defaults to now)')
+    parser.add_argument('--data-dir', default='data/historical', help='Data directory (default: data/historical)')
+    parser.add_argument('--type', choices=['ohlcv', 'orderbook', 'both'], default='ohlcv', 
+                       help='Type of data to collect (default: ohlcv)')
+    
+    args = parser.parse_args()
+    
+    # Parse datetime arguments
+    start_time = datetime.strptime(args.start_time, '%Y-%m-%d %H:%M:%S')
+    end_time = None
+    if args.end_time:
+        end_time = datetime.strptime(args.end_time, '%Y-%m-%d %H:%M:%S')
+    
+    # Create collector
+    collector = HistoricalDataCollector(
+        exchange_id=args.exchange,
+        symbol=args.symbol,
+        interval=args.interval,
+        data_dir=args.data_dir
+    )
+    
+    print(f"Starting data collection:")
+    print(f"Exchange: {args.exchange}")
+    print(f"Symbol: {args.symbol}")
+    print(f"Interval: {args.interval}")
+    print(f"Start time: {start_time}")
+    print(f"End time: {end_time or 'now'}")
+    print(f"Data type: {args.type}")
+    print(f"Data directory: {args.data_dir}")
+    print("-" * 50)
+    
+    try:
+        if args.type in ['ohlcv', 'both']:
+            print("Collecting OHLCV data...")
+            await collector.collect_historical_data(start_time, end_time)
+            print("OHLCV data collection completed!")
+        
+        if args.type in ['orderbook', 'both']:
+            print("Collecting order book data...")
+            await collector.collect_historical_orderbook(start_time, end_time)
+            print("Order book data collection completed!")
+        
+        print("All data collection completed successfully!")
+        
+    except Exception as e:
+        print(f"Error during data collection: {str(e)}")
+        raise
+
+if __name__ == "__main__":
+    asyncio.run(main()) 
