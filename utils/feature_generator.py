@@ -6,7 +6,7 @@ from pathlib import Path
 import json
 from datetime import datetime
 from market_analysis.technical_indicators import TechnicalIndicators
-from .order_book_features import calculate_order_flow_imbalance, calculate_volume_pressure
+from utils.order_book_features import calculate_order_flow_imbalance, calculate_volume_pressure
 import multiprocessing as mp
 import gc
 import time

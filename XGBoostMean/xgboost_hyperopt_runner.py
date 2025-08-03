@@ -9,9 +9,9 @@ from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classi
 from sklearn.feature_selection import SelectFromModel
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
-from .xgboost_hyperopt_config import XGBoostHyperoptConfig
-from .xgboost_hyperopt_trainer import XGBoostHyperoptTrainer
-from .xgboost_logging import (
+from XGBoostMean.xgboost_hyperopt_config import XGBoostHyperoptConfig
+from XGBoostMean.xgboost_hyperopt_trainer import XGBoostHyperoptTrainer
+from XGBoostMean.xgboost_logging import (
     get_xgboost_logger, log_trial_start, log_trial_complete, 
     log_trial_pruned, log_memory_usage, log_evaluation_results
 )

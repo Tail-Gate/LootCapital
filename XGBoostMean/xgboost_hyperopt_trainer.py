@@ -59,7 +59,7 @@ class XGBoostHyperoptTrainer:
         
         # Handle focal loss if enabled
         if self.config.use_focal_loss:
-            from .xgboost_utils import focal_loss_objective, focal_loss_eval
+            from XGBoostMean.xgboost_utils import focal_loss_objective, focal_loss_eval
             
             # Create wrapper functions with config parameters
             def focal_objective_wrapper(predt, dtrain):
