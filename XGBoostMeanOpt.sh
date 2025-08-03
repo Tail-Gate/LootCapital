@@ -9,7 +9,6 @@
 #SBATCH --time=48:00:00                  #  time for thorough optimization
 #SBATCH --output=xgboost_hyperopt_log_%j.txt     # Standard output file, %j is replaced by job number
 #SBATCH --cpus-per-task=32               # Use ALL 32 CPUs on the node
-#SBATCH --gres=gpu:0                     # 0 GPUs requested
 #SBATCH -n 1                             # Request 1 nodes for the job
 #SBATCH --exclusive                      # Request exclusive access to the node
 

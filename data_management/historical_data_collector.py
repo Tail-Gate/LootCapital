@@ -15,6 +15,10 @@ from queue import Queue
 import os
 import argparse
 try:
+    from tqdm import tqdm
+except ImportError:
+    tqdm = None
+try:
     from .high_frequency_collector import HighFrequencyCollector
 except ImportError:
     from high_frequency_collector import HighFrequencyCollector
@@ -204,7 +208,7 @@ class HistoricalDataCollector(HighFrequencyCollector):
         self,
         start_time: datetime,
         end_time: datetime = None,
-        save_interval: int = 1000
+        save_interval: int = 10  # Save every 10 batches (1000 candles)
     ):
         """
         Collect historical OHLCV and order book data.
@@ -236,6 +240,21 @@ class HistoricalDataCollector(HighFrequencyCollector):
         ohlcv_data = []
         order_book_data = []
         
+        # Calculate total expected candles for progress bar
+        total_days = (end_time - start_time).days
+        total_candles = total_days * 96  # 96 candles per day (15-minute intervals)
+        
+        # Initialize progress bar
+        if tqdm:
+            pbar = tqdm(
+                total=total_candles,
+                desc="Collecting historical data",
+                unit="candles",
+                ncols=100
+            )
+        else:
+            pbar = None
+        
         print(f"DEBUG: About to enter main collection loop")
         while self.progress['current_time'] < end_time:
             try:
@@ -244,22 +263,25 @@ class HistoricalDataCollector(HighFrequencyCollector):
                 # Fetch OHLCV data
                 ohlcv_batch = await self.fetch_ohlcv(since=start_timestamp)
                 if not ohlcv_batch.empty:
-                    print(f"DEBUG: Got {len(ohlcv_batch)} candles in batch")
                     ohlcv_data.append(ohlcv_batch)
-                    print(f"DEBUG: Total ohlcv_data batches: {len(ohlcv_data)}")
                     
                     # Update progress
                     self.progress['current_time'] = ohlcv_batch.index[-1]
                     self.progress['collected_candles'] += len(ohlcv_batch)
-                    print(f"DEBUG: Collected {self.progress['collected_candles']} candles so far")
                     
-                    # Save data periodically (reduced for testing)
-                    if len(ohlcv_data) >= 2:  # Save after 2 batches instead of 1000
-                        print(f"DEBUG: Saving batch after {len(ohlcv_data)} batches")
+                    # Update progress bar
+                    if pbar:
+                        pbar.update(len(ohlcv_batch))
+                        pbar.set_postfix({
+                            'Current': self.progress['current_time'].strftime('%Y-%m-%d'),
+                            'Collected': self.progress['collected_candles']
+                        })
+                    
+                    # Save data periodically
+                    if len(ohlcv_data) >= save_interval:
                         self._save_batch(ohlcv_data, order_book_data)
                         ohlcv_data = []
                         order_book_data = []
-                        print(f"DEBUG: Batch saved, resetting data arrays")
                 
                 # Update start timestamp for next batch
                 start_timestamp = int(self.progress['current_time'].timestamp() * 1000) + 1
@@ -270,6 +292,10 @@ class HistoricalDataCollector(HighFrequencyCollector):
             except Exception as e:
                 self.logger.error(f"Error collecting historical data: {str(e)}")
                 await asyncio.sleep(self.retry_delay)
+        
+        # Close progress bar
+        if pbar:
+            pbar.close()
         
         # Save any remaining data
         print(f"DEBUG: Collection loop finished, checking for remaining data")
@@ -294,7 +320,17 @@ class HistoricalDataCollector(HighFrequencyCollector):
             # Save OHLCV data
             ohlcv_path = self.data_dir / f"{self.symbol}_ohlcv_{self.interval}.csv"
             print(f"DEBUG: Saving OHLCV data to {ohlcv_path}")
-            ohlcv_df.to_csv(ohlcv_path)
+            
+            # Check if file exists to determine if we should append or create new
+            if ohlcv_path.exists():
+                print(f"DEBUG: File exists, appending to existing CSV")
+                # Append without header
+                ohlcv_df.to_csv(ohlcv_path, mode='a', header=False)
+            else:
+                print(f"DEBUG: File doesn't exist, creating new CSV")
+                # Create new file with header
+                ohlcv_df.to_csv(ohlcv_path)
+            
             print(f"DEBUG: OHLCV data saved successfully")
             
             # Save order book data with proper formatting
@@ -791,6 +827,18 @@ async def main():
             print("Order book data collection completed!")
         
         print("All data collection completed successfully!")
+        
+        # Show final summary
+        if args.type in ['ohlcv', 'both']:
+            ohlcv_path = Path(args.data_dir) / f"{args.symbol}_ohlcv_{args.interval}.csv"
+            if ohlcv_path.exists():
+                import pandas as pd
+                df = pd.read_csv(ohlcv_path)
+                print(f"\n📊 Collection Summary:")
+                print(f"   • Total rows collected: {len(df):,}")
+                print(f"   • Date range: {df['timestamp'].min()} to {df['timestamp'].max()}")
+                print(f"   • File size: {ohlcv_path.stat().st_size / 1024 / 1024:.2f} MB")
+                print(f"   • File location: {ohlcv_path}")
         
     except Exception as e:
         print(f"Error during data collection: {str(e)}")
