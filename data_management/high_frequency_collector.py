@@ -12,6 +12,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 import threading
 from queue import Queue
+
 import os
 
 class HighFrequencyCollector:
@@ -88,15 +89,25 @@ class HighFrequencyCollector:
         Returns:
             DataFrame with OHLCV data
         """
+        print(f"DEBUG: fetch_ohlcv called with since={since}")
+        print(f"DEBUG: exchange_id={self.exchange_id}, symbol={self.symbol}, interval={self.interval}")
+        
         for attempt in range(self.max_retries):
             try:
-                # Use fetch_ohlcv with proper parameters for OKX
-                ohlcv = self.exchange.fetch_ohlcv(
-                    symbol=self.symbol,
-                    timeframe=self.interval,
-                    since=since,
-                    limit=1000  # OKX allows up to 1000 candles per request
+                print(f"DEBUG: Attempt {attempt + 1} of {self.max_retries}")
+                print(f"DEBUG: About to call exchange.fetch_ohlcv")
+                # Use run_in_executor to run the synchronous fetch_ohlcv in a thread pool
+                loop = asyncio.get_event_loop()
+                ohlcv = await loop.run_in_executor(
+                    None,
+                    lambda: self.exchange.fetch_ohlcv(
+                        symbol=self.symbol,
+                        timeframe=self.interval,
+                        since=since,
+                        limit=1000  # OKX allows up to 1000 candles per request
+                    )
                 )
+                print(f"DEBUG: fetch_ohlcv completed, got {len(ohlcv) if ohlcv else 0} candles")
                 
                 if not ohlcv:
                     return pd.DataFrame()
@@ -129,10 +140,14 @@ class HighFrequencyCollector:
         """
         for attempt in range(self.max_retries):
             try:
-                # Use synchronous fetch_order_book since CCXT doesn't support async
-                order_book = self.exchange.fetch_order_book(
-                    symbol=self.symbol,
-                    limit=self.order_book_depth
+                # Use run_in_executor to run the synchronous fetch_order_book in a thread pool
+                loop = asyncio.get_event_loop()
+                order_book = await loop.run_in_executor(
+                    None,
+                    lambda: self.exchange.fetch_order_book(
+                        symbol=self.symbol,
+                        limit=self.order_book_depth
+                    )
                 )
                 
                 # Extract top levels

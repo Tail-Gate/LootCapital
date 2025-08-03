@@ -214,8 +214,13 @@ class HistoricalDataCollector(HighFrequencyCollector):
             end_time: End time for data collection (defaults to now)
             save_interval: Number of candles to collect before saving
         """
+        print(f"DEBUG: Starting collect_historical_data")
+        print(f"DEBUG: start_time = {start_time}")
+        print(f"DEBUG: end_time = {end_time}")
+        
         if end_time is None:
             end_time = datetime.now()
+            print(f"DEBUG: Set end_time to now: {end_time}")
             
         self.progress['start_time'] = start_time
         self.progress['end_time'] = end_time
@@ -224,44 +229,37 @@ class HistoricalDataCollector(HighFrequencyCollector):
         # Convert to timestamps
         start_timestamp = int(start_time.timestamp() * 1000)
         end_timestamp = int(end_time.timestamp() * 1000)
+        print(f"DEBUG: start_timestamp = {start_timestamp}")
+        print(f"DEBUG: end_timestamp = {end_timestamp}")
         
         # Initialize data storage
         ohlcv_data = []
         order_book_data = []
         
+        print(f"DEBUG: About to enter main collection loop")
         while self.progress['current_time'] < end_time:
             try:
+                print(f"DEBUG: Inside main loop, current_time = {self.progress['current_time']}")
+                print(f"DEBUG: About to fetch OHLCV data with since={start_timestamp}")
                 # Fetch OHLCV data
                 ohlcv_batch = await self.fetch_ohlcv(since=start_timestamp)
                 if not ohlcv_batch.empty:
+                    print(f"DEBUG: Got {len(ohlcv_batch)} candles in batch")
                     ohlcv_data.append(ohlcv_batch)
-                    
-                    # Fetch order book data for each OHLCV timestamp
-                    for timestamp in ohlcv_batch.index:
-                        try:
-                            # Add delay to respect rate limits
-                            await asyncio.sleep(0.1)  # 100ms delay between requests
-                            
-                            order_book = await self.fetch_order_book()
-                            order_book['ohlcv_timestamp'] = timestamp
-                            order_book_data.append(order_book)
-                            
-                            # Log progress
-                            self.logger.info(f"Collected order book for {timestamp}")
-                            
-                        except Exception as e:
-                            self.logger.error(f"Error collecting order book for {timestamp}: {str(e)}")
-                            continue
+                    print(f"DEBUG: Total ohlcv_data batches: {len(ohlcv_data)}")
                     
                     # Update progress
                     self.progress['current_time'] = ohlcv_batch.index[-1]
                     self.progress['collected_candles'] += len(ohlcv_batch)
+                    print(f"DEBUG: Collected {self.progress['collected_candles']} candles so far")
                     
-                    # Save data periodically
-                    if len(ohlcv_data) >= save_interval:
+                    # Save data periodically (reduced for testing)
+                    if len(ohlcv_data) >= 2:  # Save after 2 batches instead of 1000
+                        print(f"DEBUG: Saving batch after {len(ohlcv_data)} batches")
                         self._save_batch(ohlcv_data, order_book_data)
                         ohlcv_data = []
                         order_book_data = []
+                        print(f"DEBUG: Batch saved, resetting data arrays")
                 
                 # Update start timestamp for next batch
                 start_timestamp = int(self.progress['current_time'].timestamp() * 1000) + 1
@@ -274,21 +272,30 @@ class HistoricalDataCollector(HighFrequencyCollector):
                 await asyncio.sleep(self.retry_delay)
         
         # Save any remaining data
+        print(f"DEBUG: Collection loop finished, checking for remaining data")
         if ohlcv_data:
+            print(f"DEBUG: Saving final batch with {len(ohlcv_data)} batches")
             self._save_batch(ohlcv_data, order_book_data)
+        else:
+            print(f"DEBUG: No remaining data to save")
     
     def _save_batch(self, ohlcv_data: List[pd.DataFrame], order_book_data: List[Dict]):
         """Save a batch of collected data."""
         try:
+            print(f"DEBUG: _save_batch called with {len(ohlcv_data)} OHLCV batches")
             # Combine OHLCV data
             ohlcv_df = pd.concat(ohlcv_data)
+            print(f"DEBUG: Combined OHLCV DataFrame has {len(ohlcv_df)} rows")
             
             # Convert order book data to DataFrame
             order_book_df = pd.DataFrame(order_book_data)
+            print(f"DEBUG: Order book DataFrame has {len(order_book_df)} rows")
             
             # Save OHLCV data
             ohlcv_path = self.data_dir / f"{self.symbol}_ohlcv_{self.interval}.csv"
+            print(f"DEBUG: Saving OHLCV data to {ohlcv_path}")
             ohlcv_df.to_csv(ohlcv_path)
+            print(f"DEBUG: OHLCV data saved successfully")
             
             # Save order book data with proper formatting
             order_book_path = self.data_dir / f"{self.symbol}_orderbook.json"
@@ -740,7 +747,7 @@ async def main():
     parser.add_argument('--exchange', default='okx', help='Exchange ID (default: okx)')
     parser.add_argument('--symbol', default='ETH-USDT-SWAP', help='Trading symbol (default: ETH-USDT-SWAP)')
     parser.add_argument('--interval', default='15m', help='OHLCV interval (default: 15m)')
-    parser.add_argument('--start-time', required=True, help='Start time (YYYY-MM-DD HH:MM:SS)')
+    parser.add_argument('--start-time', default='2020-01-01 00:00:00', help='Start time (YYYY-MM-DD HH:MM:SS, default: 2020-01-01 00:00:00)')
     parser.add_argument('--end-time', help='End time (YYYY-MM-DD HH:MM:SS, defaults to now)')
     parser.add_argument('--data-dir', default='data/historical', help='Data directory (default: data/historical)')
     parser.add_argument('--type', choices=['ohlcv', 'orderbook', 'both'], default='ohlcv', 
