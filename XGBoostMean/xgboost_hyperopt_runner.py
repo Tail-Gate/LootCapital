@@ -218,7 +218,7 @@ def create_trading_metrics_visualizations(study, output_dir="plots"):
                 label=f'Mean: {df["sharpe_ratio"].mean():.4f}')
     ax1.axvline(df['sharpe_ratio'].max(), color='blue', linestyle='--', 
                 label=f'Best: {df["sharpe_ratio"].max():.4f}')
-    ax1.set_title('📈 Sharpe Ratio Distribution', fontweight='bold', fontsize=14)
+    ax1.set_title('Sharpe Ratio Distribution', fontweight='bold', fontsize=14)
     ax1.set_xlabel('Sharpe Ratio')
     ax1.set_ylabel('Frequency')
     ax1.legend()
@@ -231,7 +231,7 @@ def create_trading_metrics_visualizations(study, output_dir="plots"):
                 label=f'Mean: {df["win_rate"].mean():.4f}')
     ax2.axvline(df['win_rate'].max(), color='blue', linestyle='--', 
                 label=f'Best: {df["win_rate"].max():.4f}')
-    ax2.set_title('🎯 Win Rate Distribution', fontweight='bold', fontsize=14)
+    ax2.set_title('Win Rate Distribution', fontweight='bold', fontsize=14)
     ax2.set_xlabel('Win Rate')
     ax2.set_ylabel('Frequency')
     ax2.legend()
@@ -244,7 +244,7 @@ def create_trading_metrics_visualizations(study, output_dir="plots"):
                 label=f'Mean: {df["profit_factor"].mean():.4f}')
     ax3.axvline(df['profit_factor'].max(), color='blue', linestyle='--', 
                 label=f'Best: {df["profit_factor"].max():.4f}')
-    ax3.set_title('💰 Profit Factor Distribution', fontweight='bold', fontsize=14)
+    ax3.set_title('Profit Factor Distribution', fontweight='bold', fontsize=14)
     ax3.set_xlabel('Profit Factor')
     ax3.set_ylabel('Frequency')
     ax3.legend()
@@ -257,7 +257,7 @@ def create_trading_metrics_visualizations(study, output_dir="plots"):
                 label=f'Mean: {df["max_drawdown"].mean():.4f}')
     ax4.axvline(df['max_drawdown'].min(), color='blue', linestyle='--', 
                 label=f'Best: {df["max_drawdown"].min():.4f}')
-    ax4.set_title('📉 Max Drawdown Distribution', fontweight='bold', fontsize=14)
+    ax4.set_title('Max Drawdown Distribution', fontweight='bold', fontsize=14)
     ax4.set_xlabel('Max Drawdown')
     ax4.set_ylabel('Frequency')
     ax4.legend()
@@ -267,7 +267,7 @@ def create_trading_metrics_visualizations(study, output_dir="plots"):
     ax5 = fig.add_subplot(gs[1, 1])
     scatter = ax5.scatter(df['win_rate'], df['sharpe_ratio'], 
                           c=df['objective_value'], cmap='viridis', alpha=0.7, s=50)
-    ax5.set_title('📊 Sharpe Ratio vs Win Rate', fontweight='bold', fontsize=14)
+    ax5.set_title('Sharpe Ratio vs Win Rate', fontweight='bold', fontsize=14)
     ax5.set_xlabel('Win Rate')
     ax5.set_ylabel('Sharpe Ratio')
     ax5.grid(True, alpha=0.3)
@@ -277,7 +277,7 @@ def create_trading_metrics_visualizations(study, output_dir="plots"):
     ax6 = fig.add_subplot(gs[1, 2])
     scatter = ax6.scatter(df['max_drawdown'], df['profit_factor'], 
                           c=df['objective_value'], cmap='plasma', alpha=0.7, s=50)
-    ax6.set_title('💰 Profit Factor vs Max Drawdown', fontweight='bold', fontsize=14)
+    ax6.set_title('Profit Factor vs Max Drawdown', fontweight='bold', fontsize=14)
     ax6.set_xlabel('Max Drawdown')
     ax6.set_ylabel('Profit Factor')
     ax6.grid(True, alpha=0.3)
@@ -288,7 +288,7 @@ def create_trading_metrics_visualizations(study, output_dir="plots"):
     correlation_matrix = df[['sharpe_ratio', 'win_rate', 'profit_factor', 'max_drawdown', 'objective_value']].corr()
     sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', center=0, 
                 square=True, ax=ax7, fmt='.3f')
-    ax7.set_title('🔄 Trading Metrics Correlation', fontweight='bold', fontsize=14)
+    ax7.set_title('Trading Metrics Correlation', fontweight='bold', fontsize=14)
     
     # 8. Top 10 Trials by Sharpe Ratio
     ax8 = fig.add_subplot(gs[2, 1])
@@ -297,7 +297,7 @@ def create_trading_metrics_visualizations(study, output_dir="plots"):
                      color='green', alpha=0.7)
     ax8.set_yticks(range(len(top_sharpe)))
     ax8.set_yticklabels([f'Trial {trial}' for trial in top_sharpe['trial_number']])
-    ax8.set_title('🏆 Top 10 Trials by Sharpe Ratio', fontweight='bold', fontsize=14)
+    ax8.set_title('Top 10 Trials by Sharpe Ratio', fontweight='bold', fontsize=14)
     ax8.set_xlabel('Sharpe Ratio')
     ax8.grid(True, alpha=0.3)
     
@@ -313,7 +313,7 @@ def create_trading_metrics_visualizations(study, output_dir="plots"):
                      color='purple', alpha=0.7)
     ax9.set_yticks(range(len(top_profit)))
     ax9.set_yticklabels([f'Trial {trial}' for trial in top_profit['trial_number']])
-    ax9.set_title('💰 Top 10 Trials by Profit Factor', fontweight='bold', fontsize=14)
+    ax9.set_title('Top 10 Trials by Profit Factor', fontweight='bold', fontsize=14)
     ax9.set_xlabel('Profit Factor')
     ax9.grid(True, alpha=0.3)
     
@@ -323,7 +323,7 @@ def create_trading_metrics_visualizations(study, output_dir="plots"):
                 f'{value:.3f}', va='center', fontsize=10)
     
     # Add overall title
-    fig.suptitle('🎯 XGBoost Trading Metrics Analysis\nSharpe Ratio, Win Rate, Profit Factor, Max Drawdown', 
+    fig.suptitle('XGBoost Trading Metrics Analysis\nSharpe Ratio, Win Rate, Profit Factor, Max Drawdown', 
                  fontsize=16, fontweight='bold')
     
     # Save plot
@@ -355,7 +355,7 @@ def create_focused_trading_plots(df, output_dir, timestamp):
     plt.plot(df['trial_number'], df['sharpe_ratio'], 'o-', color='green', alpha=0.7, linewidth=2)
     plt.axhline(df['sharpe_ratio'].mean(), color='red', linestyle='--', 
                 label=f'Mean: {df["sharpe_ratio"].mean():.4f}')
-    plt.title('📈 Sharpe Ratio Progression Over Trials', fontweight='bold', fontsize=14)
+    plt.title('Sharpe Ratio Progression Over Trials', fontweight='bold', fontsize=14)
     plt.xlabel('Trial Number')
     plt.ylabel('Sharpe Ratio')
     plt.legend()
@@ -366,7 +366,7 @@ def create_focused_trading_plots(df, output_dir, timestamp):
     plt.plot(df['trial_number'], df['win_rate'], 'o-', color='orange', alpha=0.7, linewidth=2)
     plt.axhline(df['win_rate'].mean(), color='red', linestyle='--', 
                 label=f'Mean: {df["win_rate"].mean():.4f}')
-    plt.title('🎯 Win Rate Progression Over Trials', fontweight='bold', fontsize=14)
+    plt.title('Win Rate Progression Over Trials', fontweight='bold', fontsize=14)
     plt.xlabel('Trial Number')
     plt.ylabel('Win Rate')
     plt.legend()
@@ -377,7 +377,7 @@ def create_focused_trading_plots(df, output_dir, timestamp):
     plt.plot(df['trial_number'], df['profit_factor'], 'o-', color='purple', alpha=0.7, linewidth=2)
     plt.axhline(df['profit_factor'].mean(), color='red', linestyle='--', 
                 label=f'Mean: {df["profit_factor"].mean():.4f}')
-    plt.title('💰 Profit Factor Progression Over Trials', fontweight='bold', fontsize=14)
+    plt.title('Profit Factor Progression Over Trials', fontweight='bold', fontsize=14)
     plt.xlabel('Trial Number')
     plt.ylabel('Profit Factor')
     plt.legend()
@@ -388,7 +388,7 @@ def create_focused_trading_plots(df, output_dir, timestamp):
     plt.plot(df['trial_number'], df['max_drawdown'], 'o-', color='red', alpha=0.7, linewidth=2)
     plt.axhline(df['max_drawdown'].mean(), color='red', linestyle='--', 
                 label=f'Mean: {df["max_drawdown"].mean():.4f}')
-    plt.title('📉 Max Drawdown Progression Over Trials', fontweight='bold', fontsize=14)
+    plt.title('Max Drawdown Progression Over Trials', fontweight='bold', fontsize=14)
     plt.xlabel('Trial Number')
     plt.ylabel('Max Drawdown')
     plt.legend()
@@ -404,18 +404,29 @@ def create_focused_trading_plots(df, output_dir, timestamp):
     # 2. Trading Metrics Comparison (Box Plots)
     plt.figure(figsize=(15, 10))
     
-    # Normalize metrics for comparison (0-1 scale)
+    # Normalize metrics for comparison (0-1 scale) with safety checks
     df_normalized = df.copy()
     for col in ['sharpe_ratio', 'win_rate', 'profit_factor']:
-        df_normalized[col] = (df[col] - df[col].min()) / (df[col].max() - df[col].min())
+        col_min = df[col].min()
+        col_max = df[col].max()
+        if col_max > col_min:  # Avoid division by zero
+            df_normalized[col] = (df[col] - col_min) / (col_max - col_min)
+        else:
+            df_normalized[col] = 0.5  # Default to middle value if no variation
+    
     # Invert max_drawdown so lower is better
-    df_normalized['max_drawdown_inverted'] = 1 - (df['max_drawdown'] - df['max_drawdown'].min()) / (df['max_drawdown'].max() - df['max_drawdown'].min())
+    drawdown_min = df['max_drawdown'].min()
+    drawdown_max = df['max_drawdown'].max()
+    if drawdown_max > drawdown_min:
+        df_normalized['max_drawdown_inverted'] = 1 - (df['max_drawdown'] - drawdown_min) / (drawdown_max - drawdown_min)
+    else:
+        df_normalized['max_drawdown_inverted'] = 0.5  # Default to middle value if no variation
     
     plt.subplot(2, 2, 1)
     metrics_data = [df_normalized['sharpe_ratio'], df_normalized['win_rate'], 
                    df_normalized['profit_factor'], df_normalized['max_drawdown_inverted']]
     plt.boxplot(metrics_data, labels=['Sharpe\nRatio', 'Win\nRate', 'Profit\nFactor', 'Drawdown\n(Inverted)'])
-    plt.title('📊 Trading Metrics Distribution Comparison', fontweight='bold', fontsize=14)
+    plt.title('Trading Metrics Distribution Comparison', fontweight='bold', fontsize=14)
     plt.ylabel('Normalized Score (0-1)')
     plt.grid(True, alpha=0.3)
     
@@ -432,7 +443,7 @@ def create_focused_trading_plots(df, output_dir, timestamp):
     
     plt.xlabel('Top 5 Trials by Sharpe Ratio')
     plt.ylabel('Metric Value')
-    plt.title('🏆 Best Trials Metrics Breakdown', fontweight='bold', fontsize=14)
+    plt.title('Best Trials Metrics Breakdown', fontweight='bold', fontsize=14)
     plt.xticks(x, [f'Trial {trial}' for trial in best_trials['trial_number']])
     plt.legend()
     plt.grid(True, alpha=0.3)
@@ -444,7 +455,7 @@ def create_focused_trading_plots(df, output_dir, timestamp):
     plt.hist(df['objective_value'], bins=20, alpha=0.7, color='blue', edgecolor='black')
     plt.axvline(df['objective_value'].mean(), color='red', linestyle='--', 
                 label=f'Mean: {df["objective_value"].mean():.4f}')
-    plt.title('📊 Objective Value Distribution', fontweight='bold', fontsize=14)
+    plt.title('Objective Value Distribution', fontweight='bold', fontsize=14)
     plt.xlabel('Objective Value')
     plt.ylabel('Frequency')
     plt.legend()
@@ -458,7 +469,7 @@ def create_focused_trading_plots(df, output_dir, timestamp):
     plt.colorbar(scatter, label='Win Rate')
     plt.xlabel('Profit Factor')
     plt.ylabel('Sharpe Ratio')
-    plt.title('🎯 Sharpe Ratio vs Profit Factor\n(Colored by Win Rate)', fontweight='bold', fontsize=14)
+    plt.title('Sharpe Ratio vs Profit Factor (Colored by Win Rate)', fontweight='bold', fontsize=14)
     plt.grid(True, alpha=0.3)
     
     plt.tight_layout()
@@ -731,18 +742,24 @@ def objective(trial: optuna.Trial) -> float:
             'returns_period': trial.suggest_int('returns_period', 1, 5),
             'log_returns_period': trial.suggest_int('log_returns_period', 1, 5),
             
-            # Class imbalance parameters
+            # Class imbalance parameters - ENHANCED FOR MINORITY FOCUS
             'scale_pos_weight': trial.suggest_float('scale_pos_weight', 0.5, 3.0),
-            
-            # Focal loss parameters
+
+            # Focal loss parameters - MORE AGGRESSIVE FOR MINORITY CLASSES
             'use_focal_loss': trial.suggest_categorical('use_focal_loss', [True]),
-            'focal_alpha': trial.suggest_float('focal_alpha', 1.0, 5.0),  # More aggressive alpha range
-            'focal_gamma': trial.suggest_float('focal_gamma', 1.0, 5.0),
-            
-            # Class multiplier parameters for handling class imbalance
-            'class_multiplier_0': trial.suggest_float('class_multiplier_0', 2.0, 5.0),  # Down class - much higher emphasis
-            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 0.05, 0.5),  # Hold class - much lower weight since it dominates
-            'class_multiplier_2': trial.suggest_float('class_multiplier_2', 2.0, 5.0),  # Up class - much higher emphasis
+            'focal_alpha': trial.suggest_float('focal_alpha', 2.0, 8.0),  # More aggressive alpha range for minority focus
+            'focal_gamma': trial.suggest_float('focal_gamma', 2.0, 8.0),  # More aggressive gamma for hard examples
+
+            # Class multiplier parameters - EVEN MORE AGGRESSIVE FOR MINORITY CLASSES
+            'class_multiplier_0': trial.suggest_float('class_multiplier_0', 4.0, 12.0),  # Down class - much higher emphasis
+            'class_multiplier_1': trial.suggest_float('class_multiplier_1', 1, 4),  # Hold class - even lower weight since it dominates
+            'class_multiplier_2': trial.suggest_float('class_multiplier_2', 4.0, 12.0),  # Up class - much higher emphasis
+
+            # NEW: Minority class specific parameters
+            'minority_threshold_boost': trial.suggest_float('minority_threshold_boost', 0.1, 0.3),  # Boost threshold for minority classes
+            'minority_confidence_boost': trial.suggest_float('minority_confidence_boost', 0.1, 0.4),  # Boost confidence for minority predictions
+            'use_minority_oversampling': trial.suggest_categorical('use_minority_oversampling', [True]),  # Additional minority oversampling
+            'minority_oversampling_ratio': trial.suggest_float('minority_oversampling_ratio', 2.0, 5.0),  # How much to oversample minorities
         }
         
         # Log trial start
@@ -771,9 +788,9 @@ def objective(trial: optuna.Trial) -> float:
         else:
             data = data_response
         
-        # Filter data for 2024 January 2 to 2025 May 29
-        start_date = '2024-01-02'
-        end_date = '2025-05-29'
+        # Filter data for 2025 May 1 to 2025 July 29 (3 months for better trading signals)
+        start_date = '2024-01-01'
+        end_date = '2025-08-03'
         data = data[(data.index >= start_date) & (data.index <= end_date)]
         
         logger.info(f"[DATA] Filtered data from {start_date} to {end_date}")
@@ -820,10 +837,16 @@ def objective(trial: optuna.Trial) -> float:
         late_window = config_dict['late_window']    # Configurable late window
         moderate_threshold_ratio = config_dict['moderate_threshold_ratio']  # Configurable moderate threshold ratio
         
-        logger.info(f"[TARGET] Using time-based classification:")
+        # ENHANCED: Minority-focused parameters
+        minority_threshold_boost = config_dict.get('minority_threshold_boost', 0.2)  # Boost threshold for minority classes
+        minority_confidence_boost = config_dict.get('minority_confidence_boost', 0.2)  # Boost confidence for minority predictions
+        
+        logger.info(f"[TARGET] Using ENHANCED minority-focused classification:")
         logger.info(f"[TARGET] Main threshold: {price_threshold:.4f} ({price_threshold*100:.2f}%)")
         logger.info(f"[TARGET] Early window: {early_window} periods, Late window: {late_window} periods")
         logger.info(f"[TARGET] Moderate threshold ratio: {moderate_threshold_ratio:.2f}")
+        logger.info(f"[TARGET] Minority threshold boost: {minority_threshold_boost:.2f}")
+        logger.info(f"[TARGET] Minority confidence boost: {minority_confidence_boost:.2f}")
         
         for i in range(len(data)):
             if i + window_size >= len(data):
@@ -848,10 +871,14 @@ def objective(trial: optuna.Trial) -> float:
                 full_max_return = (future_prices.max() - current_price) / current_price
                 full_min_return = (future_prices.min() - current_price) / current_price
                 
-                # Time-based classification logic
-                if early_max_return >= price_threshold:
+                # ENHANCED: Minority-focused classification logic
+                # More aggressive thresholds for minority classes (0 and 2)
+                minority_threshold = price_threshold * (1 - minority_threshold_boost)  # Lower threshold for minorities
+                
+                # Enhanced classification logic with minority focus
+                if early_max_return >= minority_threshold:  # Lower threshold for Up class
                     future_returns.append(2)  # Early Up signal (strong early movement)
-                elif early_min_return <= -price_threshold:
+                elif early_min_return <= -minority_threshold:  # Lower threshold for Down class
                     future_returns.append(0)  # Early Down signal (strong early movement)
                 elif late_max_return >= price_threshold:
                     future_returns.append(1)  # Late Up signal (hold - late movement)
@@ -947,15 +974,15 @@ def objective(trial: optuna.Trial) -> float:
             """Calculate Sharpe ratio through trading simulation"""
             
             # Trading parameters
-            position_size = 0.04  # 4% of portfolio
-            leverage = 100  # 100x leverage
-            effective_position = position_size * leverage  # 400% effective position
-            stop_loss = 0.008  # 0.8% stop loss
+            position_size = 0.04  # 4% of account balance
+            leverage = 50  # 50x leverage
+            stop_loss = 0.01  # 0.8% stop loss
             trading_fee = 0.0002  # 0.02% per trade
             max_hold_hours = 24  # Max 24 hours hold time
             
-            # Initialize trading simulation
-            portfolio_value = 10000  # Starting portfolio value
+            # Initialize single account with $5000
+            account_balance = 5000  # Starting account balance
+            available_balance = 5000  # Available balance for new trades
             trades = []
             current_position = None
             entry_time = None
@@ -1009,6 +1036,10 @@ def objective(trial: optuna.Trial) -> float:
                     
                     # Check stop loss or max hold time
                     if pnl_pct <= -stop_loss or hold_hours >= max_hold_hours:
+                        # Calculate position size in USD
+                        position_size_usd = available_balance * position_size
+                        effective_position = position_size_usd * leverage / account_balance
+                        
                         # Close position
                         trade_return = pnl_pct * effective_position - (2 * trading_fee)  # Entry + exit fees
                         trades.append({
@@ -1032,21 +1063,32 @@ def objective(trial: optuna.Trial) -> float:
                         # Add to daily returns
                         current_day_returns.append(trade_return)
                         
-                        # Update portfolio
-                        portfolio_value *= (1 + trade_return)
+                        # Update account balance and available balance
+                        account_balance *= (1 + trade_return)
+                        # Add back the position size plus the profit/loss
+                        position_return_usd = position_size_usd * trade_return
+                        available_balance += position_size_usd + position_return_usd
                         current_position = None
                         entry_time = None
                         entry_price = None
                 
                 # Check for new trading signals (only take signals 0 and 2)
-                if prediction in [0, 2]:  # Early Down or Early Up
-                    # Open new position
-                    current_position = 'short' if prediction == 0 else 'long'
-                    entry_time = current_time
-                    entry_price = current_price
+                if prediction in [0, 2] and available_balance > 0:  # Early Down or Early Up
+                    # Calculate position size based on available balance
+                    position_size_usd = available_balance * position_size
                     
-                    # Pay entry fee
-                    portfolio_value *= (1 - trading_fee)
+                    # Check if we have enough balance for the trade
+                    if position_size_usd >= 20:  # Minimum $20 position
+                        # Open new position
+                        current_position = 'short' if prediction == 0 else 'long'
+                        entry_time = current_time
+                        entry_price = current_price
+                        
+                        # Deduct position size from available balance
+                        available_balance -= position_size_usd
+                        
+                        # Pay entry fee
+                        account_balance *= (1 - trading_fee)
             
             # Close any remaining position at the end
             if current_position is not None:
@@ -1055,6 +1097,10 @@ def objective(trial: optuna.Trial) -> float:
                     pnl_pct = (final_price - entry_price) / entry_price
                 else:  # short
                     pnl_pct = (entry_price - final_price) / entry_price
+                
+                # Calculate position size in USD
+                position_size_usd = available_balance * position_size
+                effective_position = position_size_usd * leverage / account_balance
                 
                 trade_return = pnl_pct * effective_position - (2 * trading_fee)
                 trades.append({
@@ -1066,6 +1112,12 @@ def objective(trial: optuna.Trial) -> float:
                     'reason': 'end_of_period'
                 })
                 current_day_returns.append(trade_return)
+                
+                # Update account balance and available balance
+                account_balance *= (1 + trade_return)
+                # Add back the position size plus the profit/loss
+                position_return_usd = position_size_usd * trade_return
+                available_balance += position_size_usd + position_return_usd
             
             # Add final day returns
             if current_day_returns:
@@ -1074,10 +1126,16 @@ def objective(trial: optuna.Trial) -> float:
             
             # Calculate Sharpe ratio (daily)
             if len(daily_returns) < 2:
-                return -10.0, 0.0, 0.0, 0.0  # Penalty for insufficient data
-            
-            daily_returns = np.array(daily_returns)
-            sharpe_ratio = np.mean(daily_returns) / (np.std(daily_returns) + 1e-8)
+                logger.warning(f"[SHARPE] Insufficient daily returns ({len(daily_returns)}), using hourly returns instead")
+                # Fallback to hourly returns if daily returns insufficient
+                if len(trade_returns) >= 5:  # Need at least 5 trades
+                    hourly_returns = trade_returns  # Use individual trade returns
+                    sharpe_ratio = np.mean(hourly_returns) / (np.std(hourly_returns) + 1e-8)
+                else:
+                    return -10.0, 0.0, 0.0, 0.0, 5000.0  # Penalty for insufficient data, return initial balance
+            else:
+                daily_returns = np.array(daily_returns)
+                sharpe_ratio = np.mean(daily_returns) / (np.std(daily_returns) + 1e-8)
             
             # Calculate additional metrics
             if trades:
@@ -1100,24 +1158,37 @@ def objective(trial: optuna.Trial) -> float:
                 profit_factor = 0.0
                 max_drawdown = 0.0
             
-            return sharpe_ratio, win_rate, profit_factor, max_drawdown
+            return sharpe_ratio, win_rate, profit_factor, max_drawdown, account_balance
         
         # Calculate Sharpe ratio through trading simulation
-        sharpe_ratio, win_rate, profit_factor, max_drawdown = calculate_sharpe_ratio_trading_simulation(
+        sharpe_ratio, win_rate, profit_factor, max_drawdown, account_balance = calculate_sharpe_ratio_trading_simulation(
             features.iloc[split_idx:val_idx], y_val, y_pred, y_pred_proba, data.iloc[split_idx:val_idx]
         )
+        
+        # Add detailed logging for trading signal analysis
+        trading_signals = np.sum(y_pred != 1)  # Count non-hold signals (0 and 2)
+        total_samples = len(y_pred)
+        signal_percentage = (trading_signals / total_samples) * 100
+        
+        logger.info(f"[SHARPE] Trading Signal Analysis:")
+        logger.info(f"[SHARPE] Total samples: {total_samples}")
+        logger.info(f"[SHARPE] Trading signals (0+2): {trading_signals} ({signal_percentage:.2f}%)")
+        logger.info(f"[SHARPE] Hold signals (1): {total_samples - trading_signals} ({100-signal_percentage:.2f}%)")
+        logger.info(f"[SHARPE] Signal distribution: Down={np.sum(y_pred==0)}, Hold={np.sum(y_pred==1)}, Up={np.sum(y_pred==2)}")
         
         logger.info(f"[SHARPE] Trading Simulation Results:")
         logger.info(f"[SHARPE] Sharpe Ratio (daily): {sharpe_ratio:.4f}")
         logger.info(f"[SHARPE] Win Rate: {win_rate:.4f}")
         logger.info(f"[SHARPE] Profit Factor: {profit_factor:.4f}")
         logger.info(f"[SHARPE] Max Drawdown: {max_drawdown:.4f}")
+        logger.info(f"[SHARPE] Final Account Balance: ${account_balance:.2f}")
+        logger.info(f"[SHARPE] Account Return: {((account_balance - 5000) / 5000 * 100):.2f}%")
         
         # SHARPE RATIO OBJECTIVE FUNCTION (lower is better, so we negate Sharpe)
-        # Prioritize Sharpe ratio (70%), Profit Factor (20%), Win Rate (5%), Max Drawdown (5%)
-        sharpe_penalty = -sharpe_ratio * 0.7  # Negative because we minimize
+        # Prioritize Sharpe ratio (40%), Profit Factor (20%), Win Rate (35%), Max Drawdown (5%)
+        sharpe_penalty = -sharpe_ratio * 0.4  # Negative because we minimize
         profit_factor_penalty = (1 - min(profit_factor, 3.0)) * 0.2  # Cap at 3.0
-        win_rate_penalty = (1 - win_rate) * 0.05
+        win_rate_penalty = (1 - win_rate) * 0.35
         drawdown_penalty = abs(max_drawdown) * 0.05  # Penalize large drawdowns
         
         # Combined Sharpe-based objective
@@ -1254,7 +1325,7 @@ def main():
     # Run optimization with small number of trials for testing
     study.optimize(
         objective,
-        n_trials=2000,  # Small number for testing
+        n_trials=2500,  # Small number for testing
         timeout=None,
         gc_after_trial=True,
         show_progress_bar=True

@@ -39,16 +39,62 @@ class XGBoostHyperoptTrainer:
         X_train_scaled = self.scaler.fit_transform(X_train)
         X_val_scaled = self.scaler.transform(X_val)
         
-        # Apply SMOTE to training data only
-        print("[TRAINER] Applying SMOTE for class balance...")
-        smote = SMOTE(random_state=self.config.random_state, k_neighbors=3)
-        X_train_balanced, y_train_balanced = smote.fit_resample(X_train_scaled, y_train)
+        # Apply ENHANCED minority-focused oversampling
+        print("[TRAINER] Applying ENHANCED minority-focused oversampling...")
+        
+        # Get minority oversampling parameters
+        use_minority_oversampling = getattr(self.config, 'use_minority_oversampling', True)
+        minority_oversampling_ratio = getattr(self.config, 'minority_oversampling_ratio', 3.0)
+        
+        if use_minority_oversampling:
+            # Enhanced SMOTE with minority focus
+            smote = SMOTE(random_state=self.config.random_state, k_neighbors=3, sampling_strategy='auto')
+            X_train_balanced, y_train_balanced = smote.fit_resample(X_train_scaled, y_train)
+            
+            # Additional minority oversampling for classes 0 and 2
+            minority_classes = [0, 2]  # Down and Up classes
+            for minority_class in minority_classes:
+                minority_indices = np.where(y_train_balanced == minority_class)[0]
+                if len(minority_indices) > 0:
+                    # Create additional synthetic samples for minority classes
+                    additional_samples = int(len(minority_indices) * (minority_oversampling_ratio - 1))
+                    if additional_samples > 0:
+                        # Duplicate minority samples with slight noise
+                        minority_features = X_train_balanced[minority_indices]
+                        minority_labels = y_train_balanced[minority_indices]
+                        
+                        # Ensure we don't try to create more samples than we have
+                        samples_to_use = min(additional_samples, len(minority_features))
+                        
+                        # Add noise to create additional samples
+                        noise = np.random.normal(0, 0.01, (samples_to_use, minority_features.shape[1]))
+                        additional_features = minority_features[:samples_to_use] + noise
+                        additional_labels = minority_labels[:samples_to_use]
+                        
+                        # Add to balanced dataset
+                        X_train_balanced = np.vstack([X_train_balanced, additional_features])
+                        y_train_balanced = np.hstack([y_train_balanced, additional_labels])
+            
+            print(f"[TRAINER] Enhanced minority oversampling with ratio: {minority_oversampling_ratio}")
+        else:
+            # Standard SMOTE
+            smote = SMOTE(random_state=self.config.random_state, k_neighbors=3)
+            X_train_balanced, y_train_balanced = smote.fit_resample(X_train_scaled, y_train)
         
         # Log class distribution
         unique_before, counts_before = np.unique(y_train, return_counts=True)
         unique_after, counts_after = np.unique(y_train_balanced, return_counts=True)
-        print(f"[TRAINER] Class distribution before SMOTE: {dict(zip(unique_before, counts_before))}")
-        print(f"[TRAINER] Class distribution after SMOTE: {dict(zip(unique_after, counts_after))}")
+        print(f"[TRAINER] Class distribution before oversampling: {dict(zip(unique_before, counts_before))}")
+        print(f"[TRAINER] Class distribution after ENHANCED oversampling: {dict(zip(unique_after, counts_after))}")
+        
+        # Log minority class focus
+        minority_0_count = counts_after[0] if 0 in unique_after else 0
+        minority_2_count = counts_after[2] if 2 in unique_after else 0
+        majority_1_count = counts_after[1] if 1 in unique_after else 0
+        
+        print(f"[TRAINER] Minority class focus - Class 0 (Down): {minority_0_count}, Class 2 (Up): {minority_2_count}")
+        print(f"[TRAINER] Majority class - Class 1 (Hold): {majority_1_count}")
+        print(f"[TRAINER] Minority/Majority ratio: {(minority_0_count + minority_2_count) / majority_1_count:.2f}")
         
         # Create DMatrix
         dtrain = xgb.DMatrix(X_train_balanced, label=y_train_balanced)
@@ -76,8 +122,12 @@ class XGBoostHyperoptTrainer:
                 return focal_loss_eval(predt, dtrain, self.config.focal_alpha, 
                                     self.config.focal_gamma, class_multipliers)
             
-            print(f"[TRAINER] Using focal loss with alpha={self.config.focal_alpha}, gamma={self.config.focal_gamma}")
-            print(f"[TRAINER] Class multipliers: [0: {self.config.class_multiplier_0}, 1: {self.config.class_multiplier_1}, 2: {self.config.class_multiplier_2}]")
+            print(f"[TRAINER] Using ENHANCED focal loss with alpha={self.config.focal_alpha}, gamma={self.config.focal_gamma}")
+            print(f"[TRAINER] ENHANCED class multipliers for minority focus:")
+            print(f"[TRAINER]   Class 0 (Down): {self.config.class_multiplier_0}x weight - HIGH EMPHASIS")
+            print(f"[TRAINER]   Class 1 (Hold): {self.config.class_multiplier_1}x weight - REDUCED (dominates)")
+            print(f"[TRAINER]   Class 2 (Up): {self.config.class_multiplier_2}x weight - HIGH EMPHASIS")
+            print(f"[TRAINER] Minority/Majority weight ratio: {(self.config.class_multiplier_0 + self.config.class_multiplier_2) / self.config.class_multiplier_1:.1f}x")
             
             # Train with custom objective only (evaluation will use built-in metric)
             evals = [(dtrain, 'train'), (dval, 'val')]

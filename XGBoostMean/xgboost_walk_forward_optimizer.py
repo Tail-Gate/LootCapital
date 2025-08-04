@@ -262,7 +262,7 @@ class XGBoostWalkForwardOptimizer:
         class_distribution = dict(zip(unique_classes, class_counts))
         self.logger.info(f"Class distribution: {class_distribution}")
         
-        return features, y
+        return features, y, data
     
     def train_and_evaluate_xgboost_period(self, period_data: dict):
         """Train XGBoost model for a specific time period"""
@@ -296,6 +296,15 @@ class XGBoostWalkForwardOptimizer:
                 period_data['test_end'], 
                 config
             )
+            
+            # Also get the raw data for trading simulation
+            data_test_response = self.market_data.get_data(['ETH/USD'])
+            if isinstance(data_test_response, dict):
+                data_test_full = data_test_response['ETH/USD']
+            else:
+                data_test_full = data_test_response
+            data_test_full = data_test_full[(data_test_full.index >= period_data['test_start']) & 
+                                         (data_test_full.index <= period_data['test_end'])]
             
             # Check if we have enough data
             if len(X_train_full) < 100 or len(X_test_full) < 20:
@@ -332,6 +341,33 @@ class XGBoostWalkForwardOptimizer:
             # Evaluate on test data
             self.logger.info("Evaluating on test data...")
             test_metrics = trainer.evaluate(X_test, y_test)
+            
+            # SHARPE RATIO TRADING SIMULATION (same as hyperopt runner)
+            self.logger.info("Starting Sharpe ratio calculation for live trading simulation...")
+            
+            # Get predictions and probabilities
+            dtest = xgb.DMatrix(X_test)
+            y_pred_proba = trainer.model.predict(dtest, output_margin=False)
+            y_pred = np.argmax(y_pred_proba, axis=1)
+            
+            # Calculate trading metrics through simulation
+            sharpe_ratio, win_rate, profit_factor, max_drawdown = self.calculate_sharpe_ratio_trading_simulation(
+                X_test, y_test, y_pred, y_pred_proba, data_test_full
+            )
+            
+            self.logger.info(f"Trading Simulation Results:")
+            self.logger.info(f"  Sharpe Ratio (daily): {sharpe_ratio:.4f}")
+            self.logger.info(f"  Win Rate: {win_rate:.4f}")
+            self.logger.info(f"  Profit Factor: {profit_factor:.4f}")
+            self.logger.info(f"  Max Drawdown: {max_drawdown:.4f}")
+            
+            # Add trading metrics to test_metrics
+            test_metrics['trading_metrics'] = {
+                'sharpe_ratio': sharpe_ratio,
+                'win_rate': win_rate,
+                'profit_factor': profit_factor,
+                'max_drawdown': max_drawdown
+            }
             
             # Save the model and all artifacts
             self.logger.info("Saving XGBoost model and artifacts...")
@@ -390,7 +426,7 @@ class XGBoostWalkForwardOptimizer:
             saved_paths['scaler_path'] = str(scaler_path)
             self.logger.info(f"Saved scaler: {scaler_path}")
             
-            # 5. Save inference metadata with trading signal focus
+            # 5. Save inference metadata with trading performance focus
             metadata = {
                 'model_path': str(model_path),
                 'config_path': str(config_path),
@@ -399,7 +435,9 @@ class XGBoostWalkForwardOptimizer:
                 'period_name': period_name,
                 'timestamp': timestamp,
                 'test_metrics': test_metrics,
-                # PRIORITY: Trading Signal Metrics
+                # PRIORITY: Trading Performance Metrics (same as hyperopt runner)
+                'trading_metrics': test_metrics.get('trading_metrics', {}),
+                # Secondary: Trading Signal Metrics
                 'trading_signal_metrics': {
                     'up_f1': test_metrics['f1'][2],
                     'down_f1': test_metrics['f1'][0],
@@ -466,12 +504,16 @@ class XGBoostWalkForwardOptimizer:
                 self.results['test_metrics'].append(result['test_metrics'])
                 self.results['configs'].append(result['config'])
                 
-                # Log results - PRIORITIZE F1 SCORES FOR TRADING SIGNALS
+                # Log results - PRIORITIZE TRADING PERFORMANCE METRICS
                 self.logger.info(f"✓ Period {split['period_name']} completed successfully")
-                self.logger.info(f"  🎯 TRADING SIGNAL F1 SCORES:")
+                self.logger.info(f"  🎯 TRADING PERFORMANCE METRICS:")
+                self.logger.info(f"    Sharpe Ratio: {result['test_metrics']['trading_metrics']['sharpe_ratio']:.4f}")
+                self.logger.info(f"    Win Rate: {result['test_metrics']['trading_metrics']['win_rate']:.4f}")
+                self.logger.info(f"    Profit Factor: {result['test_metrics']['trading_metrics']['profit_factor']:.4f}")
+                self.logger.info(f"    Max Drawdown: {result['test_metrics']['trading_metrics']['max_drawdown']:.4f}")
+                self.logger.info(f"  📊 Traditional ML Metrics:")
                 self.logger.info(f"    UP (Buy Signal): {result['test_metrics']['f1'][2]:.4f}")
                 self.logger.info(f"    DOWN (Sell Signal): {result['test_metrics']['f1'][0]:.4f}")
-                self.logger.info(f"  📊 Other Metrics:")
                 self.logger.info(f"    Hold (No Trade): {result['test_metrics']['f1'][1]:.4f}")
                 self.logger.info(f"    Overall Accuracy: {result['test_metrics']['classification_report']['accuracy']:.4f}")
             else:
@@ -510,59 +552,91 @@ class XGBoostWalkForwardOptimizer:
         
         self.logger.info("Generating XGBoost walk-forward optimization summary report")
         
-        # Calculate aggregate metrics
+        # Calculate aggregate metrics - PRIORITY: Trading Performance Metrics
         test_accuracies = [metrics['classification_report']['accuracy'] for metrics in self.results['test_metrics']]
         test_f1_up = [metrics['f1'][2] for metrics in self.results['test_metrics']]
         test_f1_down = [metrics['f1'][0] for metrics in self.results['test_metrics']]
         test_f1_hold = [metrics['f1'][1] for metrics in self.results['test_metrics']]
         
+        # Trading performance metrics (same as hyperopt runner)
+        test_sharpe_ratios = [metrics.get('trading_metrics', {}).get('sharpe_ratio', 0.0) for metrics in self.results['test_metrics']]
+        test_win_rates = [metrics.get('trading_metrics', {}).get('win_rate', 0.0) for metrics in self.results['test_metrics']]
+        test_profit_factors = [metrics.get('trading_metrics', {}).get('profit_factor', 0.0) for metrics in self.results['test_metrics']]
+        test_max_drawdowns = [metrics.get('trading_metrics', {}).get('max_drawdown', 0.0) for metrics in self.results['test_metrics']]
+        
         # Calculate statistics
         summary = {
             'total_periods': len(self.results['periods']),
+            # PRIORITY: Trading Performance Metrics
+            'mean_sharpe_ratio': np.mean(test_sharpe_ratios),
+            'std_sharpe_ratio': np.std(test_sharpe_ratios),
+            'mean_win_rate': np.mean(test_win_rates),
+            'std_win_rate': np.std(test_win_rates),
+            'mean_profit_factor': np.mean(test_profit_factors),
+            'std_profit_factor': np.std(test_profit_factors),
+            'mean_max_drawdown': np.mean(test_max_drawdowns),
+            'std_max_drawdown': np.std(test_max_drawdowns),
+            # Secondary: Traditional ML Metrics
             'mean_test_accuracy': np.mean(test_accuracies),
             'std_test_accuracy': np.std(test_accuracies),
             'mean_f1_up': np.mean(test_f1_up),
             'mean_f1_down': np.mean(test_f1_down),
             'mean_f1_hold': np.mean(test_f1_hold),
-            'best_period': self.results['periods'][np.argmax(test_accuracies)],
-            'worst_period': self.results['periods'][np.argmin(test_accuracies)],
+            # Best/Worst periods
+            'best_sharpe_period': self.results['periods'][np.argmax(test_sharpe_ratios)] if test_sharpe_ratios else None,
+            'best_win_rate_period': self.results['periods'][np.argmax(test_win_rates)] if test_win_rates else None,
+            'best_profit_factor_period': self.results['periods'][np.argmax(test_profit_factors)] if test_profit_factors else None,
+            'best_accuracy_period': self.results['periods'][np.argmax(test_accuracies)],
+            'worst_accuracy_period': self.results['periods'][np.argmin(test_accuracies)],
+            # Best/Worst values
+            'best_sharpe_ratio': np.max(test_sharpe_ratios) if test_sharpe_ratios else 0.0,
+            'best_win_rate': np.max(test_win_rates) if test_win_rates else 0.0,
+            'best_profit_factor': np.max(test_profit_factors) if test_profit_factors else 0.0,
+            'worst_max_drawdown': np.min(test_max_drawdowns) if test_max_drawdowns else 0.0,
             'best_accuracy': np.max(test_accuracies),
             'worst_accuracy': np.min(test_accuracies),
+            # All data
             'periods': self.results['periods'],
             'test_accuracies': test_accuracies,
             'test_f1_up': test_f1_up,
             'test_f1_down': test_f1_down,
-            'test_f1_hold': test_f1_hold
+            'test_f1_hold': test_f1_hold,
+            'test_sharpe_ratios': test_sharpe_ratios,
+            'test_win_rates': test_win_rates,
+            'test_profit_factors': test_profit_factors,
+            'test_max_drawdowns': test_max_drawdowns
         }
         
-        # Print summary - PRIORITIZE TRADING SIGNAL F1 SCORES
+        # Print summary - PRIORITIZE TRADING PERFORMANCE METRICS
         print("\n" + "="*80)
-        print("🎯 XGBOOST WALK-FORWARD OPTIMIZATION - TRADING SIGNAL FOCUS")
+        print("🎯 XGBOOST WALK-FORWARD OPTIMIZATION - TRADING PERFORMANCE FOCUS")
         print("="*80)
         print(f"Total periods: {summary['total_periods']}")
         
-        # PRIORITY: Trading Signal F1 Scores
-        print(f"\n🎯 TRADING SIGNAL F1 SCORES (PRIORITY METRICS):")
+        # PRIORITY: Trading Performance Metrics (same as hyperopt runner)
+        print(f"\n🎯 TRADING PERFORMANCE METRICS (PRIORITY):")
+        print(f"  📈 Sharpe Ratio: {summary['mean_sharpe_ratio']:.4f} ± {summary['std_sharpe_ratio']:.4f}")
+        print(f"  🎯 Win Rate: {summary['mean_win_rate']:.4f} ± {summary['std_win_rate']:.4f}")
+        print(f"  💰 Profit Factor: {summary['mean_profit_factor']:.4f} ± {summary['std_profit_factor']:.4f}")
+        print(f"  📉 Max Drawdown: {summary['mean_max_drawdown']:.4f} ± {summary['std_max_drawdown']:.4f}")
+        
+        # Secondary: Traditional ML Metrics
+        print(f"\n📊 TRADITIONAL ML METRICS (SECONDARY):")
         print(f"  📈 UP (Buy Signal): {summary['mean_f1_up']:.4f} ± {np.std(summary['test_f1_up']):.4f}")
         print(f"  📉 DOWN (Sell Signal): {summary['mean_f1_down']:.4f} ± {np.std(summary['test_f1_down']):.4f}")
-        print(f"  📊 Combined Trading Signal: {(summary['mean_f1_up'] + summary['mean_f1_down']) / 2:.4f}")
-        
-        # Secondary metrics
-        print(f"\n📊 OTHER METRICS:")
         print(f"  ⏸️  Hold (No Trade): {summary['mean_f1_hold']:.4f}")
         print(f"  📋 Overall Accuracy: {summary['mean_test_accuracy']:.4f} ± {summary['std_test_accuracy']:.4f}")
         
-        # Best/Worst periods for trading signals
-        best_up_period = summary['periods'][np.argmax(summary['test_f1_up'])]
-        best_down_period = summary['periods'][np.argmax(summary['test_f1_down'])]
-        worst_up_period = summary['periods'][np.argmin(summary['test_f1_up'])]
-        worst_down_period = summary['periods'][np.argmin(summary['test_f1_down'])]
+        # Best/Worst periods for trading performance
+        best_sharpe_period = summary['best_sharpe_period']
+        best_win_rate_period = summary['best_win_rate_period']
+        best_profit_factor_period = summary['best_profit_factor_period']
         
-        print(f"\n🏆 BEST TRADING SIGNAL PERIODS:")
-        print(f"  📈 Best UP Signal: {best_up_period} (F1: {np.max(summary['test_f1_up']):.4f})")
-        print(f"  📉 Best DOWN Signal: {best_down_period} (F1: {np.max(summary['test_f1_down']):.4f})")
-        print(f"  📈 Worst UP Signal: {worst_up_period} (F1: {np.min(summary['test_f1_up']):.4f})")
-        print(f"  📉 Worst DOWN Signal: {worst_down_period} (F1: {np.min(summary['test_f1_down']):.4f})")
+        print(f"\n🏆 BEST TRADING PERFORMANCE PERIODS:")
+        print(f"  📈 Best Sharpe Ratio: {best_sharpe_period} (Sharpe: {summary['best_sharpe_ratio']:.4f})")
+        print(f"  🎯 Best Win Rate: {best_win_rate_period} (Win Rate: {summary['best_win_rate']:.4f})")
+        print(f"  💰 Best Profit Factor: {best_profit_factor_period} (Profit Factor: {summary['best_profit_factor']:.4f})")
+        print(f"  📉 Worst Max Drawdown: {summary['worst_max_drawdown']:.4f}")
         
         # Print focal loss information if available
         if 'focal_loss_enabled' in summary and summary['focal_loss_enabled']:
@@ -573,27 +647,30 @@ class XGBoostWalkForwardOptimizer:
         else:
             print(f"\n🔧 Loss Function: Standard Cross-Entropy")
         
-        # Print period-by-period results - PRIORITIZE TRADING SIGNALS
-        print("\n📊 PERIOD-BY-PERIOD TRADING SIGNAL RESULTS:")
-        print(f"{'Period':<20} {'📈UP F1':<8} {'📉DOWN F1':<10} {'⏸️HOLD F1':<10} {'📋Accuracy':<10}")
-        print("-" * 65)
+        # Print period-by-period results - PRIORITIZE TRADING PERFORMANCE
+        print("\n📊 PERIOD-BY-PERIOD TRADING PERFORMANCE RESULTS:")
+        print(f"{'Period':<20} {'📈Sharpe':<8} {'🎯WinRate':<10} {'💰Profit':<10} {'📉Drawdown':<10}")
+        print("-" * 70)
         for i, period in enumerate(self.results['periods']):
-            # Highlight periods with good trading signals
-            up_f1 = test_f1_up[i]
-            down_f1 = test_f1_down[i]
-            combined_trading = (up_f1 + down_f1) / 2
+            # Get trading performance metrics
+            sharpe = test_sharpe_ratios[i]
+            win_rate = test_win_rates[i]
+            profit_factor = test_profit_factors[i]
+            max_drawdown = test_max_drawdowns[i]
             
             # Add indicators for good trading performance
-            up_indicator = "🔥" if up_f1 > 0.1 else "📈" if up_f1 > 0.05 else "📈"
-            down_indicator = "🔥" if down_f1 > 0.1 else "📉" if down_f1 > 0.05 else "📉"
+            sharpe_indicator = "🔥" if sharpe > 0.5 else "📈" if sharpe > 0.0 else "📈"
+            win_rate_indicator = "🔥" if win_rate > 0.6 else "🎯" if win_rate > 0.5 else "🎯"
+            profit_indicator = "🔥" if profit_factor > 2.0 else "💰" if profit_factor > 1.0 else "💰"
             
-            print(f"{period:<20} {up_indicator}{up_f1:<7.4f} {down_indicator}{down_f1:<9.4f} {test_f1_hold[i]:<10.4f} {test_accuracies[i]:<10.4f}")
+            print(f"{period:<20} {sharpe_indicator}{sharpe:<7.4f} {win_rate_indicator}{win_rate:<9.4f} {profit_indicator}{profit_factor:<9.4f} {max_drawdown:<10.4f}")
         
-        # Summary of trading signal performance
-        print(f"\n🎯 TRADING SIGNAL SUMMARY:")
-        print(f"  📈 UP Signals - Mean: {summary['mean_f1_up']:.4f}, Best: {np.max(summary['test_f1_up']):.4f}, Worst: {np.min(summary['test_f1_up']):.4f}")
-        print(f"  📉 DOWN Signals - Mean: {summary['mean_f1_down']:.4f}, Best: {np.max(summary['test_f1_down']):.4f}, Worst: {np.min(summary['test_f1_down']):.4f}")
-        print(f"  📊 Combined Trading - Mean: {(summary['mean_f1_up'] + summary['mean_f1_down']) / 2:.4f}")
+        # Summary of trading performance
+        print(f"\n🎯 TRADING PERFORMANCE SUMMARY:")
+        print(f"  📈 Sharpe Ratio - Mean: {summary['mean_sharpe_ratio']:.4f}, Best: {summary['best_sharpe_ratio']:.4f}, Std: {summary['std_sharpe_ratio']:.4f}")
+        print(f"  🎯 Win Rate - Mean: {summary['mean_win_rate']:.4f}, Best: {summary['best_win_rate']:.4f}, Std: {summary['std_win_rate']:.4f}")
+        print(f"  💰 Profit Factor - Mean: {summary['mean_profit_factor']:.4f}, Best: {summary['best_profit_factor']:.4f}, Std: {summary['std_profit_factor']:.4f}")
+        print(f"  📉 Max Drawdown - Mean: {summary['mean_max_drawdown']:.4f}, Worst: {summary['worst_max_drawdown']:.4f}, Std: {summary['std_max_drawdown']:.4f}")
         
         # Save detailed report
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -610,51 +687,48 @@ class XGBoostWalkForwardOptimizer:
         return summary
     
     def create_visualizations(self, summary: dict):
-        """Create visualizations of walk-forward results"""
+        """Create visualizations of walk-forward results - TRADING PERFORMANCE FOCUS"""
         
-        # Plot 1: TRADING SIGNAL F1 SCORES (PRIORITY)
+        # Plot 1: TRADING PERFORMANCE METRICS (PRIORITY)
         plt.figure(figsize=(12, 8))
         
         plt.subplot(2, 2, 1)
-        plt.plot(summary['test_f1_up'], label='UP (Buy Signal)', marker='o', color='green', linewidth=2)
-        plt.plot(summary['test_f1_down'], label='DOWN (Sell Signal)', marker='s', color='red', linewidth=2)
-        plt.title('🎯 TRADING SIGNAL F1 SCORES (PRIORITY)', fontweight='bold')
+        plt.plot(summary['test_sharpe_ratios'], label='Sharpe Ratio', marker='o', color='green', linewidth=2)
+        plt.plot(summary['test_win_rates'], label='Win Rate', marker='s', color='blue', linewidth=2)
+        plt.title('🎯 TRADING PERFORMANCE METRICS (PRIORITY)', fontweight='bold')
         plt.xlabel('Period')
-        plt.ylabel('F1 Score')
+        plt.ylabel('Metric Value')
         plt.legend()
         plt.grid(True)
-        plt.ylim(0, 1)
         
-        # Plot 2: Combined Trading Signal Performance
+        # Plot 2: Profit Factor and Max Drawdown
         plt.subplot(2, 2, 2)
-        combined_trading = [(up + down) / 2 for up, down in zip(summary['test_f1_up'], summary['test_f1_down'])]
-        plt.plot(combined_trading, label='Combined Trading Signal', marker='o', color='purple', linewidth=2)
-        plt.title('📊 Combined Trading Signal Performance', fontweight='bold')
+        plt.plot(summary['test_profit_factors'], label='Profit Factor', marker='o', color='purple', linewidth=2)
+        plt.plot([abs(x) for x in summary['test_max_drawdowns']], label='Max Drawdown (abs)', marker='s', color='red', linewidth=2)
+        plt.title('💰 Profit Factor & Risk Metrics', fontweight='bold')
         plt.xlabel('Period')
-        plt.ylabel('Average F1 Score')
+        plt.ylabel('Metric Value')
         plt.legend()
         plt.grid(True)
-        plt.ylim(0, 1)
         
-        # Plot 3: Trading Signal F1 Distribution
+        # Plot 3: Trading Performance Distribution
         plt.subplot(2, 2, 3)
-        plt.hist(summary['test_f1_up'], bins=8, alpha=0.7, color='green', label='UP Signals', edgecolor='black')
-        plt.hist(summary['test_f1_down'], bins=8, alpha=0.7, color='red', label='DOWN Signals', edgecolor='black')
-        plt.title('📊 Trading Signal F1 Score Distribution', fontweight='bold')
-        plt.xlabel('F1 Score')
+        plt.hist(summary['test_sharpe_ratios'], bins=8, alpha=0.7, color='green', label='Sharpe Ratio', edgecolor='black')
+        plt.hist(summary['test_win_rates'], bins=8, alpha=0.7, color='blue', label='Win Rate', edgecolor='black')
+        plt.title('📊 Trading Performance Distribution', fontweight='bold')
+        plt.xlabel('Metric Value')
         plt.ylabel('Frequency')
         plt.legend()
-        plt.axvline(summary['mean_f1_up'], color='green', linestyle='--', label=f'UP Mean: {summary["mean_f1_up"]:.4f}')
-        plt.axvline(summary['mean_f1_down'], color='red', linestyle='--', label=f'DOWN Mean: {summary["mean_f1_down"]:.4f}')
+        plt.axvline(summary['mean_sharpe_ratio'], color='green', linestyle='--', label=f'Sharpe Mean: {summary["mean_sharpe_ratio"]:.4f}')
+        plt.axvline(summary['mean_win_rate'], color='blue', linestyle='--', label=f'Win Rate Mean: {summary["mean_win_rate"]:.4f}')
         plt.legend()
         
-        # Plot 4: Trading Signal Box Plot
+        # Plot 4: Trading Performance Box Plot
         plt.subplot(2, 2, 4)
-        trading_f1_data = [summary['test_f1_up'], summary['test_f1_down']]
-        plt.boxplot(trading_f1_data, tick_labels=['UP (Buy)', 'DOWN (Sell)'])
-        plt.title('🎯 Trading Signal F1 Score Distribution', fontweight='bold')
-        plt.ylabel('F1 Score')
-        plt.ylim(0, 1)
+        trading_performance_data = [summary['test_sharpe_ratios'], summary['test_win_rates'], summary['test_profit_factors']]
+        plt.boxplot(trading_performance_data, tick_labels=['Sharpe Ratio', 'Win Rate', 'Profit Factor'])
+        plt.title('🎯 Trading Performance Distribution', fontweight='bold')
+        plt.ylabel('Metric Value')
         
         plt.tight_layout()
         
@@ -665,6 +739,165 @@ class XGBoostWalkForwardOptimizer:
         plt.close()
         
         self.logger.info(f"Visualizations saved to: {plot_path}")
+
+    def calculate_sharpe_ratio_trading_simulation(self, features_val, y_val, y_pred, y_pred_proba, data_val):
+        """Calculate Sharpe ratio through trading simulation - same as hyperopt runner"""
+        
+        # Trading parameters (same as hyperopt runner)
+        position_size = 0.04  # 4% of portfolio
+        leverage = 100  # 100x leverage
+        effective_position = position_size * leverage  # 400% effective position
+        stop_loss = 0.008  # 0.8% stop loss
+        trading_fee = 0.0002  # 0.02% per trade
+        max_hold_hours = 24  # Max 24 hours hold time
+        
+        # Initialize trading simulation
+        portfolio_value = 10000  # Starting portfolio value
+        trades = []
+        current_position = None
+        entry_time = None
+        entry_price = None
+        
+        # Loss tracking variables
+        consecutive_losses = 0
+        trading_pause_until = None
+        
+        # Get price data for validation set
+        prices = data_val['close'].values
+        timestamps = data_val.index
+        
+        # Daily Sharpe calculation parameters
+        daily_returns = []
+        current_day_returns = []
+        current_day_start = None
+        
+        for i in range(len(y_pred)):
+            current_time = timestamps[i]
+            current_price = prices[i]
+            prediction = y_pred[i]
+            confidence = np.max(y_pred_proba[i])
+            
+            # Check if we're in trading pause
+            if trading_pause_until is not None and current_time < trading_pause_until:
+                continue  # Skip trading during pause
+            elif trading_pause_until is not None and current_time >= trading_pause_until:
+                trading_pause_until = None  # Resume trading
+            
+            # Daily grouping for Sharpe calculation
+            if current_day_start is None:
+                current_day_start = current_time
+            elif (current_time - current_day_start).days >= 1:
+                # End of day, calculate daily return
+                if current_day_returns:
+                    daily_return = np.sum(current_day_returns)
+                    daily_returns.append(daily_return)
+                    current_day_returns = []
+                current_day_start = current_time
+            
+            # Check for stop loss on existing position
+            if current_position is not None:
+                hold_hours = (current_time - entry_time).total_seconds() / 3600
+                
+                # Calculate current P&L
+                if current_position == 'long':
+                    pnl_pct = (current_price - entry_price) / entry_price
+                else:  # short
+                    pnl_pct = (entry_price - current_price) / entry_price
+                
+                # Check stop loss or max hold time
+                if pnl_pct <= -stop_loss or hold_hours >= max_hold_hours:
+                    # Close position
+                    trade_return = pnl_pct * effective_position - (2 * trading_fee)  # Entry + exit fees
+                    trades.append({
+                        'type': current_position,
+                        'entry_price': entry_price,
+                        'exit_price': current_price,
+                        'return': trade_return,
+                        'hold_hours': hold_hours,
+                        'reason': 'stop_loss' if pnl_pct <= -stop_loss else 'max_hold_time'
+                    })
+                    
+                    # Track consecutive losses
+                    if trade_return < 0:
+                        consecutive_losses += 1
+                        if consecutive_losses >= 3:
+                            trading_pause_until = current_time + timedelta(hours=12)
+                            consecutive_losses = 0  # Reset after pause
+                    else:
+                        consecutive_losses = 0  # Reset on win
+                    
+                    # Add to daily returns
+                    current_day_returns.append(trade_return)
+                    
+                    # Update portfolio
+                    portfolio_value *= (1 + trade_return)
+                    current_position = None
+                    entry_time = None
+                    entry_price = None
+            
+            # Check for new trading signals (only take signals 0 and 2)
+            if prediction in [0, 2]:  # Early Down or Early Up
+                # Open new position
+                current_position = 'short' if prediction == 0 else 'long'
+                entry_time = current_time
+                entry_price = current_price
+                
+                # Pay entry fee
+                portfolio_value *= (1 - trading_fee)
+        
+        # Close any remaining position at the end
+        if current_position is not None:
+            final_price = prices[-1]
+            if current_position == 'long':
+                pnl_pct = (final_price - entry_price) / entry_price
+            else:  # short
+                pnl_pct = (entry_price - final_price) / entry_price
+            
+            trade_return = pnl_pct * effective_position - (2 * trading_fee)
+            trades.append({
+                'type': current_position,
+                'entry_price': entry_price,
+                'exit_price': final_price,
+                'return': trade_return,
+                'hold_hours': (timestamps[-1] - entry_time).total_seconds() / 3600,
+                'reason': 'end_of_period'
+            })
+            current_day_returns.append(trade_return)
+        
+        # Add final day returns
+        if current_day_returns:
+            daily_return = np.sum(current_day_returns)
+            daily_returns.append(daily_return)
+        
+        # Calculate Sharpe ratio (daily)
+        if len(daily_returns) < 2:
+            return -10.0, 0.0, 0.0, 0.0  # Penalty for insufficient data
+        
+        daily_returns = np.array(daily_returns)
+        sharpe_ratio = np.mean(daily_returns) / (np.std(daily_returns) + 1e-8)
+        
+        # Calculate additional metrics
+        if trades:
+            trade_returns = [t['return'] for t in trades]
+            profitable_trades = [r for r in trade_returns if r > 0]
+            win_rate = len(profitable_trades) / len(trade_returns) if trade_returns else 0
+            
+            # Profit factor
+            gross_profit = sum([r for r in trade_returns if r > 0])
+            gross_loss = abs(sum([r for r in trade_returns if r < 0]))
+            profit_factor = gross_profit / (gross_loss + 1e-8)
+            
+            # Max drawdown
+            cumulative_returns = np.cumsum(trade_returns)
+            running_max = np.maximum.accumulate(cumulative_returns)
+            drawdown = cumulative_returns - running_max
+            max_drawdown = np.min(drawdown)
+        else:
+            win_rate = 0.0
+            profit_factor = 0.0
+            max_drawdown = 0.0
+        
+        return sharpe_ratio, win_rate, profit_factor, max_drawdown
 
 
 def main():

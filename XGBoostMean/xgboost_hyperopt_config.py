@@ -57,6 +57,12 @@ class XGBoostHyperoptConfig:
     class_multiplier_1: float = 0.3  # Multiplier for class 1 (Hold) - low weight since it dominates
     class_multiplier_2: float = 3.0  # Multiplier for class 2 (Up) - high emphasis for trading signals
     
+    # ENHANCED: Minority class specific parameters
+    minority_threshold_boost: float = 0.2  # Boost threshold for minority classes (lower threshold)
+    minority_confidence_boost: float = 0.2  # Boost confidence for minority predictions
+    use_minority_oversampling: bool = True  # Additional minority oversampling
+    minority_oversampling_ratio: float = 3.0  # How much to oversample minorities
+    
     # Feature selection parameters
     use_feature_selection: bool = False
     feature_selection_method: str = 'importance'  # 'importance', 'correlation', 'mutual_info'
