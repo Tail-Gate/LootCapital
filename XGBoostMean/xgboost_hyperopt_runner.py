@@ -789,8 +789,8 @@ def objective(trial: optuna.Trial) -> float:
             data = data_response
         
         # Filter data for 2025 May 1 to 2025 July 29 (3 months for better trading signals)
-        start_date = '2024-01-01'
-        end_date = '2025-08-03'
+        start_date = '2025-06-01'
+        end_date = '2025-07-29'
         data = data[(data.index >= start_date) & (data.index <= end_date)]
         
         logger.info(f"[DATA] Filtered data from {start_date} to {end_date}")
@@ -980,13 +980,14 @@ def objective(trial: optuna.Trial) -> float:
             trading_fee = 0.0002  # 0.02% per trade
             max_hold_hours = 24  # Max 24 hours hold time
             
-            # Initialize single account with $5000
-            account_balance = 5000  # Starting account balance
-            available_balance = 5000  # Available balance for new trades
+            # Initialize single account with $4000
+            account_balance = 4000  # Starting account balance
+            available_balance = 4000  # Available balance for new trades
             trades = []
-            current_position = None
-            entry_time = None
-            entry_price = None
+            positions = [] # Initialize positions list
+            
+            logger.info(f"[BALANCE] Initial account balance: ${account_balance:.2f}")
+            logger.info(f"[BALANCE] Initial available balance: ${available_balance:.2f}")
             
             # Loss tracking variables
             consecutive_losses = 0
@@ -1024,100 +1025,179 @@ def objective(trial: optuna.Trial) -> float:
                         current_day_returns = []
                     current_day_start = current_time
                 
-                # Check for stop loss on existing position
-                if current_position is not None:
-                    hold_hours = (current_time - entry_time).total_seconds() / 3600
+                # Check for stop loss on existing positions (MULTIPLE POSITIONS)
+                if positions:
+                    positions_to_remove = []
+                    for i, position in enumerate(positions):
+                        hold_hours = (current_time - position['entry_time']).total_seconds() / 3600
+                        
+                        # Calculate current P&L
+                        if position['type'] == 'long':
+                            pnl_pct = (current_price - position['entry_price']) / position['entry_price']
+                        else:  # short
+                            pnl_pct = (position['entry_price'] - current_price) / position['entry_price']
+                        
+                        # Check stop loss, take profit, or max hold time
+                        take_profit = price_threshold  # Use trial's price_threshold as take profit
+                        if pnl_pct <= -stop_loss or pnl_pct >= take_profit or hold_hours >= max_hold_hours:
+                            # Calculate P&L in USD terms (corrected logic)
+                            pnl_usd = pnl_pct * position['position_size_usd'] * leverage
+                            
+                            # Calculate fees
+                            trade_value = position['position_size_usd'] * leverage
+                            entry_fee = trade_value * trading_fee
+                            exit_fee = trade_value * trading_fee
+                            total_fees = entry_fee + exit_fee
+                            
+                            # Calculate net trade return in USD
+                            net_pnl_usd = pnl_usd - total_fees
+                            
+                            # Calculate trade return as percentage of position size for metrics
+                            trade_return = net_pnl_usd / position['position_size_usd']
+                            
+                            logger.info(f"[BALANCE] Closing {position['type']} position:")
+                            logger.info(f"[BALANCE]   Entry price: ${position['entry_price']:.4f}")
+                            logger.info(f"[BALANCE]   Exit price: ${current_price:.4f}")
+                            logger.info(f"[BALANCE]   P&L %: {pnl_pct:.4f} ({pnl_pct*100:.2f}%)")
+                            logger.info(f"[BALANCE]   Position size: ${position['position_size_usd']:.2f}")
+                            logger.info(f"[BALANCE]   Leverage: {leverage}x")
+                            logger.info(f"[BALANCE]   Trade value: ${trade_value:.2f}")
+                            logger.info(f"[BALANCE]   Gross P&L USD: ${pnl_usd:.2f}")
+                            logger.info(f"[BALANCE]   Entry fee: ${entry_fee:.2f}")
+                            logger.info(f"[BALANCE]   Exit fee: ${exit_fee:.2f}")
+                            logger.info(f"[BALANCE]   Total fees: ${total_fees:.2f}")
+                            logger.info(f"[BALANCE]   Net P&L USD: ${net_pnl_usd:.2f}")
+                            logger.info(f"[BALANCE]   Trade return: {trade_return:.4f} ({trade_return*100:.2f}%)")
+                            logger.info(f"[BALANCE]   Account balance before: ${account_balance:.2f}")
+                            
+                            trades.append({
+                                'type': position['type'],
+                                'entry_price': position['entry_price'],
+                                'exit_price': current_price,
+                                'return': trade_return,
+                                'hold_hours': hold_hours,
+                                'reason': 'stop_loss' if pnl_pct <= -stop_loss else 'take_profit' if pnl_pct >= take_profit else 'max_hold_time'
+                            })
+                            
+                            # Track consecutive losses
+                            if trade_return < 0:
+                                consecutive_losses += 1
+                                if consecutive_losses >= 3:
+                                    trading_pause_until = current_time + timedelta(hours=12)
+                                    consecutive_losses = 0  # Reset after pause
+                            else:
+                                consecutive_losses = 0  # Reset on win
+                            
+                            # Add to daily returns
+                            current_day_returns.append(trade_return)
+                            
+                            # Update account balance correctly
+                            account_balance += net_pnl_usd
+                            # Return position size plus profit/loss to available balance
+                            available_balance += position['position_size_usd'] + net_pnl_usd
+                            
+                            logger.info(f"[BALANCE]   Account balance after: ${account_balance:.2f}")
+                            logger.info(f"[BALANCE]   Available balance after: ${available_balance:.2f}")
+                            
+                            # Mark position for removal
+                            positions_to_remove.append(i)
                     
-                    # Calculate current P&L
-                    if current_position == 'long':
-                        pnl_pct = (current_price - entry_price) / entry_price
-                    else:  # short
-                        pnl_pct = (entry_price - current_price) / entry_price
-                    
-                    # Check stop loss or max hold time
-                    if pnl_pct <= -stop_loss or hold_hours >= max_hold_hours:
-                        # Calculate position size in USD
-                        position_size_usd = available_balance * position_size
-                        effective_position = position_size_usd * leverage / account_balance
-                        
-                        # Close position
-                        trade_return = pnl_pct * effective_position - (2 * trading_fee)  # Entry + exit fees
-                        trades.append({
-                            'type': current_position,
-                            'entry_price': entry_price,
-                            'exit_price': current_price,
-                            'return': trade_return,
-                            'hold_hours': hold_hours,
-                            'reason': 'stop_loss' if pnl_pct <= -stop_loss else 'max_hold_time'
-                        })
-                        
-                        # Track consecutive losses
-                        if trade_return < 0:
-                            consecutive_losses += 1
-                            if consecutive_losses >= 3:
-                                trading_pause_until = current_time + timedelta(hours=12)
-                                consecutive_losses = 0  # Reset after pause
-                        else:
-                            consecutive_losses = 0  # Reset on win
-                        
-                        # Add to daily returns
-                        current_day_returns.append(trade_return)
-                        
-                        # Update account balance and available balance
-                        account_balance *= (1 + trade_return)
-                        # Add back the position size plus the profit/loss
-                        position_return_usd = position_size_usd * trade_return
-                        available_balance += position_size_usd + position_return_usd
-                        current_position = None
-                        entry_time = None
-                        entry_price = None
+                    # Remove closed positions (in reverse order to maintain indices)
+                    for i in reversed(positions_to_remove):
+                        positions.pop(i)
                 
-                # Check for new trading signals (only take signals 0 and 2)
-                if prediction in [0, 2] and available_balance > 0:  # Early Down or Early Up
+                # Check for new trading signals (only take signals 0 and 2) with confidence threshold
+                confidence_threshold = 0.25  # Lower threshold to allow more trades
+                if prediction in [0, 2] and available_balance > 0 and confidence >= confidence_threshold:  # Early Down or Early Up
                     # Calculate position size based on available balance
                     position_size_usd = available_balance * position_size
                     
                     # Check if we have enough balance for the trade
                     if position_size_usd >= 20:  # Minimum $20 position
-                        # Open new position
-                        current_position = 'short' if prediction == 0 else 'long'
-                        entry_time = current_time
-                        entry_price = current_price
+                        # Open new position (ALLOWING MULTIPLE POSITIONS)
+                        new_position = {
+                            'type': 'short' if prediction == 0 else 'long',
+                            'entry_time': current_time,
+                            'entry_price': current_price,
+                            'position_size_usd': position_size_usd
+                        }
+                        
+                        # Add to positions list (instead of single current_position)
+                        positions.append(new_position)
                         
                         # Deduct position size from available balance
                         available_balance -= position_size_usd
                         
-                        # Pay entry fee
-                        account_balance *= (1 - trading_fee)
+                        # Pay entry fee based on leveraged position value
+                        trade_value = position_size_usd * leverage
+                        position_fee = trade_value * trading_fee
+                        account_balance -= position_fee
+                        
+                        logger.info(f"[BALANCE] Opened {new_position['type']} position:")
+                        logger.info(f"[BALANCE]   Position size: ${position_size_usd:.2f}")
+                        logger.info(f"[BALANCE]   Leverage: {leverage}x")
+                        logger.info(f"[BALANCE]   Trade value: ${trade_value:.2f}")
+                        logger.info(f"[BALANCE]   Entry price: ${current_price:.4f}")
+                        logger.info(f"[BALANCE]   Entry fee: ${position_fee:.2f}")
+                        logger.info(f"[BALANCE]   Available balance after: ${available_balance:.2f}")
+                        logger.info(f"[BALANCE]   Account balance after: ${account_balance:.2f}")
             
-            # Close any remaining position at the end
-            if current_position is not None:
+            # Close any remaining positions at the end
+            if 'positions' in locals() and positions:
                 final_price = prices[-1]
-                if current_position == 'long':
-                    pnl_pct = (final_price - entry_price) / entry_price
-                else:  # short
-                    pnl_pct = (entry_price - final_price) / entry_price
-                
-                # Calculate position size in USD
-                position_size_usd = available_balance * position_size
-                effective_position = position_size_usd * leverage / account_balance
-                
-                trade_return = pnl_pct * effective_position - (2 * trading_fee)
-                trades.append({
-                    'type': current_position,
-                    'entry_price': entry_price,
-                    'exit_price': final_price,
-                    'return': trade_return,
-                    'hold_hours': (timestamps[-1] - entry_time).total_seconds() / 3600,
-                    'reason': 'end_of_period'
-                })
-                current_day_returns.append(trade_return)
-                
-                # Update account balance and available balance
-                account_balance *= (1 + trade_return)
-                # Add back the position size plus the profit/loss
-                position_return_usd = position_size_usd * trade_return
-                available_balance += position_size_usd + position_return_usd
+                for position in positions:
+                    if position['type'] == 'long':
+                        pnl_pct = (final_price - position['entry_price']) / position['entry_price']
+                    else:  # short
+                        pnl_pct = (position['entry_price'] - final_price) / position['entry_price']
+                    
+                    # Calculate P&L in USD terms (corrected logic)
+                    pnl_usd = pnl_pct * position['position_size_usd'] * leverage
+                    
+                    # Calculate fees
+                    trade_value = position['position_size_usd'] * leverage
+                    entry_fee = trade_value * trading_fee
+                    exit_fee = trade_value * trading_fee
+                    total_fees = entry_fee + exit_fee
+                    
+                    # Calculate net trade return in USD
+                    net_pnl_usd = pnl_usd - total_fees
+                    
+                    # Calculate trade return as percentage of position size for metrics
+                    trade_return = net_pnl_usd / position['position_size_usd']
+                    
+                    logger.info(f"[BALANCE] Closing final {position['type']} position:")
+                    logger.info(f"[BALANCE]   Entry price: ${position['entry_price']:.4f}")
+                    logger.info(f"[BALANCE]   Exit price: ${final_price:.4f}")
+                    logger.info(f"[BALANCE]   P&L %: {pnl_pct:.4f} ({pnl_pct*100:.2f}%)")
+                    logger.info(f"[BALANCE]   Position size: ${position['position_size_usd']:.2f}")
+                    logger.info(f"[BALANCE]   Leverage: {leverage}x")
+                    logger.info(f"[BALANCE]   Trade value: ${trade_value:.2f}")
+                    logger.info(f"[BALANCE]   Gross P&L USD: ${pnl_usd:.2f}")
+                    logger.info(f"[BALANCE]   Entry fee: ${entry_fee:.2f}")
+                    logger.info(f"[BALANCE]   Exit fee: ${exit_fee:.2f}")
+                    logger.info(f"[BALANCE]   Total fees: ${total_fees:.2f}")
+                    logger.info(f"[BALANCE]   Net P&L USD: ${net_pnl_usd:.2f}")
+                    logger.info(f"[BALANCE]   Trade return: {trade_return:.4f} ({trade_return*100:.2f}%)")
+                    logger.info(f"[BALANCE]   Account balance before: ${account_balance:.2f}")
+                    
+                    trades.append({
+                        'type': position['type'],
+                        'entry_price': position['entry_price'],
+                        'exit_price': final_price,
+                        'return': trade_return,
+                        'hold_hours': (timestamps[-1] - position['entry_time']).total_seconds() / 3600,
+                        'reason': 'end_of_period'
+                    })
+                    current_day_returns.append(trade_return)
+                    
+                    # Update account balance correctly
+                    account_balance += net_pnl_usd
+                    # Return position size plus profit/loss to available balance
+                    available_balance += position['position_size_usd'] + net_pnl_usd
+                    
+                    logger.info(f"[BALANCE]   Account balance after: ${account_balance:.2f}")
+                    logger.info(f"[BALANCE]   Available balance after: ${available_balance:.2f}")
             
             # Add final day returns
             if current_day_returns:
@@ -1128,18 +1208,19 @@ def objective(trial: optuna.Trial) -> float:
             if len(daily_returns) < 2:
                 logger.warning(f"[SHARPE] Insufficient daily returns ({len(daily_returns)}), using hourly returns instead")
                 # Fallback to hourly returns if daily returns insufficient
+                trade_returns = [t['return'] for t in trades] if trades else []  # Initialize trade_returns
                 if len(trade_returns) >= 5:  # Need at least 5 trades
                     hourly_returns = trade_returns  # Use individual trade returns
                     sharpe_ratio = np.mean(hourly_returns) / (np.std(hourly_returns) + 1e-8)
                 else:
-                    return -10.0, 0.0, 0.0, 0.0, 5000.0  # Penalty for insufficient data, return initial balance
+                    return -10.0, 0.0, 0.0, 0.0, 4000.0, []  # Penalty for insufficient data, return initial balance
             else:
                 daily_returns = np.array(daily_returns)
                 sharpe_ratio = np.mean(daily_returns) / (np.std(daily_returns) + 1e-8)
             
             # Calculate additional metrics
+            trade_returns = [t['return'] for t in trades] if trades else []  # Initialize trade_returns
             if trades:
-                trade_returns = [t['return'] for t in trades]
                 profitable_trades = [r for r in trade_returns if r > 0]
                 win_rate = len(profitable_trades) / len(trade_returns) if trade_returns else 0
                 
@@ -1158,10 +1239,23 @@ def objective(trial: optuna.Trial) -> float:
                 profit_factor = 0.0
                 max_drawdown = 0.0
             
-            return sharpe_ratio, win_rate, profit_factor, max_drawdown, account_balance
+            # Final balance summary logging
+            initial_balance = 4000.0
+            total_return = account_balance - initial_balance
+            total_return_pct = (total_return / initial_balance) * 100
+            
+            logger.info(f"[BALANCE] === TRADING SIMULATION SUMMARY ===")
+            logger.info(f"[BALANCE] Initial account balance: ${initial_balance:.2f}")
+            logger.info(f"[BALANCE] Final account balance: ${account_balance:.2f}")
+            logger.info(f"[BALANCE] Total P&L: ${total_return:.2f} ({total_return_pct:.2f}%)")
+            logger.info(f"[BALANCE] Final available balance: ${available_balance:.2f}")
+            logger.info(f"[BALANCE] Total trades executed: {len(trades)}")
+            logger.info(f"[BALANCE] ========================================")
+            
+            return sharpe_ratio, win_rate, profit_factor, max_drawdown, account_balance, trades
         
         # Calculate Sharpe ratio through trading simulation
-        sharpe_ratio, win_rate, profit_factor, max_drawdown, account_balance = calculate_sharpe_ratio_trading_simulation(
+        sharpe_ratio, win_rate, profit_factor, max_drawdown, account_balance, trades = calculate_sharpe_ratio_trading_simulation(
             features.iloc[split_idx:val_idx], y_val, y_pred, y_pred_proba, data.iloc[split_idx:val_idx]
         )
         
@@ -1170,11 +1264,17 @@ def objective(trial: optuna.Trial) -> float:
         total_samples = len(y_pred)
         signal_percentage = (trading_signals / total_samples) * 100
         
+        # Count actual executed trades
+        executed_trades = len(trades)
+        signal_to_trade_ratio = (executed_trades / trading_signals * 100) if trading_signals > 0 else 0
+        
         logger.info(f"[SHARPE] Trading Signal Analysis:")
         logger.info(f"[SHARPE] Total samples: {total_samples}")
         logger.info(f"[SHARPE] Trading signals (0+2): {trading_signals} ({signal_percentage:.2f}%)")
         logger.info(f"[SHARPE] Hold signals (1): {total_samples - trading_signals} ({100-signal_percentage:.2f}%)")
         logger.info(f"[SHARPE] Signal distribution: Down={np.sum(y_pred==0)}, Hold={np.sum(y_pred==1)}, Up={np.sum(y_pred==2)}")
+        logger.info(f"[SHARPE] Executed trades: {executed_trades}")
+        logger.info(f"[SHARPE] Signal to trade ratio: {signal_to_trade_ratio:.2f}%")
         
         logger.info(f"[SHARPE] Trading Simulation Results:")
         logger.info(f"[SHARPE] Sharpe Ratio (daily): {sharpe_ratio:.4f}")
@@ -1182,7 +1282,7 @@ def objective(trial: optuna.Trial) -> float:
         logger.info(f"[SHARPE] Profit Factor: {profit_factor:.4f}")
         logger.info(f"[SHARPE] Max Drawdown: {max_drawdown:.4f}")
         logger.info(f"[SHARPE] Final Account Balance: ${account_balance:.2f}")
-        logger.info(f"[SHARPE] Account Return: {((account_balance - 5000) / 5000 * 100):.2f}%")
+        logger.info(f"[SHARPE] Account Return: {((account_balance - 4000) / 4000 * 100):.2f}%")
         
         # SHARPE RATIO OBJECTIVE FUNCTION (lower is better, so we negate Sharpe)
         # Prioritize Sharpe ratio (40%), Profit Factor (20%), Win Rate (35%), Max Drawdown (5%)
@@ -1325,7 +1425,7 @@ def main():
     # Run optimization with small number of trials for testing
     study.optimize(
         objective,
-        n_trials=2500,  # Small number for testing
+        n_trials=7,  # Small number for testing
         timeout=None,
         gc_after_trial=True,
         show_progress_bar=True

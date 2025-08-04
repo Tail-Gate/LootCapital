@@ -351,9 +351,24 @@ class XGBoostWalkForwardOptimizer:
             y_pred = np.argmax(y_pred_proba, axis=1)
             
             # Calculate trading metrics through simulation
-            sharpe_ratio, win_rate, profit_factor, max_drawdown = self.calculate_sharpe_ratio_trading_simulation(
-                X_test, y_test, y_pred, y_pred_proba, data_test_full
+            sharpe_ratio, win_rate, profit_factor, max_drawdown, trades = self.calculate_sharpe_ratio_trading_simulation(
+                X_test, y_test, y_pred, y_pred_proba, data_test_full, config
             )
+            
+            # Count trading signals vs executed trades
+            trading_signals = np.sum(y_pred != 1)  # Count non-hold signals (0 and 2)
+            total_samples = len(y_pred)
+            signal_percentage = (trading_signals / total_samples) * 100
+            executed_trades = len(trades)
+            signal_to_trade_ratio = (executed_trades / trading_signals * 100) if trading_signals > 0 else 0
+            
+            self.logger.info(f"Trading Signal Analysis:")
+            self.logger.info(f"  Total samples: {total_samples}")
+            self.logger.info(f"  Trading signals (0+2): {trading_signals} ({signal_percentage:.2f}%)")
+            self.logger.info(f"  Hold signals (1): {total_samples - trading_signals} ({100-signal_percentage:.2f}%)")
+            self.logger.info(f"  Signal distribution: Down={np.sum(y_pred==0)}, Hold={np.sum(y_pred==1)}, Up={np.sum(y_pred==2)}")
+            self.logger.info(f"  Executed trades: {executed_trades}")
+            self.logger.info(f"  Signal to trade ratio: {signal_to_trade_ratio:.2f}%")
             
             self.logger.info(f"Trading Simulation Results:")
             self.logger.info(f"  Sharpe Ratio (daily): {sharpe_ratio:.4f}")
@@ -740,23 +755,24 @@ class XGBoostWalkForwardOptimizer:
         
         self.logger.info(f"Visualizations saved to: {plot_path}")
 
-    def calculate_sharpe_ratio_trading_simulation(self, features_val, y_val, y_pred, y_pred_proba, data_val):
+    def calculate_sharpe_ratio_trading_simulation(self, features_val, y_val, y_pred, y_pred_proba, data_val, config=None):
         """Calculate Sharpe ratio through trading simulation - same as hyperopt runner"""
         
         # Trading parameters (same as hyperopt runner)
-        position_size = 0.04  # 4% of portfolio
-        leverage = 100  # 100x leverage
-        effective_position = position_size * leverage  # 400% effective position
-        stop_loss = 0.008  # 0.8% stop loss
+        position_size = 0.04  # 4% of account balance
+        leverage = 50  # 50x leverage
+        stop_loss = 0.01  # 0.8% stop loss
         trading_fee = 0.0002  # 0.02% per trade
         max_hold_hours = 24  # Max 24 hours hold time
         
-        # Initialize trading simulation
-        portfolio_value = 10000  # Starting portfolio value
+        # Get price_threshold from config for take profit
+        price_threshold = getattr(config, 'price_threshold', 0.025) if config else 0.025
+        
+        # Initialize single account with $4000
+        account_balance = 4000  # Starting account balance
+        available_balance = 4000  # Available balance for new trades
         trades = []
-        current_position = None
-        entry_time = None
-        entry_price = None
+        positions = []  # Initialize positions list
         
         # Loss tracking variables
         consecutive_losses = 0
@@ -794,75 +810,134 @@ class XGBoostWalkForwardOptimizer:
                     current_day_returns = []
                 current_day_start = current_time
             
-            # Check for stop loss on existing position
-            if current_position is not None:
-                hold_hours = (current_time - entry_time).total_seconds() / 3600
+            # Check for stop loss on existing positions (MULTIPLE POSITIONS)
+            if positions:
+                positions_to_remove = []
+                for i, position in enumerate(positions):
+                    hold_hours = (current_time - position['entry_time']).total_seconds() / 3600
+                    
+                    # Calculate current P&L
+                    if position['type'] == 'long':
+                        pnl_pct = (current_price - position['entry_price']) / position['entry_price']
+                    else:  # short
+                        pnl_pct = (position['entry_price'] - current_price) / position['entry_price']
+                    
+                    # Check stop loss, take profit, or max hold time
+                    take_profit = price_threshold  # Use config's price_threshold as take profit
+                    if pnl_pct <= -stop_loss or pnl_pct >= take_profit or hold_hours >= max_hold_hours:
+                        # Calculate P&L in USD terms (corrected logic)
+                        pnl_usd = pnl_pct * position['position_size_usd'] * leverage
+                        
+                        # Calculate fees based on leveraged position value
+                        trade_value = position['position_size_usd'] * leverage
+                        entry_fee = trade_value * trading_fee
+                        exit_fee = trade_value * trading_fee
+                        total_fees = entry_fee + exit_fee
+                        
+                        # Calculate net trade return in USD
+                        net_pnl_usd = pnl_usd - total_fees
+                        
+                        # Calculate trade return as percentage of position size for metrics
+                        trade_return = net_pnl_usd / position['position_size_usd']
+                        
+                        trades.append({
+                            'type': position['type'],
+                            'entry_price': position['entry_price'],
+                            'exit_price': current_price,
+                            'return': trade_return,
+                            'hold_hours': hold_hours,
+                            'reason': 'stop_loss' if pnl_pct <= -stop_loss else 'take_profit' if pnl_pct >= take_profit else 'max_hold_time'
+                        })
+                        
+                        # Track consecutive losses
+                        if trade_return < 0:
+                            consecutive_losses += 1
+                            if consecutive_losses >= 3:
+                                trading_pause_until = current_time + timedelta(hours=12)
+                                consecutive_losses = 0  # Reset after pause
+                        else:
+                            consecutive_losses = 0  # Reset on win
+                        
+                        # Add to daily returns
+                        current_day_returns.append(trade_return)
+                        
+                        # Update account balance correctly
+                        account_balance += net_pnl_usd
+                        # Return position size plus profit/loss to available balance
+                        available_balance += position['position_size_usd'] + net_pnl_usd
+                        
+                        # Mark position for removal
+                        positions_to_remove.append(i)
                 
-                # Calculate current P&L
-                if current_position == 'long':
-                    pnl_pct = (current_price - entry_price) / entry_price
-                else:  # short
-                    pnl_pct = (entry_price - current_price) / entry_price
-                
-                # Check stop loss or max hold time
-                if pnl_pct <= -stop_loss or hold_hours >= max_hold_hours:
-                    # Close position
-                    trade_return = pnl_pct * effective_position - (2 * trading_fee)  # Entry + exit fees
-                    trades.append({
-                        'type': current_position,
-                        'entry_price': entry_price,
-                        'exit_price': current_price,
-                        'return': trade_return,
-                        'hold_hours': hold_hours,
-                        'reason': 'stop_loss' if pnl_pct <= -stop_loss else 'max_hold_time'
-                    })
-                    
-                    # Track consecutive losses
-                    if trade_return < 0:
-                        consecutive_losses += 1
-                        if consecutive_losses >= 3:
-                            trading_pause_until = current_time + timedelta(hours=12)
-                            consecutive_losses = 0  # Reset after pause
-                    else:
-                        consecutive_losses = 0  # Reset on win
-                    
-                    # Add to daily returns
-                    current_day_returns.append(trade_return)
-                    
-                    # Update portfolio
-                    portfolio_value *= (1 + trade_return)
-                    current_position = None
-                    entry_time = None
-                    entry_price = None
+                # Remove closed positions (in reverse order to maintain indices)
+                for i in reversed(positions_to_remove):
+                    positions.pop(i)
             
-            # Check for new trading signals (only take signals 0 and 2)
-            if prediction in [0, 2]:  # Early Down or Early Up
-                # Open new position
-                current_position = 'short' if prediction == 0 else 'long'
-                entry_time = current_time
-                entry_price = current_price
+            # Check for new trading signals (only take signals 0 and 2) with confidence threshold
+            confidence_threshold = 0.25  # Lower threshold to allow more trades
+            if prediction in [0, 2] and available_balance > 0 and confidence >= confidence_threshold:  # Early Down or Early Up
+                # Calculate position size based on available balance
+                position_size_usd = available_balance * position_size
                 
-                # Pay entry fee
-                portfolio_value *= (1 - trading_fee)
+                # Check if we have enough balance for the trade
+                if position_size_usd >= 20:  # Minimum $20 position
+                    # Open new position (ALLOWING MULTIPLE POSITIONS)
+                    new_position = {
+                        'type': 'short' if prediction == 0 else 'long',
+                        'entry_time': current_time,
+                        'entry_price': current_price,
+                        'position_size_usd': position_size_usd
+                    }
+                    
+                    # Add to positions list (instead of single current_position)
+                    positions.append(new_position)
+                    
+                    # Deduct position size from available balance
+                    available_balance -= position_size_usd
+                    
+                    # Pay entry fee based on leveraged position value
+                    trade_value = position_size_usd * leverage
+                    position_fee = trade_value * trading_fee
+                    account_balance -= position_fee
         
-        # Close any remaining position at the end
-        if current_position is not None:
+        # Close any remaining positions at the end
+        if positions:
             final_price = prices[-1]
-            if current_position == 'long':
-                pnl_pct = (final_price - entry_price) / entry_price
-            else:  # short
-                pnl_pct = (entry_price - final_price) / entry_price
-            
-            trade_return = pnl_pct * effective_position - (2 * trading_fee)
-            trades.append({
-                'type': current_position,
-                'entry_price': entry_price,
-                'exit_price': final_price,
-                'return': trade_return,
-                'hold_hours': (timestamps[-1] - entry_time).total_seconds() / 3600,
-                'reason': 'end_of_period'
-            })
-            current_day_returns.append(trade_return)
+            for position in positions:
+                if position['type'] == 'long':
+                    pnl_pct = (final_price - position['entry_price']) / position['entry_price']
+                else:  # short
+                    pnl_pct = (position['entry_price'] - final_price) / position['entry_price']
+                
+                # Calculate P&L in USD terms (corrected logic)
+                pnl_usd = pnl_pct * position['position_size_usd'] * leverage
+                
+                # Calculate fees based on leveraged position value
+                trade_value = position['position_size_usd'] * leverage
+                entry_fee = trade_value * trading_fee
+                exit_fee = trade_value * trading_fee
+                total_fees = entry_fee + exit_fee
+                
+                # Calculate net trade return in USD
+                net_pnl_usd = pnl_usd - total_fees
+                
+                # Calculate trade return as percentage of position size for metrics
+                trade_return = net_pnl_usd / position['position_size_usd']
+                
+                trades.append({
+                    'type': position['type'],
+                    'entry_price': position['entry_price'],
+                    'exit_price': final_price,
+                    'return': trade_return,
+                    'hold_hours': (timestamps[-1] - position['entry_time']).total_seconds() / 3600,
+                    'reason': 'end_of_period'
+                })
+                current_day_returns.append(trade_return)
+                
+                # Update account balance correctly
+                account_balance += net_pnl_usd
+                # Return position size plus profit/loss to available balance
+                available_balance += position['position_size_usd'] + net_pnl_usd
         
         # Add final day returns
         if current_day_returns:
@@ -871,7 +946,7 @@ class XGBoostWalkForwardOptimizer:
         
         # Calculate Sharpe ratio (daily)
         if len(daily_returns) < 2:
-            return -10.0, 0.0, 0.0, 0.0  # Penalty for insufficient data
+            return -10.0, 0.0, 0.0, 0.0, []  # Penalty for insufficient data
         
         daily_returns = np.array(daily_returns)
         sharpe_ratio = np.mean(daily_returns) / (np.std(daily_returns) + 1e-8)
@@ -897,7 +972,7 @@ class XGBoostWalkForwardOptimizer:
             profit_factor = 0.0
             max_drawdown = 0.0
         
-        return sharpe_ratio, win_rate, profit_factor, max_drawdown
+        return sharpe_ratio, win_rate, profit_factor, max_drawdown, trades
 
 
 def main():
