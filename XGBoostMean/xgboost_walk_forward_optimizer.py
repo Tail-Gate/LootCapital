@@ -283,7 +283,7 @@ class XGBoostWalkForwardOptimizer:
             
             # Prepare training data
             self.logger.info("Preparing training data...")
-            X_train_full, y_train_full = self.prepare_period_data(
+            X_train_full, y_train_full, data_train_full = self.prepare_period_data(
                 period_data['train_start'], 
                 period_data['train_end'], 
                 config
@@ -291,20 +291,11 @@ class XGBoostWalkForwardOptimizer:
             
             # Prepare test data
             self.logger.info("Preparing test data...")
-            X_test_full, y_test_full = self.prepare_period_data(
+            X_test_full, y_test_full, data_test_full = self.prepare_period_data(
                 period_data['test_start'], 
                 period_data['test_end'], 
                 config
             )
-            
-            # Also get the raw data for trading simulation
-            data_test_response = self.market_data.get_data(['ETH/USD'])
-            if isinstance(data_test_response, dict):
-                data_test_full = data_test_response['ETH/USD']
-            else:
-                data_test_full = data_test_response
-            data_test_full = data_test_full[(data_test_full.index >= period_data['test_start']) & 
-                                         (data_test_full.index <= period_data['test_end'])]
             
             # Check if we have enough data
             if len(X_train_full) < 100 or len(X_test_full) < 20:
