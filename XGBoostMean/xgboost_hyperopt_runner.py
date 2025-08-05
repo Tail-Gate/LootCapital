@@ -789,8 +789,8 @@ def objective(trial: optuna.Trial) -> float:
             data = data_response
         
         # Filter data for 2025 May 1 to 2025 July 29 (3 months for better trading signals)
-        start_date = '2025-06-01'
-        end_date = '2025-07-29'
+        start_date = '2024-01-02'
+        end_date = '2025-08-03'
         data = data[(data.index >= start_date) & (data.index <= end_date)]
         
         logger.info(f"[DATA] Filtered data from {start_date} to {end_date}")
@@ -1425,7 +1425,7 @@ def main():
     # Run optimization with small number of trials for testing
     study.optimize(
         objective,
-        n_trials=7,  # Small number for testing
+        n_trials=2500,  # Small number for testing
         timeout=None,
         gc_after_trial=True,
         show_progress_bar=True

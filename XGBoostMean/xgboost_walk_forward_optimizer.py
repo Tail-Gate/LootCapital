@@ -1009,7 +1009,7 @@ def main():
         end_date = datetime.strptime(args.end_date, '%Y-%m-%d')
     else:
         # Default to 2025-05-29
-        end_date = datetime(2025, 5, 29)
+        end_date = datetime(2025, 8, 3)
         
     if args.start_date:
         start_date = datetime.strptime(args.start_date, '%Y-%m-%d')
