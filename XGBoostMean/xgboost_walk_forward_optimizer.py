@@ -78,6 +78,9 @@ class XGBoostWalkForwardOptimizer:
             'configs': []
         }
         
+        # Configuration tracking
+        self.config_file_used = None
+        
         # Initialize components
         self.market_data = MarketData(data_source_path='data')
         self.technical_indicators = TechnicalIndicators()
@@ -137,82 +140,89 @@ class XGBoostWalkForwardOptimizer:
         # Find all XGBoost parameter files
         param_files = list(config_dir.glob('xgboost_mean_reversion_best_params_*.json'))
         
+        # Enhanced logging to show what files are found
+        self.logger.info(f"🔍 SEARCHING for config files with pattern: 'xgboost_mean_reversion_best_params_*.json'")
+        self.logger.info(f"📁 Config directory: {config_dir.absolute()}")
+        self.logger.info(f"📄 Found {len(param_files)} matching config files:")
+        for i, file in enumerate(param_files, 1):
+            file_time = datetime.fromtimestamp(os.path.getctime(file)).strftime('%Y-%m-%d %H:%M:%S')
+            self.logger.info(f"  {i}. {file.name} (created: {file_time})")
+        
         if not param_files:
-            self.logger.warning("No XGBoost parameter files found")
+            self.logger.warning("❌ No XGBoost parameter files found")
             return None
         
         # Get the most recent file
         latest_file = max(param_files, key=os.path.getctime)
+        latest_file_time = datetime.fromtimestamp(os.path.getctime(latest_file)).strftime('%Y-%m-%d %H:%M:%S')
+        
+        self.logger.info(f"✅ SELECTED config file: {latest_file.name}")
+        self.logger.info(f"📅 File creation time: {latest_file_time}")
+        self.logger.info(f"📍 Full path: {latest_file.absolute()}")
         
         try:
             with open(latest_file, 'r') as f:
                 optimized_params = json.load(f)
             
-            self.logger.info(f"Loaded optimized hyperparameters from: {latest_file}")
-            self.logger.info(f"Optimized parameters: {optimized_params}")
+            self.logger.info(f"✅ Successfully loaded optimized hyperparameters from: {latest_file}")
+            self.logger.info(f"📊 Loaded {len(optimized_params)} parameters")
+            
+            # Store the config file path for final summary
+            self.config_file_used = latest_file
             
             return optimized_params
             
         except Exception as e:
-            self.logger.error(f"Failed to load optimized hyperparameters: {e}")
+            self.logger.error(f"❌ Failed to load optimized hyperparameters: {e}")
             return None
     
     def create_time_based_target(self, data: pd.DataFrame, config: XGBoostHyperoptConfig):
-        """Create time-based classification target for mean reversion"""
+        """Create a multi-class target based on a future risk/reward profile"""
         
-        price_threshold = config.price_threshold
-        early_window = config.early_window
-        late_window = config.late_window
-        moderate_threshold_ratio = config.moderate_threshold_ratio
-        window_size = 15  # 15 candlesticks window
+        # New parameters from your updated hyperparameter optimization
+        lookahead_window = config.lookahead_window
+        profit_target_pct = config.price_threshold # price_threshold now represents profit target
+        stop_loss_pct = 0.015  # Hardcoded 1.5% stop-loss
         
-        self.logger.info(f"Creating time-based target with:")
-        self.logger.info(f"  Price threshold: {price_threshold:.4f}")
-        self.logger.info(f"  Early window: {early_window}, Late window: {late_window}")
-        self.logger.info(f"  Moderate threshold ratio: {moderate_threshold_ratio:.2f}")
+        self.logger.info(f"Creating unbiased target with:")
+        self.logger.info(f"  Profit Target: {profit_target_pct:.4f}")
+        self.logger.info(f"  Stop Loss: {stop_loss_pct:.4f}")
+        self.logger.info(f"  Lookahead Window: {lookahead_window} periods")
         
-        future_returns = []
+        targets = []
+        
+        # Pad the data to avoid index errors at the end
+        data_padded = pd.concat([data, pd.DataFrame(index=pd.date_range(data.index[-1], periods=lookahead_window+1, freq='T'))])
         
         for i in range(len(data)):
-            if i + window_size >= len(data):
-                # For the last few candlesticks, we can't look ahead 15 periods
-                future_returns.append(1)  # No signal
-            else:
-                # Get current price
-                current_price = data['close'].iloc[i]
-                
-                # Calculate early period returns (first 5 periods)
-                early_prices = data['close'].iloc[i:i+early_window+1]
-                early_max_return = (early_prices.max() - current_price) / current_price
-                early_min_return = (early_prices.min() - current_price) / current_price
-                
-                # Calculate late period returns (periods 6-15)
-                late_prices = data['close'].iloc[i+early_window:i+window_size+1]
-                late_max_return = (late_prices.max() - current_price) / current_price
-                late_min_return = (late_prices.min() - current_price) / current_price
-                
-                # Calculate full window returns
-                future_prices = data['close'].iloc[i:i+window_size+1]
-                full_max_return = (future_prices.max() - current_price) / current_price
-                full_min_return = (future_prices.min() - current_price) / current_price
-                
-                # Time-based classification logic
-                if early_max_return >= price_threshold:
-                    future_returns.append(2)  # Early Up signal
-                elif early_min_return <= -price_threshold:
-                    future_returns.append(0)  # Early Down signal
-                elif late_max_return >= price_threshold:
-                    future_returns.append(1)  # Late Up signal (hold)
-                elif late_min_return <= -price_threshold:
-                    future_returns.append(1)  # Late Down signal (hold)
-                elif full_max_return >= price_threshold * moderate_threshold_ratio:
-                    future_returns.append(1)  # Hold signal (moderate movement)
-                elif full_min_return <= -price_threshold * moderate_threshold_ratio:
-                    future_returns.append(1)  # Hold signal (moderate movement)
-                else:
-                    future_returns.append(1)  # No significant movement (hold)
+            current_price = data['close'].iloc[i]
+            
+            # Check for a long signal within the lookahead window
+            future_prices = data_padded['close'].iloc[i+1 : i+1+lookahead_window]
+            
+            long_profit_level = current_price * (1 + profit_target_pct)
+            long_stop_loss_level = current_price * (1 - stop_loss_pct)
+            short_profit_level = current_price * (1 - profit_target_pct)
+            short_stop_loss_level = current_price * (1 + stop_loss_pct)
+
+            # Check if profit target is hit before stop-loss for a long trade
+            if (future_prices >= long_profit_level).any():
+                if not (future_prices <= long_stop_loss_level).any():
+                    targets.append(2)  # Class 2: Long Signal
+                    continue
+
+            # Check if profit target is hit before stop-loss for a short trade
+            if (future_prices <= short_profit_level).any():
+                if not (future_prices >= short_stop_loss_level).any():
+                    targets.append(0)  # Class 0: Short Signal
+                    continue
+            
+            targets.append(1)  # Class 1: Hold (if neither a profit nor stop-loss condition is met)
         
-        return np.array(future_returns)
+        # Ensure targets and data have the same length
+        targets.extend([1] * (len(data) - len(targets)))
+        
+        return np.array(targets)
     
     def prepare_period_data(self, start_date: datetime, end_date: datetime, config: XGBoostHyperoptConfig):
         """Prepare data for a specific time period"""
@@ -276,6 +286,7 @@ class XGBoostWalkForwardOptimizer:
             
             if optimized_params:
                 config = XGBoostHyperoptConfig(**optimized_params)
+                self.optimized_hyperparameters = optimized_params  # Store for summary report
                 self.logger.info("Using optimized hyperparameters")
             else:
                 config = XGBoostHyperoptConfig()
@@ -551,6 +562,52 @@ class XGBoostWalkForwardOptimizer:
             self.logger.info(f"Success rate: {successful_periods/len(splits)*100:.1f}%")
         self.logger.info(f"Total time: {total_time/60:.1f} minutes")
         
+        # Configuration Summary
+        self.logger.info(f"\n🔧 CONFIGURATION SUMMARY:")
+        if hasattr(self, 'config_file_used') and self.config_file_used:
+            self.logger.info(f"📄 Config file used: {self.config_file_used}")
+            # Display the actual hyperparameter values used
+            if hasattr(self, 'optimized_hyperparameters') and self.optimized_hyperparameters:
+                self.logger.info(f"\n📊 HYPERPARAMETER VALUES USED:")
+                self.logger.info(f"{'='*50}")
+                
+                # Group parameters by category for better readability
+                xgb_params = {}
+                other_params = {}
+                
+                for key, value in self.optimized_hyperparameters.items():
+                    if key.startswith(('n_estimators', 'max_depth', 'learning_rate', 'subsample', 
+                                     'colsample_bytree', 'min_child_weight', 'gamma', 'reg_alpha', 
+                                     'reg_lambda', 'scale_pos_weight')):
+                        xgb_params[key] = value
+                    else:
+                        other_params[key] = value
+                
+                # Display XGBoost core parameters
+                if xgb_params:
+                    self.logger.info(f"🎯 XGBoost Core Parameters:")
+                    for key, value in sorted(xgb_params.items()):
+                        if isinstance(value, float):
+                            self.logger.info(f"  {key:<20}: {value:.6f}")
+                        else:
+                            self.logger.info(f"  {key:<20}: {value}")
+                
+                # Display other parameters (SMOTE, focal loss, etc.)
+                if other_params:
+                    self.logger.info(f"\n🔧 Other Configuration Parameters:")
+                    for key, value in sorted(other_params.items()):
+                        if isinstance(value, float):
+                            self.logger.info(f"  {key:<20}: {value:.6f}")
+                        else:
+                            self.logger.info(f"  {key:<20}: {value}")
+                
+                self.logger.info(f"{'='*50}")
+                self.logger.info(f"📈 Total parameters loaded: {len(self.optimized_hyperparameters)}")
+            else:
+                self.logger.info(f"⚠️  No hyperparameter values available to display")
+        else:
+            self.logger.info(f"❌ No config file was used (used default parameters)")
+        
         return self.results
     
     def generate_summary_report(self):
@@ -645,11 +702,22 @@ class XGBoostWalkForwardOptimizer:
         print(f"  📉 Worst Max Drawdown: {summary['worst_max_drawdown']:.4f}")
         
         # Print focal loss information if available
-        if 'focal_loss_enabled' in summary and summary['focal_loss_enabled']:
+        focal_loss_enabled = False
+        if hasattr(self, 'optimized_hyperparameters') and self.optimized_hyperparameters:
+            focal_loss_enabled = self.optimized_hyperparameters.get('use_focal_loss', False)
+        
+        if focal_loss_enabled:
             print(f"\n🔧 FOCAL LOSS CONFIGURATION:")
-            print(f"  Alpha: {summary['focal_alpha']:.4f}")
-            print(f"  Gamma: {summary['focal_gamma']:.4f}")
-            print(f"  Class Multipliers: [0: {summary['class_multipliers']['class_0']:.4f}, 1: {summary['class_multipliers']['class_1']:.4f}, 2: {summary['class_multipliers']['class_2']:.4f}]")
+            focal_alpha = self.optimized_hyperparameters.get('focal_alpha', 'N/A')
+            focal_gamma = self.optimized_hyperparameters.get('focal_gamma', 'N/A')
+            class_mult_0 = self.optimized_hyperparameters.get('class_multiplier_0', 'N/A')
+            class_mult_1 = self.optimized_hyperparameters.get('class_multiplier_1', 'N/A')
+            class_mult_2 = self.optimized_hyperparameters.get('class_multiplier_2', 'N/A')
+            
+            print(f"  ✅ FOCAL LOSS ENABLED")
+            print(f"  Alpha: {focal_alpha}")
+            print(f"  Gamma: {focal_gamma}")
+            print(f"  Class Multipliers: [DOWN: {class_mult_0}, HOLD: {class_mult_1}, UP: {class_mult_2}]")
         else:
             print(f"\n🔧 Loss Function: Standard Cross-Entropy")
         
@@ -752,7 +820,7 @@ class XGBoostWalkForwardOptimizer:
         # Trading parameters (same as hyperopt runner)
         position_size = 0.04  # 4% of account balance
         leverage = 50  # 50x leverage
-        stop_loss = 0.01  # 0.8% stop loss
+        stop_loss = 0.015  # 1.5% stop loss (Hardcoded to match target definition)
         trading_fee = 0.0002  # 0.02% per trade
         max_hold_hours = 24  # Max 24 hours hold time
         

@@ -32,10 +32,8 @@ class XGBoostHyperoptConfig:
     probability_threshold: float = 0.6
     price_threshold: float = 0.01  # 1% movement threshold
     
-    # Time-based classification parameters
-    early_window: int = 5  # First 5 periods for early signals
-    late_window: int = 10  # Last 10 periods for late signals
-    moderate_threshold_ratio: float = 0.5  # Ratio for moderate movements
+    # Unbiased target parameters
+    lookahead_window: int = 15  # Configurable lookahead window for unbiased target creation
     
     # Memory management
     max_memory_usage: float = 0.8
